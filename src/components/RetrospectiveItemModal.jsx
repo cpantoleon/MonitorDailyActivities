@@ -106,7 +106,7 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
             </div>
             <div className="form-group">
               <label htmlFor="retro-item-date">Date:</label>
-              <DatePicker id="retro-item-date" name="item_date" selected={formData.item_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" placeholderText="Select a date" />
+              <DatePicker id="retro-item-date" name="item_date" selected={formData.item_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" placeholderText="Select a date" popperPlacement="top-start" />
             </div>
             <div className="modal-actions">
               <button type="submit" className="modal-button-save">{item ? 'Save Changes' : 'Add Item'}</button>

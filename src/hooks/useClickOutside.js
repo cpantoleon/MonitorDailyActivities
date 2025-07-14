@@ -5,7 +5,9 @@ const useClickOutside = (handler) => {
 
   useEffect(() => {
     const maybeHandler = (event) => {
-      if (domNode.current && !domNode.current.contains(event.target)) {
+      const isClickInsideDatePicker = event.target.closest('.react-datepicker-popper');
+      
+      if (domNode.current && !domNode.current.contains(event.target) && !isClickInsideDatePicker) {
         handler();
       }
     };

@@ -5,7 +5,7 @@ import React from 'react';
 const ProjectSelector = ({ projects, selectedProject, onSelectProject }) => {
   return (
     <div className="selection-group">
-      <span className="dropdown-label">Project Selection</span>
+      <label htmlFor="project-selector" className="dropdown-label">Project Selection</label>
       <select
         id="project-selector"
         name="project-selector"

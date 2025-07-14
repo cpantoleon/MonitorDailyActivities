@@ -494,11 +494,19 @@ function App() {
   }, [selectedProject, allProcessedRequirements, selectedSprint]);
 
   useEffect(() => {
-    if (isSearching) return;
-    if (selectedProject && selectedSprint && allProcessedRequirements.length > 0) {
-      setDisplayableRequirements(allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint));
-    } else { setDisplayableRequirements([]); }
-  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching]);
+    let reqs = [];
+    if (isSearching && requirementQuery) {
+        const lowerCaseQuery = requirementQuery.toLowerCase();
+        reqs = allProcessedRequirements.filter(req =>
+            req.requirementUserIdentifier.toLowerCase().includes(lowerCaseQuery)
+        );
+    } else if (!isSearching && selectedProject && selectedSprint) {
+        reqs = allProcessedRequirements.filter(req => 
+            req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint
+        );
+    }
+    setDisplayableRequirements(reqs);
+  }, [allProcessedRequirements, isSearching, requirementQuery, selectedProject, selectedSprint]);
 
   const handleShowHistory = useCallback((requirementGroup) => {
     setRequirementForHistory(requirementGroup); setIsHistoryModalOpen(true);

@@ -253,7 +253,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
             </div>
             <div className="form-group">
               <label htmlFor="defect-created-date">Date Logged:</label>
-              <DatePicker id="defect-created-date" name="created_date" selected={formData.created_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" />
+              <DatePicker id="defect-created-date" name="created_date" selected={formData.created_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" popperPlacement="top-start" />
             </div>
             <div className="form-group">
               <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>

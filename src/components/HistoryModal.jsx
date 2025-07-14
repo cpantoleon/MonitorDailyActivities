@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
-
-const formatDateForInputInternal = (dateObj) => {
-    if (!dateObj) return '';
-    const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().split('T')[0];
-};
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 const formatDateForDisplayInternal = (dateObj) => {
     if (!dateObj) return 'N/A';
@@ -18,7 +13,7 @@ const formatDateForDisplayInternal = (dateObj) => {
 
 const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBaseUrl }) => {
   const [editingEntryId, setEditingEntryId] = useState(null);
-  const [editFormDate, setEditFormDate] = useState('');
+  const [editFormDate, setEditFormDate] = useState(null);
   const [editFormComment, setEditFormComment] = useState('');
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const commentInputRef = useRef(null);
@@ -30,14 +25,14 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
   useEffect(() => {
     if (!isOpen) {
       setEditingEntryId(null);
-      setEditFormDate('');
+      setEditFormDate(null);
       setEditFormComment('');
       setModalForRequirementId(null);
       setChangeHistory([]);
       setIsLoadingChanges(false);
     } else if (requirement && (requirement.id !== modalForRequirementId || !modalForRequirementId)) {
       setEditingEntryId(null);
-      setEditFormDate('');
+      setEditFormDate(null);
       setEditFormComment('');
       setModalForRequirementId(requirement.id);
       
@@ -83,17 +78,18 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
 
   const handleStartEdit = (historyEntry) => {
     setEditingEntryId(historyEntry.id);
-    setEditFormDate(formatDateForInputInternal(historyEntry.date));
+    setEditFormDate(historyEntry.date);
     setEditFormComment(historyEntry.comment || '');
   };
 
   const handleSaveEdit = (originalHistoryEntry) => {
     if (!editingEntryId || editingEntryId !== originalHistoryEntry.id) return;
-    if (!editFormDate) { alert("Date cannot be empty."); return; }
-    const newDate = new Date(editFormDate + 'T00:00:00Z');
-    if (isNaN(newDate.getTime())) { alert("Invalid date entered."); return; }
+    if (!editFormDate || !(editFormDate instanceof Date) || isNaN(editFormDate.getTime())) {
+      alert("A valid date is required.");
+      return;
+    }
 
-    onSaveHistoryEntry(requirement.id, originalHistoryEntry.activityId, newDate, editFormComment);
+    onSaveHistoryEntry(requirement.id, originalHistoryEntry.activityId, editFormDate, editFormComment);
     setEditingEntryId(null);
   };
 
@@ -121,16 +117,26 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
                     <td>{entry.status}</td>
                     <td>
                       {isEditingThisRow ? (
-                        <input type="date" id={`history-date-${entry.id}`} name={`history-date-${entry.id}`} value={editFormDate} onChange={e => setEditFormDate(e.target.value)} />
+                        <DatePicker
+                          selected={editFormDate}
+                          onChange={date => setEditFormDate(date)}
+                          dateFormat="MM/dd/yyyy"
+                          className="notes-datepicker"
+                          wrapperClassName="date-picker-wrapper"
+                          popperPlacement="top-start"
+                          portalId="root" 
+                        />
                       ) : ( formatDateForDisplayInternal(entry.date) )}
                     </td>
-                    <td>{entry.sprint || 'N/A'}</td>
+                    {/* FIX 2: Added style to prevent wrapping */}
+                    <td style={{ whiteSpace: 'nowrap' }}>{entry.sprint || 'N/A'}</td>
                     <td>
                       {isEditingThisRow ? (
                         <input ref={commentInputRef} type="text" id={`history-comment-${entry.id}`} name={`history-comment-${entry.id}`} value={editFormComment} onChange={e => setEditFormComment(e.target.value)} placeholder="Enter comment" />
                       ) : ( entry.comment || 'N/A' )}
                     </td>
-                    <td>
+                    {/* FIX 3: Added style to prevent wrapping */}
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       {isEditingThisRow ? (
                         <><button onClick={() => handleSaveEdit(entry)}>Save</button><button onClick={handleCancelEdit}>Cancel</button></>
                       ) : ( entry.activityId ? 

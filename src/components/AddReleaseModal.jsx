@@ -100,7 +100,16 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
             </div>
             <div className="form-group">
               <label htmlFor="release-date">Release Date:</label>
-              <DatePicker id="release-date" name="release_date" selected={formData.release_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" />
+              <DatePicker 
+                id="release-date" 
+                name="release_date" 
+                selected={formData.release_date} 
+                onChange={handleDateChange} 
+                dateFormat="MM/dd/yyyy" 
+                className="notes-datepicker" 
+                wrapperClassName="date-picker-wrapper" 
+                popperPlacement="top-start" 
+              />
             </div>
             <div className="form-group new-project-toggle">
               <input type="checkbox" id="release-is-current" name="is_current" checked={formData.is_current} onChange={handleChange} />
