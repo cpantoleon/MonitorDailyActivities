@@ -40,24 +40,49 @@ const processExcelData = (fileBuffer) => {
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet, { defval: "" });
 
+    let keyColumn = null;
+    const range = xlsx.utils.decode_range(worksheet['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const address = xlsx.utils.encode_cell({ r: 0, c: C });
+        const cell = worksheet[address];
+        if (cell && cell.v === 'Key') {
+            keyColumn = xlsx.utils.encode_col(C);
+            break;
+        }
+    }
+
     const results = {
         validRows: [],
         skippedCount: 0,
     };
 
-    data.forEach(row => {
+    data.forEach((row, index) => {
         const summary = row['Summary'] ? String(row['Summary']).trim() : '';
         if (!summary) return;
+
         const type = row['T'] ? String(row['T']).trim() : '';
         if (!validTypes.includes(type)) {
             results.skippedCount++;
             return;
         }
+
         const linkRegex = /\[(.*?)\]/;
         const title = summary.replace(linkRegex, '').trim();
         const key = row['Key'] ? String(row['Key']).trim() : '';
         const tags = row['Sprint'] ? String(row['Sprint']).trim() : null;
-        const link = key ? `https://jira.example.com/browse/${key}` : null;
+        
+        let link = null;
+        if (keyColumn) {
+
+            const excelRowNumber = index + 2; 
+            const keyCellAddress = `${keyColumn}${excelRowNumber}`;
+            const keyCell = worksheet[keyCellAddress];
+
+            if (keyCell && keyCell.l) {
+                link = keyCell.l.Target;
+            }
+        }
+
         results.validRows.push({ title, type, tags, link, key });
     });
     return results;
@@ -69,12 +94,23 @@ const processDefectExcelData = (fileBuffer) => {
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet, { defval: "" });
 
+    let keyColumn = null;
+    const range = xlsx.utils.decode_range(worksheet['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const address = xlsx.utils.encode_cell({ r: 0, c: C });
+        const cell = worksheet[address];
+        if (cell && cell.v === 'Key') {
+            keyColumn = xlsx.utils.encode_col(C);
+            break;
+        }
+    }
+
     const results = {
         validRows: [],
         skippedCount: 0,
     };
 
-    data.forEach(row => {
+    data.forEach((row, index) => {
         const type = row['T'] ? String(row['T']).trim() : '';
         if (type !== 'Defect') {
             results.skippedCount++;
@@ -86,16 +122,22 @@ const processDefectExcelData = (fileBuffer) => {
             results.skippedCount++;
             return;
         }
+        let link = null;
+        if (keyColumn) {
+            const excelRowNumber = index + 2; 
+            const keyCellAddress = `${keyColumn}${excelRowNumber}`;
+            const keyCell = worksheet[keyCellAddress];
 
-        const key = row['Key'] ? String(row['Key']).trim() : '';
-        const link = key ? `https://jira.example.com/browse/${key}` : null;
+            if (keyCell && keyCell.l) {
+                link = keyCell.l.Target;
+            }
+        }
 
         results.validRows.push({ title, link });
     });
 
     return results;
 };
-
 
 app.get("/api/projects", (req, res) => {
     const sql = "SELECT name FROM projects ORDER BY name ASC";
@@ -776,11 +818,13 @@ app.post("/api/releases", async (req, res) => {
         const projectId = await getProjectId(project);
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
+
             if (is_current) {
                 db.run(`UPDATE releases SET is_current = 0 WHERE project_id = ?`, [projectId]);
             }
-            const sql = `INSERT INTO releases (project_id, name, release_date, is_current) VALUES (?, ?, ?, ?)`;
-            db.run(sql, [projectId, name, release_date, is_current ? 1 : 0], function(err) {
+
+            const releaseSql = `INSERT INTO releases (project_id, name, release_date, is_current) VALUES (?, ?, ?, ?)`;
+            db.run(releaseSql, [projectId, name, release_date, is_current ? 1 : 0], function(err) {
                 if (err) {
                     db.run("ROLLBACK");
                     if (err.message.includes("UNIQUE constraint failed")) {
@@ -789,9 +833,19 @@ app.post("/api/releases", async (req, res) => {
                     return res.status(400).json({ "error": err.message });
                 }
                 const newId = this.lastID;
-                db.run("COMMIT", (commitErr) => {
-                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
-                    res.status(201).json({ message: "Release created successfully", data: { id: newId, project, name, release_date, is_current } });
+
+                const noteText = `release date: ${name}`;
+                const noteSql = `INSERT INTO notes (project_id, noteDate, noteText) VALUES (?, ?, ?)
+                                 ON CONFLICT(project_id, noteDate) DO UPDATE SET noteText = noteText || char(10) || excluded.noteText;`;
+                db.run(noteSql, [projectId, release_date, noteText], (noteErr) => {
+                    if (noteErr) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ "error": "Failed to create release note: " + noteErr.message });
+                    }
+                    db.run("COMMIT", (commitErr) => {
+                        if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                        res.status(201).json({ message: "Release created successfully", data: { id: newId, project, name, release_date, is_current } });
+                    });
                 });
             });
         });
@@ -800,50 +854,126 @@ app.post("/api/releases", async (req, res) => {
     }
 });
 
-app.put("/api/releases/:id", async (req, res) => {
+app.put("/api/releases/:id", (req, res) => {
     const releaseId = req.params.id;
     const { name, release_date, is_current, project } = req.body;
     if (!name || !release_date || !project) {
         return res.status(400).json({ error: "Name, release date, and project are required for update." });
     }
-    try {
-        const projectId = await getProjectId(project);
+
+    db.get("SELECT project_id, name, release_date FROM releases WHERE id = ?", [releaseId], (getErr, oldRelease) => {
+        if (getErr) return res.status(500).json({ "error": "DB error fetching old release data." });
+        if (!oldRelease) return res.status(404).json({ error: `Release with id ${releaseId} not found.` });
+
+        const dateChanged = oldRelease.release_date !== release_date;
+        const nameChanged = oldRelease.name !== name;
+
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
+
             if (is_current) {
-                db.run(`UPDATE releases SET is_current = 0 WHERE project_id = ? AND id != ?`, [projectId, releaseId]);
+                db.run(`UPDATE releases SET is_current = 0 WHERE project_id = ? AND id != ?`, [oldRelease.project_id, releaseId]);
             }
-            const sql = `UPDATE releases SET name = ?, release_date = ?, is_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-            db.run(sql, [name, release_date, is_current ? 1 : 0, releaseId], function(err) {
-                if (err) {
+
+            const updateReleaseSql = `UPDATE releases SET name = ?, release_date = ?, is_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+            db.run(updateReleaseSql, [name, release_date, is_current ? 1 : 0, releaseId], function(updateErr) {
+                if (updateErr) {
                     db.run("ROLLBACK");
-                    if (err.message.includes("UNIQUE constraint failed")) {
+                    if (updateErr.message.includes("UNIQUE constraint failed")) {
                         return res.status(409).json({ "error": `A release named '${name}' already exists for project '${project}'.` });
                     }
-                    return res.status(400).json({ "error": err.message });
+                    return res.status(400).json({ "error": updateErr.message });
                 }
                 if (this.changes === 0) {
                     db.run("ROLLBACK");
                     return res.status(404).json({ error: `Release with id ${releaseId} not found.` });
                 }
-                db.run("COMMIT", (commitErr) => {
-                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
-                    res.json({ message: "Release updated successfully", data: { id: releaseId, changes: this.changes } });
-                });
+
+                const handleNoteLogic = () => {
+                    const oldNoteText = `release date: ${oldRelease.name}`;
+                    db.get(`SELECT noteText FROM notes WHERE project_id = ? AND noteDate = ?`, [oldRelease.project_id, oldRelease.release_date], (getOldNoteErr, oldNoteRow) => {
+                        if (getOldNoteErr) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ "error": "DB error getting old note: " + getOldNoteErr.message });
+                        }
+
+                        const cleanupCallback = (cleanupErr) => {
+                            if (cleanupErr) {
+                                db.run("ROLLBACK");
+                                return res.status(500).json({ "error": "DB error cleaning up old note: " + cleanupErr.message });
+                            }
+                            const newNoteText = `release date: ${name}`;
+                            const upsertNewNoteSql = `INSERT INTO notes (project_id, noteDate, noteText) VALUES (?, ?, ?) ON CONFLICT(project_id, noteDate) DO UPDATE SET noteText = noteText || char(10) || excluded.noteText;`;
+                            db.run(upsertNewNoteSql, [oldRelease.project_id, release_date, newNoteText], (upsertErr) => {
+                                if (upsertErr) {
+                                    db.run("ROLLBACK");
+                                    return res.status(500).json({ "error": "DB error creating new note: " + upsertErr.message });
+                                }
+                                db.run("COMMIT", (commitErr) => {
+                                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                                    res.json({ message: "Release updated successfully" });
+                                });
+                            });
+                        };
+
+                        if (oldNoteRow) {
+                            const newNoteContent = oldNoteRow.noteText.split('\n').filter(line => line.trim() !== oldNoteText.trim()).join('\n');
+                            if (newNoteContent.trim() === '') {
+                                db.run(`DELETE FROM notes WHERE project_id = ? AND noteDate = ?`, [oldRelease.project_id, oldRelease.release_date], cleanupCallback);
+                            } else {
+                                db.run(`UPDATE notes SET noteText = ? WHERE project_id = ? AND noteDate = ?`, [newNoteContent, oldRelease.project_id, oldRelease.release_date], cleanupCallback);
+                            }
+                        } else {
+                            cleanupCallback(null);
+                        }
+                    });
+                };
+
+                if (dateChanged || nameChanged) {
+                    handleNoteLogic();
+                } else {
+                    db.run("COMMIT", (commitErr) => {
+                        if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                        res.json({ message: "Release updated successfully" });
+                    });
+                }
             });
         });
-    } catch (error) {
-        return res.status(400).json({ error: error.message });
-    }
+    });
 });
 
 app.delete("/api/releases/:id", (req, res) => {
     const releaseId = req.params.id;
-    const sql = 'DELETE FROM releases WHERE id = ?';
-    db.run(sql, releaseId, function (err) {
-        if (err) return res.status(400).json({ "error": err.message });
-        if (this.changes === 0) return res.status(404).json({ error: `Release with id ${releaseId} not found.`});
-        res.json({ message: "Release deleted successfully", changes: this.changes });
+    db.get("SELECT project_id, name, release_date FROM releases WHERE id = ?", [releaseId], (getErr, releaseToDelete) => {
+        if (getErr) return res.status(500).json({ "error": "DB error fetching release data for deletion." });
+        if (!releaseToDelete) return res.status(404).json({ error: `Release with id ${releaseId} not found.` });
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            
+            db.run('DELETE FROM releases WHERE id = ?', releaseId, function(deleteErr) {
+                if (deleteErr) { db.run("ROLLBACK"); return res.status(400).json({ "error": deleteErr.message }); }
+                if (this.changes === 0) { db.run("ROLLBACK"); return res.status(404).json({ error: `Release with id ${releaseId} not found.` }); }
+
+                const noteTextToRemove = `release date: ${releaseToDelete.name}`;
+                db.get(`SELECT noteText FROM notes WHERE project_id = ? AND noteDate = ?`, [releaseToDelete.project_id, releaseToDelete.release_date], (getNoteErr, noteRow) => {
+                    if (getNoteErr) { db.run("ROLLBACK"); return res.status(500).json({ "error": "DB error handling note on release deletion." }); }
+                    if (noteRow) {
+                        const newNoteContent = noteRow.noteText.split('\n').filter(line => line.trim() !== noteTextToRemove.trim()).join('\n');
+                        if (newNoteContent.trim() === '') {
+                            db.run(`DELETE FROM notes WHERE project_id = ? AND noteDate = ?`, [releaseToDelete.project_id, releaseToDelete.release_date]);
+                        } else {
+                            db.run(`UPDATE notes SET noteText = ? WHERE project_id = ? AND noteDate = ?`, [newNoteContent, releaseToDelete.project_id, releaseToDelete.release_date]);
+                        }
+                    }
+                });
+
+                db.run("COMMIT", (commitErr) => {
+                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                    res.json({ message: "Release deleted successfully", changes: this.changes });
+                });
+            });
+        });
     });
 });
 
