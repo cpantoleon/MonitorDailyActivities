@@ -131,6 +131,16 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating defect_requirement_links table", err.message);
             });
 
+            db.run(`CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )`, (err) => {
+                if (err) console.error("Error creating app_settings table", err.message);
+                else {
+                    db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['weather_location', 'Marousi, Athens']);
+                }
+            });
+
             console.log("All table checks/creations complete.");
         });
     }

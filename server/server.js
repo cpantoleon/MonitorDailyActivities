@@ -173,6 +173,34 @@ app.delete("/api/projects/:name", (req, res) => {
     });
 });
 
+app.put("/api/projects/:name", (req, res) => {
+    const currentName = decodeURIComponent(req.params.name);
+    const { newName } = req.body;
+
+    if (!newName || !newName.trim()) {
+        return res.status(400).json({ error: "New project name is required." });
+    }
+
+    const trimmedNewName = newName.trim();
+    const sql = 'UPDATE projects SET name = ? WHERE name = ?';
+
+    db.run(sql, [trimmedNewName, currentName], function(err) {
+        if (err) {
+            if (err.message.includes("UNIQUE constraint failed")) {
+                return res.status(409).json({ "error": `A project named '${trimmedNewName}' already exists.` });
+            }
+            return res.status(500).json({ error: `Failed to rename project: ${err.message}` });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: `Project '${currentName}' not found.` });
+        }
+        res.json({ 
+            message: `Project '${currentName}' was successfully renamed to '${trimmedNewName}'.`,
+            data: { oldName: currentName, newName: trimmedNewName }
+        });
+    });
+});
+
 app.get("/api/requirements", (req, res) => {
     const activitiesSql = `SELECT
                     act.id as activityDbId, act.requirementGroupId, p.name as project,
@@ -1243,6 +1271,29 @@ app.delete("/api/defects/:id", (req, res) => {
         if (err) return res.status(400).json({ "error": err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Defect with id ${defectId} not found.`});
         res.json({ message: "Defect deleted successfully", changes: this.changes });
+    });
+});
+
+app.get("/api/settings/weather-location", (req, res) => {
+    const sql = "SELECT value FROM app_settings WHERE key = 'weather_location'";
+    db.get(sql, [], (err, row) => {
+        if (err) return res.status(500).json({ "error": err.message });
+        res.json({ location: row ? row.value : 'Marousi, Athens' });
+    });
+});
+
+app.post("/api/settings/weather-location", (req, res) => {
+    const { location } = req.body;
+    if (!location || location.trim() === '') {
+        return res.status(400).json({ error: "Location cannot be empty." });
+    }
+    const sql = `INSERT INTO app_settings (key, value) VALUES ('weather_location', ?)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value;`;
+    db.run(sql, [location.trim()], function(err) {
+        if (err) {
+            return res.status(500).json({ "error": err.message });
+        }
+        res.json({ message: "Location saved successfully.", location: location.trim() });
     });
 });
 
