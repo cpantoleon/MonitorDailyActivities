@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -65,13 +65,8 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
     onImport(formState.selectedFile, formState.targetProject);
   };
 
-  const handleProjectChange = (selectedOption) => {
-    setFormState(prev => ({...prev, targetProject: selectedOption ? selectedOption.value : ''}));
-  };
-
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  const handleProjectChange = (e) => {
+    setFormState(prev => ({...prev, targetProject: e.target.value }));
   };
 
   const tooltipContent = (
@@ -108,17 +103,14 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
             <input type="file" id="importDefectFile" name="importDefectFile" accept=".xlsx, .xls" onChange={handleFileChange} />
           </div>
           <div className="form-group">
-            <label htmlFor="importDefectProject">Target Project:</label>
-            <Select
-              inputId="importDefectProject"
-              name="importDefectProject"
-              value={projectOptions.find(opt => opt.value === formState.targetProject)}
+            <label id="importDefectProject-label" htmlFor="importDefectProject-button">Target Project:</label>
+            <CustomDropdown
+              id="importDefectProject"
+              name="targetProject"
+              value={formState.targetProject}
               onChange={handleProjectChange}
               options={projectOptions}
-              styles={customSelectStyles}
-              menuPortalTarget={document.body}
               placeholder="-- Select a Project --"
-              required
             />
           </div>
           <div className="modal-actions">

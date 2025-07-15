@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Select from 'react-select';
 import DatePicker from 'react-datepicker';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -43,10 +43,6 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
   
   const modalRef = useClickOutside(handleCloseRequest);
 
-  const handleSelectChange = (selectedOption) => {
-    setFormData(prev => ({ ...prev, project: selectedOption ? selectedOption.value : '' }));
-  };
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -71,9 +67,6 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
   if (!isOpen) return null;
 
   const projectOptions = projects.map(p => ({ value: p, label: p }));
-  const customSelectStyles = {
-    menuPortal: base => ({ ...base, zIndex: 9999 })
-  };
 
   return (
     <>
@@ -82,16 +75,14 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
           <h2>Add New Release</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="release-project">Project:</label>
-              <Select
-                inputId="release-project"
+              <label id="release-project-label" htmlFor="release-project-button">Project:</label>
+              <CustomDropdown
+                id="release-project"
                 name="project"
-                value={projectOptions.find(opt => opt.value === formData.project)}
-                onChange={handleSelectChange}
+                value={formData.project}
+                onChange={handleChange}
                 options={projectOptions}
-                styles={customSelectStyles}
-                menuPortalTarget={document.body}
-                required
+                placeholder="-- Select Project --"
               />
             </div>
             <div className="form-group">

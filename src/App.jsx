@@ -12,6 +12,7 @@ import EditRequirementModal from './components/EditRequirementModal';
 import ImportRequirementsModal from './components/ImportRequirementsModal';
 import AddReleaseModal from './components/AddReleaseModal';
 import EditReleaseModal from './components/EditReleaseModal';
+import EditProjectModal from './components/EditProjectModal';
 import NotesPage from './pages/NotesPage';
 import DefectsPage from './pages/DefectsPage';
 import SprintAnalysisPage from './pages/SprintAnalysisPage';
@@ -27,7 +28,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, Title, BarElement, CategoryScale, 
 
 const API_BASE_URL = '/api';
 
-const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenAddReleaseModal, onOpenEditReleaseModal, onDeleteProjectRequest, selectedProject, hasProjects, hasAnyReleases }) => {
+const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenAddReleaseModal, onOpenEditReleaseModal, onOpenEditProjectModal, hasProjects, hasAnyReleases }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -60,6 +61,9 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
           <button onClick={createHandler(onOpenAddProjectModal)} className="options-menu-item">
             + Add Project
           </button>
+          <button onClick={createHandler(onOpenEditProjectModal)} className="options-menu-item" disabled={!hasProjects}>
+            +/- Edit/Delete Project
+          </button>
           <button onClick={createHandler(onOpenAddModal)} className="options-menu-item">
             + Add Requirement
           </button>
@@ -71,14 +75,6 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
           </button>
           <button onClick={createHandler(onOpenImportModal)} className="options-menu-item">
             + Import Data
-          </button>
-          <button 
-            onClick={createHandler(onDeleteProjectRequest)} 
-            className="options-menu-item danger" 
-            disabled={!selectedProject}
-            title={!selectedProject ? "Select a project to enable deletion" : `Delete project: ${selectedProject}`}
-          >
-            - Delete Project
           </button>
         </div>
       )}
@@ -105,7 +101,7 @@ const SprintActivitiesPage = ({
   onOpenImportModal,
   onOpenAddReleaseModal,
   onOpenEditReleaseModal,
-  onDeleteProjectRequest,
+  onOpenEditProjectModal,
   isSearching,
   displayableRequirements,
   onShowHistory,
@@ -276,7 +272,7 @@ const SprintActivitiesPage = ({
             onOpenImportModal={onOpenImportModal}
             onOpenAddReleaseModal={onOpenAddReleaseModal}
             onOpenEditReleaseModal={onOpenEditReleaseModal}
-            onDeleteProjectRequest={onDeleteProjectRequest}
+            onOpenEditProjectModal={onOpenEditProjectModal}
             selectedProject={selectedProject}
             hasProjects={projects.length > 0}
             hasAnyReleases={hasAnyReleases}
@@ -350,6 +346,7 @@ function App() {
   });
 
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [toastInfo, setToastInfo] = useState({ message: null, type: 'success', key: null });
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
@@ -494,19 +491,11 @@ function App() {
   }, [selectedProject, allProcessedRequirements, selectedSprint]);
 
   useEffect(() => {
-    let reqs = [];
-    if (isSearching && requirementQuery) {
-        const lowerCaseQuery = requirementQuery.toLowerCase();
-        reqs = allProcessedRequirements.filter(req =>
-            req.requirementUserIdentifier.toLowerCase().includes(lowerCaseQuery)
-        );
-    } else if (!isSearching && selectedProject && selectedSprint) {
-        reqs = allProcessedRequirements.filter(req => 
-            req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint
-        );
-    }
-    setDisplayableRequirements(reqs);
-  }, [allProcessedRequirements, isSearching, requirementQuery, selectedProject, selectedSprint]);
+    if (isSearching) return;
+    if (selectedProject && selectedSprint && allProcessedRequirements.length > 0) {
+      setDisplayableRequirements(allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint));
+    } else { setDisplayableRequirements([]); }
+  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching]);
 
   const handleShowHistory = useCallback((requirementGroup) => {
     setRequirementForHistory(requirementGroup); setIsHistoryModalOpen(true);
@@ -703,6 +692,26 @@ function App() {
     }
   }, [fetchData, showMainMessage, handleCloseAddProjectModal]);
 
+  const handleEditProject = async ({ originalName, newName }) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/projects/${encodeURIComponent(originalName)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newName }),
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to rename project.');
+        }
+        showMainMessage('Project renamed successfully!', 'success');
+        await fetchData();
+        setSelectedProject(newName);
+        setIsEditProjectModalOpen(false);
+    } catch (error) {
+        showMainMessage(`Error: ${error.message}`, 'error');
+    }
+  };
+
   const handleOpenImportModal = useCallback(() => setIsImportModalOpen(true), []);
   const handleCloseImportModal = useCallback(() => {
     setIsImportModalOpen(false);
@@ -808,6 +817,8 @@ function App() {
       setIsEditReleaseModalOpen(false);
       originalReleases = [...allReleases];
       setAllReleases(prevReleases => prevReleases.filter(r => r.id !== currentItem.id));
+    } else if (currentType === 'project') {
+      setIsEditProjectModalOpen(false);
     }
 
     let url, successMessage, errorMessage;
@@ -1079,7 +1090,7 @@ function App() {
               onOpenImportModal={handleOpenImportModal}
               onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}
               onOpenEditReleaseModal={() => setIsEditReleaseModalOpen(true)}
-              onDeleteProjectRequest={() => handleDeleteRequest('project', { name: selectedProject })}
+              onOpenEditProjectModal={() => setIsEditProjectModalOpen(true)}
               isSearching={isSearching}
               displayableRequirements={displayableRequirements}
               onShowHistory={handleShowHistory}
@@ -1102,6 +1113,14 @@ function App() {
       <ImportRequirementsModal isOpen={isImportModalOpen} onClose={handleCloseImportModal} onImport={handleValidateImport} projects={projects} releases={allReleases} currentProject={selectedProject} />
       <AddReleaseModal isOpen={isAddReleaseModalOpen} onClose={() => setIsAddReleaseModalOpen(false)} onAdd={handleAddRelease} projects={projects} currentProject={selectedProject} />
       <EditReleaseModal isOpen={isEditReleaseModalOpen} onClose={() => setIsEditReleaseModalOpen(false)} onSave={handleEditRelease} onDelete={(release) => handleDeleteRequest('release', release)} releases={allReleases} projects={projects} currentProject={selectedProject} />
+      <EditProjectModal 
+        isOpen={isEditProjectModalOpen} 
+        onClose={() => setIsEditProjectModalOpen(false)} 
+        onSave={handleEditProject} 
+        onDelete={(project) => handleDeleteRequest('project', project)} 
+        projects={projects} 
+        currentProject={selectedProject} 
+      />
       <ConfirmationModal isOpen={isImportConfirmModalOpen} onClose={() => setIsImportConfirmModalOpen(false)} onConfirm={handleConfirmImport} title="Confirm Import" message={`The file contains ${importConfirmData?.newCount || 0} new item(s) and ${importConfirmData?.duplicateCount || 0} item(s) that already exist (based on 'Key'). Existing items will be imported with a modified name (e.g., 'Item Name (1)'). Do you want to proceed?`} />
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />

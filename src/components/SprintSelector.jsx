@@ -1,24 +1,26 @@
-// src\components\SprintSelector.jsx
-
 import React from 'react';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 
 const SprintSelector = ({ sprints, selectedSprint, onSelectSprint, disabled }) => {
+  // Convert the simple array of strings into the format our dropdown needs
+  const sprintOptions = sprints.map(s => ({ value: s, label: s }));
+
+  const handleChange = (e) => {
+    onSelectSprint(e.target.value);
+  };
+
   return (
     <div className="selection-group">
-      <span className="dropdown-label">Sprint Selection</span>
-      <select
+      <label id="sprint-selector-label" htmlFor="sprint-selector-button" className="dropdown-label">Sprint Selection</label>
+      <CustomDropdown
         id="sprint-selector"
         name="sprint-selector"
         value={selectedSprint}
-        onChange={(e) => onSelectSprint(e.target.value)}
-        className="main-label"
+        onChange={handleChange}
+        options={sprintOptions}
+        placeholder="-- Select Sprint --"
         disabled={disabled || sprints.length === 0}
-      >
-        <option value="">-- Select Sprint --</option>
-        {sprints.map(sprint => (
-          <option key={sprint} value={sprint}>{sprint}</option>
-        ))}
-      </select>
+      />
     </div>
   );
 };

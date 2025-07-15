@@ -518,6 +518,7 @@ body {
     font-weight: normal;
     color: #5C4033;
     cursor: pointer;
+    -webkit-user-select: none; /* FIX: Added for Safari compatibility */
     user-select: none;
 }
 .add-new-modal-content .new-project-toggle .checkbox-label::after {
@@ -787,6 +788,7 @@ body {
 }
 .legend-title.clickable {
   cursor: pointer;
+  -webkit-user-select: none; /* FIX: Added for Safari compatibility */
   user-select: none;
 }
 .legend-title.clickable:hover {
@@ -1229,6 +1231,7 @@ body {
   color: white;
   font-weight: bold;
   font-size: 15px;
+  -webkit-user-select: none; /* FIX: Added for Safari compatibility */
   user-select: none;
   cursor: help;
 }

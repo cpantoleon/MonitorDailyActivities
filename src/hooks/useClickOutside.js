@@ -6,8 +6,9 @@ const useClickOutside = (handler) => {
   useEffect(() => {
     const maybeHandler = (event) => {
       const isClickInsideDatePicker = event.target.closest('.react-datepicker-popper');
+      const isClickInsideCustomDropdown = event.target.closest('.custom-dropdown-options');
       
-      if (domNode.current && !domNode.current.contains(event.target) && !isClickInsideDatePicker) {
+      if (domNode.current && !domNode.current.contains(event.target) && !isClickInsideDatePicker && !isClickInsideCustomDropdown) {
         handler();
       }
     };

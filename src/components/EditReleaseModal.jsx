@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Select from 'react-select';
 import DatePicker from 'react-datepicker';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -34,19 +34,20 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
       .map(r => ({ value: r.id, label: r.name }));
   }, [selectedModalProject, releases]);
 
-  const handleProjectSelect = (selectedOption) => {
-    setSelectedModalProject(selectedOption ? selectedOption.value : '');
+  const handleProjectSelect = (e) => {
+    setSelectedModalProject(e.target.value);
     setSelectedReleaseId('');
     setFormData(null);
     setInitialFormData(null);
   };
 
-  const handleReleaseSelect = (selectedOption) => {
-    const releaseId = selectedOption ? selectedOption.value : '';
+  const handleReleaseSelect = (e) => {
+    const releaseId = e.target.value;
     setSelectedReleaseId(releaseId);
 
     if (releaseId) {
-      const release = releases.find(r => r.id === releaseId);
+      // FIX: Ensure we compare numbers with numbers.
+      const release = releases.find(r => r.id === Number(releaseId));
       if (release) {
         const data = {
           id: release.id,
@@ -108,39 +109,31 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
 
   if (!isOpen) return null;
 
-  const customSelectStyles = {
-    menuPortal: base => ({ ...base, zIndex: 9999 })
-  };
-
   return (
     <div className="add-new-modal-overlay">
       <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '500px' }}>
         <h2>Edit/Delete Release</h2>
         <div className="form-group">
-          <label htmlFor="project-select-in-modal">Select Project:</label>
-          <Select
-            inputId="project-select-in-modal"
+          <label id="project-select-in-modal-label" htmlFor="project-select-in-modal-button">Select Project:</label>
+          <CustomDropdown
+            id="project-select-in-modal"
             name="project_selector_in_modal"
-            options={projectOptions}
-            value={projectOptions.find(opt => opt.value === selectedModalProject)}
+            value={selectedModalProject}
             onChange={handleProjectSelect}
-            styles={customSelectStyles}
-            menuPortalTarget={document.body}
+            options={projectOptions}
             placeholder="-- Select a Project --"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="release-select">Select Release to Edit:</label>
-          <Select
-            inputId="release-select"
+          <label id="release-select-label" htmlFor="release-select-button">Select Release to Edit:</label>
+          <CustomDropdown
+            id="release-select"
             name="release_selector"
-            value={releaseOptions.find(opt => opt.value === selectedReleaseId) || null}
+            value={selectedReleaseId}
             onChange={handleReleaseSelect}
             options={releaseOptions}
-            styles={customSelectStyles}
-            menuPortalTarget={document.body}
             placeholder="-- Select a Release --"
-            isDisabled={!selectedModalProject || releaseOptions.length === 0}
+            disabled={!selectedModalProject || releaseOptions.length === 0}
           />
         </div>
         

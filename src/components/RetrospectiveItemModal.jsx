@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -61,10 +61,6 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
-  const handleSelectChange = (name, selectedOption) => {
-    setFormData(prev => ({...prev, [name]: selectedOption ? selectedOption.value : '' }));
-  };
 
   const handleDateChange = (date) => {
     if (date) {
@@ -85,11 +81,6 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
 
   if (!isOpen) return null;
 
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  };
-
   return (
     <>
       <div className="add-new-modal-overlay">
@@ -97,8 +88,14 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
           <h2>{item ? 'Edit Retrospective Item' : 'Add Retrospective Item'}</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="retro-column-type">Column:</label>
-              <Select inputId="retro-column-type" name="column_type" value={columnTypes.find(opt => opt.value === formData.column_type)} onChange={(option) => handleSelectChange('column_type', option)} options={columnTypes} styles={customSelectStyles} menuPortalTarget={document.body} required />
+              <label id="retro-column-type-label" htmlFor="retro-column-type-button">Column:</label>
+              <CustomDropdown
+                id="retro-column-type"
+                name="column_type"
+                value={formData.column_type}
+                onChange={handleChange}
+                options={columnTypes}
+              />
             </div>
             <div className="form-group">
               <label htmlFor="retro-description">Description:</label>

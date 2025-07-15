@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -59,10 +59,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
     const val = type === 'checkbox' ? checked : value;
     setFormData(prev => ({ ...prev, [name]: val }));
   };
-  
-  const handleSelectChange = (name, selectedOption) => {
-    setFormData(prev => ({...prev, [name]: selectedOption ? selectedOption.value : '' }));
-  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -86,10 +82,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
   const typeOptions = ['Change Request', 'Task', 'Bug', 'Story'].map(t => ({ value: t, label: t }));
   const releaseOptions = releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }));
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  };
+
   const releaseTooltipContent = (
     <>
       <strong>Assign to a Release</strong>
@@ -108,41 +101,58 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               <input type="text" id="editReqName" name="name" value={formData.name || ''} onChange={handleChange} required />
             </div>
             <div className="form-group">
-              <label htmlFor="editReqType" className="optional-label">Type:</label>
-              <Select inputId="editReqType" name="type" value={typeOptions.find(opt => opt.value === formData.type)} onChange={(option) => handleSelectChange('type', option)} options={typeOptions} styles={customSelectStyles} menuPortalTarget={document.body} placeholder="-- Select Type --" isClearable />
+              <label id="editReqType-label" htmlFor="editReqType-button" className="optional-label">Type:</label>
+              <CustomDropdown
+                id="editReqType"
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+                options={typeOptions}
+                placeholder="-- Select Type --"
+              />
             </div>
             <div className="form-group">
               <label htmlFor="editReqComment" className="optional-label">Current Comment:</label>
               <textarea id="editReqComment" name="comment" value={formData.comment || ''} onChange={handleChange} rows="4" placeholder="Enter a comment for the current status" />
             </div>
             <div className="form-group">
-              <label htmlFor="editReqSprint">Sprint:</label>
-              <Select inputId="editReqSprint" name="sprint" value={sprintNumberOptions.find(opt => opt.value === formData.sprint)} onChange={(option) => handleSelectChange('sprint', option)} options={sprintNumberOptions} isDisabled={formData.isBacklog} styles={customSelectStyles} menuPortalTarget={document.body} />
+              <label id="editReqSprint-label" htmlFor="editReqSprint-button">Sprint:</label>
+              <CustomDropdown
+                id="editReqSprint"
+                name="sprint"
+                value={formData.sprint}
+                onChange={handleChange}
+                options={sprintNumberOptions}
+                disabled={formData.isBacklog}
+              />
             </div>
             <div className="form-group new-project-toggle">
               <input type="checkbox" id="isBacklogCheckboxEdit" name="isBacklog" checked={formData.isBacklog || false} onChange={handleChange} />
               <label htmlFor="isBacklogCheckboxEdit" className="checkbox-label optional-label">Assign to Backlog</label>
             </div>
             <div className="form-group">
-              <label htmlFor="editReqStatus">Status:</label>
-              <Select inputId="editReqStatus" name="status" value={statusOptions.find(opt => opt.value === formData.status)} onChange={(option) => handleSelectChange('status', option)} options={statusOptions} styles={customSelectStyles} menuPortalTarget={document.body} required />
+              <label id="editReqStatus-label" htmlFor="editReqStatus-button">Status:</label>
+              <CustomDropdown
+                id="editReqStatus"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                options={statusOptions}
+              />
             </div>
             <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <label htmlFor="editReqRelease" className="optional-label" style={{marginBottom: 0}}>Release:</label>
+                <label id="editReqRelease-label" htmlFor="editReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
                 <Tooltip content={releaseTooltipContent} className="release" />
               </div>
-              <Select
-                inputId="editReqRelease"
+              <CustomDropdown
+                id="editReqRelease"
                 name="release_id"
-                value={releaseOptions.find(opt => opt.value === formData.release_id)}
-                onChange={(option) => handleSelectChange('release_id', option)}
+                value={formData.release_id}
+                onChange={handleChange}
                 options={releaseOptions}
-                isDisabled={releases.length === 0}
-                styles={customSelectStyles}
-                menuPortalTarget={document.body}
+                disabled={releases.length === 0}
                 placeholder={releases.length === 0 ? "-- No releases for this project --" : "-- Select a Release --"}
-                isClearable={false}
               />
             </div>
             <div className="form-group">

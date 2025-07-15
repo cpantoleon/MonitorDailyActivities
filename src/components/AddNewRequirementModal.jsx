@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -57,15 +57,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     label: `${i + 1}`
   }));
 
-  const handleSelectChange = (name, selectedOption) => {
-    onFormChange({ target: { name, value: selectedOption ? selectedOption.value : '' } });
-  };
-
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  };
-
   const releaseTooltipContent = (
     <>
       <strong>Assign to a Release</strong>
@@ -80,18 +71,15 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
           <h2>Add New Requirement</h2>
           <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
             <div className="form-group">
-              <label htmlFor="newReqProjectSelect">Project:</label>
-              <Select
-                inputId="newReqProjectSelect"
+              <label id="newReqProject-label" htmlFor="newReqProjectSelect-button">Project:</label>
+              <CustomDropdown
+                id="newReqProjectSelect"
                 name="project"
-                value={projectOptions.find(opt => opt.value === formData.project)}
-                onChange={(option) => handleSelectChange('project', option)}
+                value={formData.project}
+                onChange={onFormChange}
                 options={projectOptions}
-                isDisabled={projects.length === 0}
-                styles={customSelectStyles}
-                menuPortalTarget={document.body}
+                disabled={projects.length === 0}
                 placeholder={projects.length === 0 ? "-- No projects available --" : "-- Select a Project --"}
-                required
               />
             </div>
             <div className="form-group">
@@ -99,16 +87,36 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
               <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder="e.g., User Login Feature GIV-INT-01" required />
             </div>
             <div className="form-group">
-              <label htmlFor="newReqType" className="optional-label">Type:</label>
-              <Select inputId="newReqType" name="type" value={typeOptions.find(opt => opt.value === formData.type)} onChange={(option) => handleSelectChange('type', option)} options={typeOptions} styles={customSelectStyles} menuPortalTarget={document.body} placeholder="-- Select Type --" isClearable />
+              <label id="newReqType-label" htmlFor="newReqType-button" className="optional-label">Type:</label>
+              <CustomDropdown
+                id="newReqType"
+                name="type"
+                value={formData.type}
+                onChange={onFormChange}
+                options={typeOptions}
+                placeholder="-- Select Type --"
+              />
             </div>
             <div className="form-group">
-              <label htmlFor="newReqStatus">Status:</label>
-              <Select inputId="newReqStatus" name="status" value={statusOptions.find(opt => opt.value === formData.status)} onChange={(option) => handleSelectChange('status', option)} options={statusOptions} styles={customSelectStyles} menuPortalTarget={document.body} required />
+              <label id="newReqStatus-label" htmlFor="newReqStatus-button">Status:</label>
+              <CustomDropdown
+                id="newReqStatus"
+                name="status"
+                value={formData.status}
+                onChange={onFormChange}
+                options={statusOptions}
+              />
             </div>
             <div className="form-group">
-              <label htmlFor="newReqSprint">Sprint:</label>
-              <Select inputId="newReqSprint" name="sprint" value={sprintNumberOptions.find(opt => opt.value === formData.sprint)} onChange={(option) => handleSelectChange('sprint', option)} options={sprintNumberOptions} isDisabled={formData.isBacklog} styles={customSelectStyles} menuPortalTarget={document.body} />
+              <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
+              <CustomDropdown
+                id="newReqSprint"
+                name="sprint"
+                value={formData.sprint}
+                onChange={onFormChange}
+                options={sprintNumberOptions}
+                disabled={formData.isBacklog}
+              />
             </div>
             <div className="form-group new-project-toggle">
               <input type="checkbox" id="isBacklogCheckbox" name="isBacklog" checked={formData.isBacklog} onChange={onFormChange} />
@@ -116,20 +124,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
             </div>
             <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <label htmlFor="newReqRelease" className="optional-label" style={{marginBottom: 0}}>Release:</label>
+                <label id="newReqRelease-label" htmlFor="newReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
                 <Tooltip content={releaseTooltipContent} className="release" />
               </div>
-              <Select
-                inputId="newReqRelease"
+              <CustomDropdown
+                id="newReqRelease"
                 name="release_id"
-                value={releaseOptions.find(opt => opt.value === formData.release_id) || null}
-                onChange={(option) => handleSelectChange('release_id', option)}
+                value={formData.release_id}
+                onChange={onFormChange}
                 options={releaseOptions}
-                isDisabled={!formData.project || releaseOptions.length === 0}
-                styles={customSelectStyles}
-                menuPortalTarget={document.body}
+                disabled={!formData.project || releaseOptions.length === 0}
                 placeholder={!formData.project ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
-                isClearable
               />
             </div>
             <div className="form-group">

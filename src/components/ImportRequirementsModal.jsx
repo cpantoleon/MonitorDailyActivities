@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -75,21 +75,19 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
     onImport(state.selectedFile, state.targetProject, sprintValue, state.targetReleaseId);
   };
 
-  const handleProjectChange = (selectedOption) => {
-    const newProject = selectedOption ? selectedOption.value : '';
-    setState(prev => ({
-        ...prev,
-        targetProject: newProject,
-        targetReleaseId: ''
-    }));
-  };
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const val = type === 'checkbox' ? checked : value;
 
-  const handleSelectChange = (name, selectedOption) => {
-    setState(prev => ({...prev, [name]: selectedOption ? selectedOption.value : ''}));
-  };
-  
-  const handleCheckboxChange = (e) => {
-    setState(prev => ({...prev, isBacklog: e.target.checked}));
+    if (name === 'targetProject') {
+        setState(prev => ({
+            ...prev,
+            targetProject: val,
+            targetReleaseId: ''
+        }));
+    } else {
+        setState(prev => ({...prev, [name]: val}));
+    }
   };
 
   const projectOptions = projects.map(p => ({ value: p, label: p }));
@@ -97,11 +95,6 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
     value: `${i + 1}`,
     label: `${i + 1}`
   }));
-
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  };
 
   const tooltipContent = (
     <>
@@ -138,49 +131,44 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
             <input type="file" id="importReqFile" name="importReqFile" accept=".xlsx, .xls" onChange={handleFileChange} />
           </div>
           <div className="form-group">
-            <label htmlFor="importReqProject">Target Project:</label>
-            <Select
-              inputId="importReqProject"
-              name="importReqProject"
-              value={projectOptions.find(opt => opt.value === state.targetProject)}
-              onChange={handleProjectChange}
+            {/* FIX: The label now has an ID that we can reference */}
+            <label id="importReqProject-label" htmlFor="importReqProject-button">Target Project:</label>
+            <CustomDropdown
+              id="importReqProject"
+              name="targetProject"
+              value={state.targetProject}
+              onChange={handleChange}
               options={projectOptions}
-              styles={customSelectStyles}
-              menuPortalTarget={document.body}
               placeholder="-- Select a Project --"
-              required
             />
           </div>
           <div className="form-group">
-            <label htmlFor="importReqSprint">Target Sprint:</label>
-            <Select
-              inputId="importReqSprint"
-              name="importReqSprint"
-              value={sprintNumberOptions.find(opt => opt.value === state.targetSprint)}
-              onChange={(opt) => handleSelectChange('targetSprint', opt)}
+            {/* FIX: The label now has an ID that we can reference */}
+            <label id="importReqSprint-label" htmlFor="importReqSprint-button">Target Sprint:</label>
+            <CustomDropdown
+              id="importReqSprint"
+              name="targetSprint"
+              value={state.targetSprint}
+              onChange={handleChange}
               options={sprintNumberOptions}
-              isDisabled={state.isBacklog}
-              styles={customSelectStyles}
-              menuPortalTarget={document.body}
+              disabled={state.isBacklog}
             />
           </div>
           <div className="form-group new-project-toggle">
-            <input type="checkbox" id="importIsBacklog" name="importIsBacklog" checked={state.isBacklog} onChange={handleCheckboxChange} />
+            <input type="checkbox" id="importIsBacklog" name="isBacklog" checked={state.isBacklog} onChange={handleChange} />
             <label htmlFor="importIsBacklog" className="checkbox-label optional-label">Assign to Backlog</label>
           </div>
           <div className="form-group">
-            <label htmlFor="importReqRelease" className="optional-label">Assign to Release (Optional):</label>
-            <Select
-              inputId="importReqRelease"
-              name="importReqRelease"
-              value={releaseOptions.find(opt => opt.value === state.targetReleaseId) || null}
-              onChange={(opt) => handleSelectChange('targetReleaseId', opt)}
+            {/* FIX: The label now has an ID that we can reference */}
+            <label id="importReqRelease-label" htmlFor="importReqRelease-button" className="optional-label">Assign to Release (Optional):</label>
+            <CustomDropdown
+              id="importReqRelease"
+              name="targetReleaseId"
+              value={state.targetReleaseId}
+              onChange={handleChange}
               options={releaseOptions}
-              isDisabled={!state.targetProject || releaseOptions.length === 0}
-              styles={customSelectStyles}
-              menuPortalTarget={document.body}
+              disabled={!state.targetProject || releaseOptions.length === 0}
               placeholder={!state.targetProject ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
-              isClearable
             />
           </div>
           <div className="modal-actions">

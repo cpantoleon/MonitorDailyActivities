@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import Select from 'react-select';
+import CustomDropdown from './CustomDropdown'; // Use the new component
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -139,11 +139,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name, selectedOption) => {
-    const value = selectedOption ? selectedOption.value : '';
     if (name === 'project') {
       setFormData(prev => ({
         ...getInitialFormState(value),
@@ -202,11 +197,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   };
 
   if (!isOpen) return null;
-
-  const customSelectStyles = {
-    menuList: (base) => ({ ...base, maxHeight: '180px', overflowY: 'auto' }),
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  };
   
   const projectOptions = projects.map(p => ({ value: p, label: p }));
   const areaOptions = modalAreas.map(pa => ({ value: pa, label: pa }));
@@ -220,8 +210,16 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           <h2>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="defect-project">Project:</label>
-              <Select inputId="defect-project" name="project" value={projectOptions.find(opt => opt.value === formData.project)} onChange={(option) => handleSelectChange('project', option)} options={projectOptions} styles={customSelectStyles} menuPortalTarget={document.body} placeholder="-- Select Project --" required isDisabled={!!defect} />
+              <label id="defect-project-label" htmlFor="defect-project-button">Project:</label>
+              <CustomDropdown
+                id="defect-project"
+                name="project"
+                value={formData.project}
+                onChange={handleChange}
+                options={projectOptions}
+                placeholder="-- Select Project --"
+                disabled={!!defect}
+              />
             </div>
             <div className="form-group">
               <label htmlFor="defect-title">Title:</label>
@@ -232,11 +230,18 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               <textarea id="defect-description" name="description" value={formData.description} onChange={handleChange} rows="3" />
             </div>
             <div className="form-group">
-              <label htmlFor="defect-area">Area:</label>
+              <label id="defect-area-label" htmlFor="defect-area-button">Area:</label>
               {isCustomArea ? (
-                <input type="text" id="defect-area" name="area" value={formData.area} onChange={handleChange} placeholder="Enter new area description" required />
+                <input type="text" id="defect-area-input" name="area" value={formData.area} onChange={handleChange} placeholder="Enter new area description" required />
               ) : (
-                <Select inputId="defect-area" name="area" value={areaOptions.find(opt => opt.value === formData.area)} onChange={(option) => handleSelectChange('area', option)} options={areaOptions} styles={customSelectStyles} menuPortalTarget={document.body} placeholder="-- Select Area --" required />
+                <CustomDropdown
+                  id="defect-area"
+                  name="area"
+                  value={formData.area}
+                  onChange={handleChange}
+                  options={areaOptions}
+                  placeholder="-- Select Area --"
+                />
               )}
             </div>
             <div className="form-group new-project-toggle">
@@ -244,8 +249,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               <label htmlFor="isCustomAreaCheckbox" className="checkbox-label optional-label">Add New Area</label>
             </div>
             <div className="form-group">
-              <label htmlFor="defect-status">Status:</label>
-              <Select inputId="defect-status" name="status" value={statusSelectOptions.find(opt => opt.value === formData.status)} onChange={(option) => handleSelectChange('status', option)} options={statusSelectOptions} styles={customSelectStyles} menuPortalTarget={document.body} required />
+              <label id="defect-status-label" htmlFor="defect-status-button">Status:</label>
+              <CustomDropdown
+                id="defect-status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                options={statusSelectOptions}
+              />
             </div>
             <div className="form-group">
               <label htmlFor="defect-link" className="optional-label">Link:</label>
