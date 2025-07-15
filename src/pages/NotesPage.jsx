@@ -4,6 +4,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import ConfirmationModal from '../components/ConfirmationModal';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import DailyInfoWidget from '../components/DailyInfoWidget';
+import WeatherWidget from '../components/WeatherWidget';
+import '../components/DailyInfoWidget.css';
+import CustomDropdown from '../components/CustomDropdown';
 
 const KEYWORD_CONFIG = [
   { keyword: 'release date', type: 'release', label: 'Release Date' },
@@ -17,9 +21,14 @@ const getNoteType = (noteText) => {
   if (!noteText || noteText.trim() === "") {
     return null;
   }
-  const lowerNoteText = noteText.toLowerCase();
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = noteText;
+  const plainText = tempDiv.textContent || tempDiv.innerText || "";
+
+  const lowerPlainText = plainText.toLowerCase();
   for (const config of KEYWORD_CONFIG) {
-    if (lowerNoteText.includes(config.keyword.toLowerCase())) {
+    if (lowerPlainText.includes(config.keyword.toLowerCase())) {
       return config.type;
     }
   }
@@ -54,6 +63,8 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [datesToHighlight, setDatesToHighlight] = useState([]);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  // State to hold the editor instance for adding event listeners
+  const [editorInstance, setEditorInstance] = useState(null);
 
   const formatDateKey = (date) => {
     if (!(date instanceof Date) || isNaN(date.getTime())) return '';
@@ -62,58 +73,6 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-
-  const fetchNotesForProject = useCallback(async (project) => {
-    if (!project) {
-      setProjectNotesMap({});
-      setNoteText('');
-      setDatesToHighlight([]);
-      return;
-    }
-    setIsLoadingNotes(true);
-    try {
-      const response = await fetch(`${apiBaseUrl}/notes/${project}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch notes for ${project}: ${response.statusText}`);
-      }
-      const result = await response.json();
-      const notesData = result.data || {};
-      setProjectNotesMap(notesData);
-      const highlights = Object.entries(notesData)
-        .map(([dateKey, text]) => {
-          const noteType = getNoteType(text);
-          if (noteType) {
-            const [year, month, day] = dateKey.split('-').map(Number);
-            return { date: new Date(year, month - 1, day), type: noteType };
-          }
-          return null;
-        })
-        .filter(item => item !== null);
-      setDatesToHighlight(highlights);
-      const currentDataDateKey = formatDateKey(selectedDate);
-      setNoteText(notesData[currentDataDateKey] || '');
-    } catch (error) {
-      console.error("Error fetching notes:", error);
-      if (showMessage) showMessage(`Error fetching notes: ${error.message}`, 'error');
-      setProjectNotesMap({});
-      setDatesToHighlight([]);
-    } finally {
-      setIsLoadingNotes(false);
-    }
-  }, [apiBaseUrl, selectedDate, showMessage]);
-
-  useEffect(() => {
-    fetchNotesForProject(selectedProject);
-  }, [selectedProject, fetchNotesForProject]);
-
-  useEffect(() => {
-    const dateKey = formatDateKey(selectedDate);
-    if (selectedProject) {
-        setNoteText(projectNotesMap[dateKey] || '');
-    } else {
-        setNoteText('');
-    }
-  }, [selectedDate, projectNotesMap, selectedProject]);
 
   const handleSaveNote = useCallback(async (textToSave) => {
     if (!selectedProject) {
@@ -170,6 +129,85 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       setIsLoadingNotes(false);
     }
   }, [selectedProject, selectedDate, apiBaseUrl, showMessage]);
+  
+  // NEW: useEffect to handle the Ctrl+S keyboard shortcut
+  useEffect(() => {
+    if (!editorInstance) return;
+
+    const editableElement = editorInstance.ui.getEditableElement();
+    if (!editableElement) return;
+
+    const handleKeyDown = (event) => {
+      // Check for Ctrl+S or Cmd+S
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault(); // Prevent the browser's save dialog
+        
+        // Get the latest data directly from the editor and save
+        const currentData = editorInstance.getData();
+        handleSaveNote(currentData);
+      }
+    };
+
+    editableElement.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup function to remove the event listener when the component unmounts
+    return () => {
+      editableElement.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editorInstance, handleSaveNote]); // Rerun if the editor or save function changes
+
+  const fetchNotesForProject = useCallback(async (project) => {
+    if (!project) {
+      setProjectNotesMap({});
+      setNoteText('');
+      setDatesToHighlight([]);
+      return;
+    }
+    setIsLoadingNotes(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/notes/${project}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch notes for ${project}: ${response.statusText}`);
+      }
+      const result = await response.json();
+      const notesData = result.data || {};
+      setProjectNotesMap(notesData);
+      const highlights = Object.entries(notesData)
+        .map(([dateKey, text]) => {
+          const noteType = getNoteType(text);
+          if (noteType) {
+            const [year, month, day] = dateKey.split('-').map(Number);
+            return { date: new Date(year, month - 1, day), type: noteType };
+          }
+          return null;
+        })
+        .filter(item => item !== null);
+      setDatesToHighlight(highlights);
+      const currentDataDateKey = formatDateKey(selectedDate);
+      setNoteText(notesData[currentDataDateKey] || '');
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      if (showMessage) showMessage(`Error fetching notes: ${error.message}`, 'error');
+      setProjectNotesMap({});
+      setDatesToHighlight([]);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  }, [apiBaseUrl, selectedDate, showMessage]);
+
+  useEffect(() => {
+    fetchNotesForProject(selectedProject);
+  }, [selectedProject, fetchNotesForProject]);
+
+  useEffect(() => {
+    const dateKey = formatDateKey(selectedDate);
+    if (selectedProject) {
+        setNoteText(projectNotesMap[dateKey] || '');
+    } else {
+        setNoteText('');
+    }
+  }, [selectedDate, projectNotesMap, selectedProject]);
+
 
   const handleClearRequest = () => {
     const dateKey = formatDateKey(selectedDate);
@@ -216,115 +254,128 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     extraPlugins: [MyUploadAdapterPlugin],
   };
 
-  return (
-    <div className="notes-page-container">
-      <style>{`
-        .ck-editor__editable_inline {
-            min-height: 250px;
-        }
-        .ck-content .image {
-            max-width: 200px;
-            height: auto;
-        }
-        .ck-content .image-inline {
-            max-width: 200px;
-            height: auto;
-        }
-      `}</style>
-      <h2>Daily Notes</h2>
-      <div className="notes-controls">
-        <div>
-          <label htmlFor="note-project">Project:</label>
-          <select
-            id="note-project"
-            name="noteProject"
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            disabled={!projects || projects.length === 0}
-          >
-            <option value="">-- Select Project --</option>
-            {(projects || []).map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="note-date">Date:</label>
-          <DatePicker
-            id="note-date"
-            name="noteDate"
-            selected={selectedDate}
-            onChange={(date) => setSelectedDate(date)}
-            dateFormat="MM/dd/yyyy"
-            className="notes-datepicker"
-            renderDayContents={renderDayContents}
-            disabled={!selectedProject}
-          />
-        </div>
-      </div>
+  const handleProjectChange = (e) => {
+    setSelectedProject(e.target.value);
+  };
 
-      <div className="notes-legend">
-        <div className="legend-title clickable" onClick={toggleLegend}>
-          Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
-        </div>
-        {isLegendOpen && (
-          <div className="legend-content">
-            <div className="legend-item">
-              <span className="note-dot"></span>
-              <span>{DEFAULT_NOTE_LABEL}</span>
-            </div>
-            {KEYWORD_CONFIG.map(config => (
-              <div key={config.type} className="legend-item">
-                <span className={`note-dot note-dot-${config.type}`}></span>
-                <span>{config.label} (note contains "{config.keyword}")</span>
-              </div>
-            ))}
+  const projectOptions = projects.map(p => ({ value: p, label: p }));
+
+  return (
+    <div className="notes-page-container with-sidebar">
+      <div className="notes-main-column">
+        <style>{`
+          .ck-editor__editable_inline {
+              min-height: 250px;
+          }
+          .ck-content .image {
+              max-width: 200px;
+              height: auto;
+          }
+          .ck-content .image-inline {
+              max-width: 200px;
+              height: auto;
+          }
+        `}</style>
+        <h2>Daily Notes</h2>
+        <div className="notes-controls">
+          <div>
+            <label id="note-project-label" htmlFor="note-project-button">Project:</label>
+            <CustomDropdown
+              id="note-project"
+              name="noteProject"
+              value={selectedProject}
+              onChange={handleProjectChange}
+              options={projectOptions}
+              placeholder="-- Select Project --"
+              disabled={!projects || projects.length === 0}
+            />
           </div>
+          <div>
+            <label htmlFor="note-date">Date:</label>
+            <DatePicker
+              id="note-date"
+              name="noteDate"
+              selected={selectedDate}
+              onChange={(date) => setSelectedDate(date)}
+              dateFormat="MM/dd/yyyy"
+              className="notes-datepicker"
+              renderDayContents={renderDayContents}
+            />
+          </div>
+        </div>
+
+        <div className="notes-legend">
+          <div className="legend-title clickable" onClick={toggleLegend}>
+            Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
+          </div>
+          {isLegendOpen && (
+            <div className="legend-content">
+              <div className="legend-item">
+                <span className="note-dot"></span>
+                <span>{DEFAULT_NOTE_LABEL}</span>
+              </div>
+              {KEYWORD_CONFIG.map(config => (
+                <div key={config.type} className="legend-item">
+                  <span className={`note-dot note-dot-${config.type}`}></span>
+                  <span>{config.label} (note contains "{config.keyword}")</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isLoadingNotes && selectedProject && <p style={{textAlign: 'center', marginBottom: '10px'}}>Loading/Saving notes for {selectedProject}...</p>}
+
+        {selectedProject ? (
+          <div className="notes-editor-area">
+            <h3 id="notes-editor-label">Notes for {selectedProject} on {selectedDate.toLocaleDateString()}</h3>
+            <div className="editor-wrapper">
+              <CKEditor
+                  editor={ ClassicEditor }
+                  data={noteText}
+                  config={editorConfiguration}
+                  onReady={editor => {
+                    // Save the editor instance to state
+                    setEditorInstance(editor);
+                    
+                    const editableElement = editor.ui.getEditableElement();
+                    if (editableElement && editableElement.parentElement) {
+                        editableElement.parentElement.setAttribute('aria-labelledby', 'notes-editor-label');
+                    }
+                  }}
+                  onChange={ ( event, editor ) => {
+                      const data = editor.getData();
+                      setNoteText(data);
+                  } }
+                  disabled={!selectedProject}
+              />
+            </div>
+            <div className="notes-actions-container">
+              <button
+                onClick={() => handleSaveNote(noteText)}
+                className="save-note-button"
+                disabled={isLoadingNotes || !selectedProject}
+              >
+                {isLoadingNotes ? 'Saving...' : 'Save Note'}
+              </button>
+              <button
+                onClick={handleClearRequest}
+                className="clear-note-button"
+                disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
+              >
+                Clear Note
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="select-project-prompt">Please select a project to view or add notes.</p>
         )}
       </div>
 
-      {isLoadingNotes && selectedProject && <p style={{textAlign: 'center', marginBottom: '10px'}}>Loading/Saving notes for {selectedProject}...</p>}
-
-      {!isLoadingNotes && selectedProject ? (
-        <div className="notes-editor-area">
-          <h3 id="notes-editor-label">Notes for {selectedProject} on {selectedDate instanceof Date && !isNaN(selectedDate.getTime()) ? selectedDate.toLocaleDateString() : 'Select a date'}</h3>
-          <div className="editor-wrapper">
-            <CKEditor
-                editor={ ClassicEditor }
-                data={noteText}
-                config={editorConfiguration}
-                onReady={editor => {
-                  // This connects the h3 label to the editor for screen readers.
-                  const editableElement = editor.ui.getEditableElement();
-                  if (editableElement && editableElement.parentElement) {
-                      editableElement.parentElement.setAttribute('aria-labelledby', 'notes-editor-label');
-                  }
-                }}
-                onChange={ ( event, editor ) => {
-                    const data = editor.getData();
-                    setNoteText(data);
-                } }
-                disabled={!selectedProject}
-            />
-          </div>
-          <div className="notes-actions-container">
-            <button
-              onClick={() => handleSaveNote(noteText)}
-              className="save-note-button"
-              disabled={isLoadingNotes || !selectedProject}
-            >
-              {isLoadingNotes ? 'Saving...' : 'Save Note'}
-            </button>
-            <button
-              onClick={handleClearRequest}
-              className="clear-note-button"
-              disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
-            >
-              Clear Note
-            </button>
-          </div>
-        </div>
-      ) : (
-        !isLoadingNotes && !selectedProject && <p className="select-project-prompt">Please select a project to view or add notes.</p>
-      )}
+      <div className="notes-sidebar-column">
+        <WeatherWidget showMessage={showMessage} />
+        <DailyInfoWidget />
+      </div>
 
       <ConfirmationModal
         isOpen={isConfirmClearOpen}

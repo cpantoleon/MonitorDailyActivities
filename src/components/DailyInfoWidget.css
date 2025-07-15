@@ -1,0 +1,28 @@
+.daily-info-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0;
+  font-size: 0.9em;
+}
+
+.nameday-section {
+  width: 100%;
+}
+
+/* The .nameday-header rule can be removed as it's no longer in the JSX */
+
+.iframe-container {
+  width: 250px;
+  height: 440px;
+  overflow: hidden;
+  margin: 0 auto;
+  border-radius: 6px; /* Add a slight border-radius to match the inner widget */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Add a subtle shadow for depth */
+}
+
+.iframe-container iframe {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}

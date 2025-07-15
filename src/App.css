@@ -518,7 +518,7 @@ body {
     font-weight: normal;
     color: #5C4033;
     cursor: pointer;
-    -webkit-user-select: none; /* FIX: Added for Safari compatibility */
+    -webkit-user-select: none;
     user-select: none;
 }
 .add-new-modal-content .new-project-toggle .checkbox-label::after {
@@ -604,6 +604,28 @@ body {
   max-width: 1000px;
   margin: 0 auto;
   width: 100%;
+}
+
+.notes-page-container.with-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 25px;
+  align-items: flex-start;
+  max-width: 1400px;
+}
+
+.notes-main-column {
+  grid-column: 1 / 2;
+}
+
+.notes-sidebar-column {
+  grid-column: 2 / 3;
+  position: sticky;
+  top: 20px; 
+}
+
+.notes-sidebar-column .daily-info-widget {
+  margin-top: 25px;
 }
 
 .notes-page-container h2,
@@ -788,7 +810,7 @@ body {
 }
 .legend-title.clickable {
   cursor: pointer;
-  -webkit-user-select: none; /* FIX: Added for Safari compatibility */
+  -webkit-user-select: none;
   user-select: none;
 }
 .legend-title.clickable:hover {
@@ -1231,7 +1253,7 @@ body {
   color: white;
   font-weight: bold;
   font-size: 15px;
-  -webkit-user-select: none; /* FIX: Added for Safari compatibility */
+  -webkit-user-select: none;
   user-select: none;
   cursor: help;
 }
@@ -1388,4 +1410,20 @@ body {
     min-width: 100%;
     max-width: 100%;
   }
+}
+
+@media screen and (max-width: 1200px) {
+  .notes-page-container.with-sidebar {
+    grid-template-columns: 1fr;
+  }
+  .notes-sidebar-column {
+    grid-row: 2;
+    position: static; 
+    margin-top: 20px;
+  }
+}
+
+.react-datepicker__input-time-container .react-datepicker-time__input-container .react-datepicker-time__input input[type=time] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
