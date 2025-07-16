@@ -753,6 +753,18 @@
                   },
                   "sprint": {
                     "type": "string"
+                  },
+                  "release_id": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "importMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "new_only"
+                    ],
+                    "description": "Determines how to handle duplicates. 'all' renames duplicates, 'new_only' skips them."
                   }
                 },
                 "required": [
@@ -838,6 +850,14 @@
                   },
                   "project": {
                     "type": "string"
+                  },
+                  "importMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "new_only"
+                    ],
+                    "description": "Determines how to handle duplicates. 'all' renames duplicates, 'new_only' skips them."
                   }
                 },
                 "required": [

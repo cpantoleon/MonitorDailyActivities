@@ -11,6 +11,10 @@ import CustomDropdown from '../components/CustomDropdown';
 
 const KEYWORD_CONFIG = [
   { keyword: 'release date', type: 'release', label: 'Release Date' },
+  { keyword: 'FAT', type: 'fat', label: 'FAT' },
+  { keyword: 'regression', type: 'regression', label: 'Regression' },
+  { keyword: 'security', type: 'security', label: 'Security' },
+  { keyword: 'demo', type: 'demo', label: 'Demo' },
   { keyword: 'event', type: 'event', label: 'Event' },
   { keyword: 'call', type: 'call', label: 'Call' },
 ];
@@ -324,7 +328,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           )}
         </div>
 
-        {isLoadingNotes && selectedProject && <p style={{textAlign: 'center', marginBottom: '10px'}}>Loading/Saving notes for {selectedProject}...</p>}
+        {/* {isLoadingNotes && selectedProject && <p style={{textAlign: 'center', marginBottom: '10px'}}>Loading/Saving notes for {selectedProject}...</p>} */}
 
         {selectedProject ? (
           <div className="notes-editor-area">

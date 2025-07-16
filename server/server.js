@@ -514,7 +514,7 @@ app.post('/api/import/validate', upload.single('file'), async (req, res) => {
 });
 
 app.post('/api/import/requirements', upload.single('file'), async (req, res) => {
-    const { project, sprint, release_id } = req.body;
+    const { project, sprint, release_id, importMode } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
     if (!project || !sprint) return res.status(400).json({ error: 'Project and Sprint are required.' });
     
@@ -533,22 +533,27 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
             const existingNames = new Set(existingRows.map(r => r.requirementUserIdentifier));
 
             let renamedCount = 0;
+            let itemsToImport;
 
-            const itemsToImport = validRows.map(item => {
-                let newItem = { ...item };
-                if (newItem.key && existingKeys.has(newItem.key)) {
-                    renamedCount++;
-                    let newTitle = newItem.title;
-                    let counter = 1;
-                    while (existingNames.has(newTitle)) {
-                        newTitle = `${item.title} (${counter})`;
-                        counter++;
+            if (importMode === 'new_only') {
+                itemsToImport = validRows.filter(item => !item.key || !existingKeys.has(item.key));
+            } else {
+                itemsToImport = validRows.map(item => {
+                    let newItem = { ...item };
+                    if (newItem.key && existingKeys.has(newItem.key)) {
+                        renamedCount++;
+                        let newTitle = newItem.title;
+                        let counter = 1;
+                        while (existingNames.has(newTitle)) {
+                            newTitle = `${item.title} (${counter})`;
+                            counter++;
+                        }
+                        newItem.title = newTitle;
+                        existingNames.add(newTitle);
                     }
-                    newItem.title = newTitle;
-                    existingNames.add(newTitle);
-                }
-                return newItem;
-            });
+                    return newItem;
+                });
+            }
 
             if (itemsToImport.length === 0) {
                 let messageParts = ["Import finished. No valid items to import"];
@@ -630,7 +635,7 @@ app.post('/api/import/defects/validate', upload.single('file'), async (req, res)
 });
 
 app.post('/api/import/defects', upload.single('file'), async (req, res) => {
-    const { project } = req.body;
+    const { project, importMode } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
     if (!project) return res.status(400).json({ error: 'Project is required.' });
 
@@ -646,22 +651,28 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
             const existingLinks = new Set(existingRows.map(r => r.link).filter(Boolean));
             const existingTitles = new Set(existingRows.map(r => r.title));
             let renamedCount = 0;
+            
+            let itemsToImport;
 
-            const itemsToImport = validRows.map(item => {
-                let newItem = { ...item };
-                if (newItem.link && existingLinks.has(newItem.link)) {
-                    renamedCount++;
-                    let newTitle = newItem.title;
-                    let counter = 1;
-                    while (existingTitles.has(newTitle)) {
-                        newTitle = `${item.title} (${counter})`;
-                        counter++;
+            if (importMode === 'new_only') {
+                itemsToImport = validRows.filter(item => !item.link || !existingLinks.has(item.link));
+            } else {
+                itemsToImport = validRows.map(item => {
+                    let newItem = { ...item };
+                    if (newItem.link && existingLinks.has(newItem.link)) {
+                        renamedCount++;
+                        let newTitle = newItem.title;
+                        let counter = 1;
+                        while (existingTitles.has(newTitle)) {
+                            newTitle = `${item.title} (${counter})`;
+                            counter++;
+                        }
+                        newItem.title = newTitle;
+                        existingTitles.add(newTitle);
                     }
-                    newItem.title = newTitle;
-                    existingTitles.add(newTitle);
-                }
-                return newItem;
-            });
+                    return newItem;
+                });
+            }
 
             if (itemsToImport.length === 0) {
                 let message = "Import finished. No valid defects to import";

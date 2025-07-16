@@ -63,8 +63,7 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal }) => {
   );
 };
 
-const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate }) => {
-  const [selectedProject, setSelectedProject] = useState('');
+const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, selectedProject, onSelectProject }) => {
   const [allDefects, setAllDefects] = useState([]);
   const [activeDefects, setActiveDefects] = useState([]);
   const [closedDefects, setClosedDefects] = useState([]);
@@ -101,10 +100,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       const response = await fetch(`${API_BASE_URL}/defects/all`);
       if (!response.ok) throw new Error('Failed to fetch all defects');
       const result = await response.json();
-      setAllDefects(result.data || []);
+      const defectData = result.data || [];
+      setAllDefects(defectData);
+      return defectData;
     } catch (error) {
       showMessage(`Error loading defect list: ${error.message}`, 'error');
       setAllDefects([]);
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -132,10 +134,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     const params = new URLSearchParams(location.search);
     const projectParam = params.get('project');
     if (projectParam && projects.includes(projectParam)) {
-        setSelectedProject(projectParam);
+        onSelectProject(projectParam);
         navigate('/defects', { replace: true });
     }
-  }, [location.search, navigate, projects]);
+  }, [location.search, navigate, projects, onSelectProject]);
 
   const handleToggleCharts = async () => {
     if (showAreaChart) {
@@ -144,8 +146,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     }
 
     const defectsForChart = showClosedView ? closedDefects : activeDefects;
-    if (defectsForChart.length > 0) {
-      const areaCounts = defectsForChart.reduce((acc, defect) => {
+
+    const defectsForAreaChart = defectsForChart.filter(
+      defect => defect.area !== 'Imported'
+    );
+
+    if (defectsForAreaChart.length > 0) {
+      const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
         acc[defect.area] = (acc[defect.area] || 0) + 1;
         return acc;
       }, {});
@@ -237,7 +244,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         throw new Error(result.error || 'Failed to delete defect');
       }
       showMessage('Defect deleted successfully!', 'success');
-      await fetchAllDefects();
+      
+      const freshDefects = await fetchAllDefects();
+      
+      if (isSearching) {
+        const lowerCaseQuery = defectQuery.toLowerCase();
+        const sourceData = freshDefects.filter(defect => showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed');
+        const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
+        setSearchResults(newSearchResults);
+      }
+
       if (onDefectUpdate) onDefectUpdate();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
@@ -269,10 +285,11 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setImportConfirmData(null);
   }, []);
 
-  const executeDefectImport = useCallback(async (file, project) => {
+  const executeDefectImport = useCallback(async (file, project, importMode = 'all') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project', project);
+    formData.append('importMode', importMode);
     try {
         const response = await fetch(`${API_BASE_URL}/import/defects`, { method: 'POST', body: formData });
         const result = await response.json();
@@ -280,13 +297,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         showMessage(result.message, 'success');
         await fetchAllDefects();
         if (onDefectUpdate) onDefectUpdate();
-        setSelectedProject(project);
+        onSelectProject(project);
     } catch (error) {
         showMessage(`Import Error: ${error.message}`, 'error');
     } finally {
         handleCloseImportModal();
     }
-  }, [fetchAllDefects, showMessage, handleCloseImportModal, onDefectUpdate]);
+  }, [fetchAllDefects, showMessage, handleCloseImportModal, onDefectUpdate, onSelectProject]);
 
   const handleValidateDefectImport = useCallback(async (file, project) => {
     const formData = new FormData();
@@ -318,10 +335,18 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     }
   }, [executeDefectImport, showMessage, handleCloseImportModal]);
 
-  const handleConfirmImport = () => {
+  const handleConfirmImportAll = () => {
     if (!importConfirmData) return;
     const { file, project } = importConfirmData;
-    executeDefectImport(file, project);
+    executeDefectImport(file, project, 'all');
+    setIsImportConfirmModalOpen(false);
+    setImportConfirmData(null);
+  };
+
+  const handleConfirmImportNewOnly = () => {
+    if (!importConfirmData) return;
+    const { file, project } = importConfirmData;
+    executeDefectImport(file, project, 'new_only');
     setIsImportConfirmModalOpen(false);
     setImportConfirmData(null);
   };
@@ -339,9 +364,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setSearchResults(results);
     if (results.length > 0) {
       const uniqueProjects = [...new Set(results.map(d => d.project))];
-      setSelectedProject(uniqueProjects.length === 1 ? uniqueProjects[0] : '');
+      onSelectProject(uniqueProjects.length === 1 ? uniqueProjects[0] : '');
     } else {
-      setSelectedProject('');
+      onSelectProject('');
     }
   };
 
@@ -350,7 +375,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setDefectQuery('');
     setSearchResults([]);
     setSearchSuggestions([]);
-    setSelectedProject('');
+    onSelectProject('');
   };
 
   const handleDefectQueryChange = (query) => {
@@ -377,7 +402,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     const selectedDefect = allDefects.find(d => d.id === suggestion.id);
     if (selectedDefect) {
       setSearchResults([selectedDefect]);
-      setSelectedProject(selectedDefect.project);
+      onSelectProject(selectedDefect.project);
       setIsSearching(true);
     } else {
       handleDefectSearch(suggestion.name);
@@ -474,7 +499,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       <h2>Defect Tracking</h2>
       <div className="selection-controls">
         <div className="selection-group-container">
-            <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={setSelectedProject} />
+            <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={onSelectProject} />
             <SearchComponent
               query={defectQuery}
               onQueryChange={handleDefectQueryChange}
@@ -517,7 +542,32 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
       
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
-      <ConfirmationModal isOpen={isImportConfirmModalOpen} onClose={() => setIsImportConfirmModalOpen(false)} onConfirm={handleConfirmImport} title="Confirm Defect Import" message={`The file contains ${importConfirmData?.newCount || 0} new defect(s) and ${importConfirmData?.duplicateCount || 0} duplicate(s). Do you want to proceed?`} />
+      
+      {isImportConfirmModalOpen && importConfirmData && (
+          <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
+              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+                  <h3>Confirm Defect Import</h3>
+                  <p>
+                      The file contains {importConfirmData.newCount} new defect(s) and {importConfirmData.duplicateCount} duplicate(s).
+                      {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
+                  </p>
+                  <p>How would you like to proceed?</p>
+                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+                      <button onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                          Import All
+                      </button>
+                      {importConfirmData.newCount > 0 && (
+                          <button onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                              Import New Only
+                          </button>
+                      )}
+                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

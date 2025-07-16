@@ -11,6 +11,33 @@ body {
   color: #4A3B2A;
 }
 
+.listbox-search-input {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  border: 1px solid #DEB887;
+  border-radius: 3px;
+  box-sizing: border-box;
+  font-size: 0.9em;
+  background-color: #FFFAF0;
+  color: #5C4033;
+}
+
+.listbox-search-input:focus {
+  outline: none;
+  border-color: #A0522D;
+  box-shadow: 0 0 0 2px rgba(160, 82, 45, 0.2);
+}
+
+.add-new-modal-content fieldset legend {
+  display: block;
+  margin-bottom: 6px;
+  color: #704214;
+  font-weight: 500;
+  font-size: 0.9em;
+  padding: 0; 
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -774,7 +801,7 @@ body {
 .note-dot {
   height: 6px;
   width: 6px;
-  background-color: #8B4513;
+  background-color: #000000;
   border-radius: 50%;
   display: inline-block;
   position: relative;
@@ -790,6 +817,10 @@ body {
 }
 
 .note-dot-release { background-color: #007bff; }
+.note-dot-fat { background-color: #20c997; }
+.note-dot-regression { background-color: #17a2b8; }
+.note-dot-security { background-color: #6f42c1; }
+.note-dot-demo { background-color: #fd7e14; }
 .note-dot-event { background-color: #ffc107; }
 .note-dot-call { background-color: #dc3545; }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -32,6 +32,10 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   const [selectedRequirements, setSelectedRequirements] = useState([]);
   const [toAdd, setToAdd] = useState([]);
   const [toRemove, setToRemove] = useState([]);
+
+  // --- NEW: State for search queries ---
+  const [availableSearchQuery, setAvailableSearchQuery] = useState('');
+  const [selectedSearchQuery, setSelectedSearchQuery] = useState('');
 
   const requirementsForSelectedProject = useMemo(() => {
     if (!formData.project || !allRequirements) return [];
@@ -122,11 +126,24 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     fetchAreasForProject(formData.project);
   }, [isOpen, formData.project, defect]);
   
+  // --- UPDATED: useEffect to filter lists based on search queries ---
   useEffect(() => {
     if (isOpen) {
       const linkedIdsSet = new Set(formData.linkedRequirementGroupIds);
-      const available = requirementsForSelectedProject.filter(r => !linkedIdsSet.has(r.id));
-      const selected = requirementsForSelectedProject.filter(r => linkedIdsSet.has(r.id));
+      let available = requirementsForSelectedProject.filter(r => !linkedIdsSet.has(r.id));
+      let selected = requirementsForSelectedProject.filter(r => linkedIdsSet.has(r.id));
+
+      if (availableSearchQuery) {
+        available = available.filter(r => 
+          r.requirementUserIdentifier.toLowerCase().includes(availableSearchQuery.toLowerCase())
+        );
+      }
+      if (selectedSearchQuery) {
+        selected = selected.filter(r => 
+          r.requirementUserIdentifier.toLowerCase().includes(selectedSearchQuery.toLowerCase())
+        );
+      }
+
       setAvailableRequirements(available);
       setSelectedRequirements(selected);
     } else {
@@ -134,8 +151,10 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         setSelectedRequirements([]);
         setToAdd([]);
         setToRemove([]);
+        setAvailableSearchQuery('');
+        setSelectedSearchQuery('');
     }
-  }, [isOpen, requirementsForSelectedProject, formData.linkedRequirementGroupIds]);
+  }, [isOpen, requirementsForSelectedProject, formData.linkedRequirementGroupIds, availableSearchQuery, selectedSearchQuery]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -272,6 +291,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 <div className="dual-listbox-container">
                   <div className="listbox-wrapper">
                     <label htmlFor="available-requirements-listbox" className="optional-label">Available</label>
+                    {/* --- NEW: Search input for Available list --- */}
+                    <input
+                      type="text"
+                      placeholder="Search available..."
+                      className="listbox-search-input"
+                      value={availableSearchQuery}
+                      onChange={(e) => setAvailableSearchQuery(e.target.value)}
+                    />
                     <select multiple id="available-requirements-listbox" name="available-requirements" value={toAdd} onChange={(e) => handleSelectionChange(e, setToAdd)} disabled={requirementsForSelectedProject.length === 0}>
                       {availableRequirements.map(req => <option key={req.id} value={req.id}>{req.requirementUserIdentifier}</option>)}
                     </select>
@@ -282,6 +309,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                   </div>
                   <div className="listbox-wrapper">
                     <label htmlFor="selected-requirements-listbox" className="optional-label">Selected</label>
+                    {/* --- NEW: Search input for Selected list --- */}
+                    <input
+                      type="text"
+                      placeholder="Search selected..."
+                      className="listbox-search-input"
+                      value={selectedSearchQuery}
+                      onChange={(e) => setSelectedSearchQuery(e.target.value)}
+                    />
                     <select multiple id="selected-requirements-listbox" name="selected-requirements" value={toRemove} onChange={(e) => handleSelectionChange(e, setToRemove)} disabled={selectedRequirements.length === 0}>
                       {selectedRequirements.map(req => <option key={req.id} value={req.id}>{req.requirementUserIdentifier}</option>)}
                     </select>

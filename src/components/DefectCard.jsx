@@ -33,7 +33,7 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
       style={{ cursor: isDraggable ? 'grab' : 'default' }}
     >
       <h4 className="defect-card-title">{defect.title}</h4>
-      <p className="defect-card-area"><strong>Area:</strong> {defect.area}</p>
+      {defect.area !== 'Imported' && <p className="defect-card-area"><strong>Area:</strong> {defect.area}</p>}
       {defect.description && <p className="defect-card-description"><strong>Description:</strong> {defect.description}</p>}
       {defect.link && <p className="defect-card-link"><strong>Link:</strong> <a href={defect.link} target="_blank" rel="noopener noreferrer">{defect.link}</a></p>}
       <p className="defect-card-date"><strong>Logged:</strong> {formatDate(defect.created_date)}</p>

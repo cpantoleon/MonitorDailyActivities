@@ -366,6 +366,8 @@ function App() {
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '' });
 
+  const [selectedDefectProject, setSelectedDefectProject] = useState('');
+
   const hasFetched = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -718,11 +720,12 @@ function App() {
     setImportConfirmData(null);
   }, []);
 
-  const executeImport = useCallback(async (file, project, sprint, release_id) => {
+  const executeImport = useCallback(async (file, project, sprint, release_id, importMode = 'all') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project', project);
     formData.append('sprint', sprint);
+    formData.append('importMode', importMode);
     if (release_id) {
       formData.append('release_id', release_id);
     }
@@ -774,7 +777,7 @@ function App() {
             setImportConfirmData({ file, project, sprint, release_id, ...result.data });
             setIsImportConfirmModalOpen(true);
         } else {
-            executeImport(file, project, sprint, release_id);
+            executeImport(file, project, sprint, release_id, 'all');
         }
     } catch (error) {
         showMainMessage(`Validation Error: ${error.message}`, 'error');
@@ -782,10 +785,18 @@ function App() {
     }
   }, [executeImport, showMainMessage, handleCloseImportModal]);
 
-  const handleConfirmImport = () => {
+  const handleConfirmImportAllRequirements = () => {
     if (!importConfirmData) return;
     const { file, project, sprint, release_id } = importConfirmData;
-    executeImport(file, project, sprint, release_id);
+    executeImport(file, project, sprint, release_id, 'all');
+    setIsImportConfirmModalOpen(false);
+    setImportConfirmData(null);
+  };
+
+  const handleConfirmImportNewOnlyRequirements = () => {
+    if (!importConfirmData) return;
+    const { file, project, sprint, release_id } = importConfirmData;
+    executeImport(file, project, sprint, release_id, 'new_only');
     setIsImportConfirmModalOpen(false);
     setImportConfirmData(null);
   };
@@ -855,7 +866,14 @@ function App() {
             setSelectedProject('');
             await fetchData();
         } else if (currentType === 'requirement') {
-            await fetchData();
+            const freshRequirements = await fetchRequirementsOnly();
+            if (isSearching) {
+                const lowerCaseQuery = requirementQuery.toLowerCase();
+                const newSearchResults = freshRequirements.filter(req =>
+                    req.requirementUserIdentifier.toLowerCase().includes(lowerCaseQuery)
+                );
+                setDisplayableRequirements(newSearchResults);
+            }
         }
         
     } catch (error) {
@@ -864,7 +882,7 @@ function App() {
             setAllReleases(originalReleases);
         }
     }
-  }, [itemToDelete, deleteType, allReleases, fetchData, showMainMessage]);
+  }, [itemToDelete, deleteType, allReleases, fetchData, showMainMessage, isSearching, requirementQuery, fetchRequirementsOnly]);
 
   const getDeleteConfirmationMessage = () => {
     if (!itemToDelete) return '';
@@ -1103,7 +1121,7 @@ function App() {
             />
           } 
         />
-        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} />} />
+        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} />} />
         <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
         <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
       </Routes>
@@ -1121,7 +1139,31 @@ function App() {
         projects={projects} 
         currentProject={selectedProject} 
       />
-      <ConfirmationModal isOpen={isImportConfirmModalOpen} onClose={() => setIsImportConfirmModalOpen(false)} onConfirm={handleConfirmImport} title="Confirm Import" message={`The file contains ${importConfirmData?.newCount || 0} new item(s) and ${importConfirmData?.duplicateCount || 0} item(s) that already exist (based on 'Key'). Existing items will be imported with a modified name (e.g., 'Item Name (1)'). Do you want to proceed?`} />
+      {isImportConfirmModalOpen && importConfirmData && (
+          <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
+              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+                  <h3>Confirm Requirement Import</h3>
+                  <p>
+                      The file contains {importConfirmData.newCount} new requirement(s) and {importConfirmData.duplicateCount} duplicate(s).
+                      {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
+                  </p>
+                  <p>How would you like to proceed?</p>
+                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+                      <button onClick={handleConfirmImportAllRequirements} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                          Import All
+                      </button>
+                      {importConfirmData.newCount > 0 && (
+                          <button onClick={handleConfirmImportNewOnlyRequirements} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                              Import New Only
+                          </button>
+                      )}
+                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />

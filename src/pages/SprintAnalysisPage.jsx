@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ProjectSelector from '../components/ProjectSelector';
 import RetrospectiveColumn from '../components/RetrospectiveColumn';
 import RetrospectiveItemModal from '../components/RetrospectiveItemModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import SearchComponent from '../components/SearchComponent';
 
 const API_BASE_URL = '/api';
 
@@ -21,6 +22,10 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
 
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
 
 
   const fetchRetrospectiveItems = useCallback(async (project) => {
@@ -44,12 +49,6 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
       setIsLoading(false);
     }
   }, [showMessage]);
-
-  useEffect(() => {
-    if (projects && projects.length > 0 && !selectedProject) {
-      // setSelectedProject(projects[0]);
-    }
-  }, [projects, selectedProject]);
 
   useEffect(() => {
     fetchRetrospectiveItems(selectedProject);
@@ -149,8 +148,48 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
     }
   };
 
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setIsSearching(!!query);
+    setSearchSuggestions([]);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setIsSearching(false);
+    setSearchSuggestions([]);
+  };
+
+  const handleQueryChange = (query) => {
+    setSearchQuery(query);
+    if (query.length < 2) {
+      setSearchSuggestions([]);
+      return;
+    }
+    const lowerCaseQuery = query.toLowerCase();
+    const suggestions = retrospectiveItems
+      .filter(item => item.description.toLowerCase().includes(lowerCaseQuery))
+      .map(item => ({ id: item.id, name: item.description, context: item.column_type }))
+      .slice(0, 5);
+    setSearchSuggestions(suggestions);
+  };
+
+  const handleSuggestionSelect = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    setIsSearching(true);
+    setSearchSuggestions([]);
+  };
+
+  const displayedItems = useMemo(() => {
+    if (!isSearching || !searchQuery) return retrospectiveItems;
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    return retrospectiveItems.filter(item => 
+        item.description.toLowerCase().includes(lowerCaseQuery)
+    );
+  }, [isSearching, searchQuery, retrospectiveItems]);
+
   const getItemsForColumn = (columnType) => {
-    return retrospectiveItems.filter(item => item.column_type === columnType);
+    return displayedItems.filter(item => item.column_type === columnType);
   };
 
   return (
@@ -162,6 +201,15 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
             projects={projects || []}
             selectedProject={selectedProject}
             onSelectProject={setSelectedProject}
+          />
+          <SearchComponent
+            query={searchQuery}
+            onQueryChange={handleQueryChange}
+            onSearch={handleSearch}
+            onClear={handleClearSearch}
+            onSuggestionSelect={handleSuggestionSelect}
+            suggestions={searchSuggestions}
+            placeholder="Search retrospective items..."
           />
         </div>
         <div className="page-actions-group">
@@ -176,9 +224,10 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
       </div>
 
       {isLoading && <p className="loading-message-retro">Loading items...</p>}
-      {!isLoading && !selectedProject && <p className="select-project-prompt-retro">Please select a project to view retrospective items.</p>}
+      {!isLoading && !selectedProject && !isSearching && <p className="select-project-prompt-retro">Please select a project to view retrospective items.</p>}
+      {!isLoading && isSearching && displayedItems.length === 0 && <p className="empty-column-message">No items found for your search.</p>}
 
-      {!isLoading && selectedProject && (
+      {!isLoading && (selectedProject || isSearching) && (
         <div className="retrospective-board">
           {COLUMN_TYPES.map(column => (
             <RetrospectiveColumn

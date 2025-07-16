@@ -5,10 +5,21 @@ const useClickOutside = (handler) => {
 
   useEffect(() => {
     const maybeHandler = (event) => {
-      const isClickInsideDatePicker = event.target.closest('.react-datepicker-popper');
-      const isClickInsideCustomDropdown = event.target.closest('.custom-dropdown-options');
-      
-      if (domNode.current && !domNode.current.contains(event.target) && !isClickInsideDatePicker && !isClickInsideCustomDropdown) {
+      const portalSelectors = [
+        '.react-datepicker-popper',
+        '.custom-dropdown-options',
+        '.confirmation-modal-overlay',
+        '.add-new-modal-overlay',
+        '.history-modal-overlay',
+        '.gif-modal-overlay'
+      ];
+
+      const portalElement = event.target.closest(portalSelectors.join(','));
+
+      if (domNode.current && !domNode.current.contains(event.target)) {
+        if (portalElement && !portalElement.contains(domNode.current)) {
+          return;
+        }
         handler();
       }
     };
