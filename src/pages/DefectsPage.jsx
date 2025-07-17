@@ -122,13 +122,18 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   useEffect(() => {
     if (selectedProject) {
       const projectDefects = allDefects.filter(d => d.project === selectedProject);
+      const currentClosedDefects = projectDefects.filter(d => d.status === 'Closed');
       setActiveDefects(projectDefects.filter(d => d.status !== 'Closed'));
-      setClosedDefects(projectDefects.filter(d => d.status === 'Closed'));
+      setClosedDefects(currentClosedDefects);
+
+      if (showClosedView && currentClosedDefects.length === 0) {
+        setShowClosedView(false);
+      }
     } else {
       setActiveDefects([]);
       setClosedDefects([]);
     }
-  }, [allDefects, selectedProject]);
+  }, [allDefects, selectedProject, showClosedView]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -139,9 +144,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   }, [location.search, navigate, projects, onSelectProject]);
 
-  const handleToggleCharts = async () => {
-    if (showAreaChart) {
-      setShowAreaChart(false);
+  const updateChartData = useCallback(async () => {
+    if (!selectedProject) {
+      setAreaChartData(null);
+      setReturnToDevChartData(null);
       return;
     }
 
@@ -176,16 +182,21 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         if (!response.ok) throw new Error('Failed to fetch return to developer counts');
         const result = await response.json();
         if (result.data && result.data.length > 0) {
-          setReturnToDevChartData({
-            labels: result.data.map(d => d.title),
-            datasets: [{
-              label: 'Times Returned to Developer',
-              data: result.data.map(d => d.return_count),
-              backgroundColor: 'rgba(255, 159, 64, 0.7)',
-              borderColor: 'rgba(255, 159, 64, 1)',
-              borderWidth: 1,
-            }]
-          });
+          const filteredData = result.data.filter(d => d.return_count >= 2);
+          if (filteredData.length > 0) {
+            setReturnToDevChartData({
+              labels: filteredData.map(d => d.title),
+              datasets: [{
+                label: 'Times Returned to Developer',
+                data: filteredData.map(d => d.return_count),
+                backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1,
+              }]
+            });
+          } else {
+            setReturnToDevChartData(null);
+          }
         } else {
           setReturnToDevChartData(null);
         }
@@ -196,8 +207,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     } else {
       setReturnToDevChartData(null);
     }
-    
-    setShowAreaChart(true);
+  }, [selectedProject, showClosedView, activeDefects, closedDefects, showMessage]);
+
+  useEffect(() => {
+    if (showAreaChart) {
+      updateChartData();
+    }
+  }, [showAreaChart, updateChartData]);
+
+  const handleToggleCharts = () => {
+    setShowAreaChart(prev => !prev);
   };
 
   const handleOpenModal = (defect = null) => {
@@ -514,7 +533,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
             <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
                 {showAreaChart ? 'Hide' : 'Show'} Charts
             </button>
-            <button onClick={() => setShowClosedView(p => !p)} className="defect-action-button" disabled={isLoading || allDefects.filter(d => d.status === 'Closed').length === 0} style={{backgroundColor: '#E0D3B6', borderColor: '#C8BBA2'}}>
+            <button onClick={() => setShowClosedView(p => !p)} className="defect-action-button" disabled={isLoading || closedDefects.length === 0} style={{backgroundColor: '#E0D3B6', borderColor: '#C8BBA2'}}>
                 {showClosedView ? 'Show Active Defects' : 'Show Closed Defects'}
             </button>
             <DefectOptionsMenu
