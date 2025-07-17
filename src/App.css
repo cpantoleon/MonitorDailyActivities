@@ -35,7 +35,7 @@ body {
   color: #704214;
   font-weight: 500;
   font-size: 0.9em;
-  padding: 0; 
+  padding: 0;
 }
 
 .app-container {
@@ -648,7 +648,7 @@ body {
 .notes-sidebar-column {
   grid-column: 2 / 3;
   position: sticky;
-  top: 20px; 
+  top: 20px;
 }
 
 .notes-sidebar-column .daily-info-widget {
@@ -973,10 +973,10 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.07);
 }
 .defects-controls .selection-group, .retrospective-controls .selection-group { margin-bottom: 0; }
-.defects-actions-group { 
-  display: flex; 
-  align-items: flex-end; 
-  gap: 12px; 
+.defects-actions-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
 }
 .add-defect-button, .add-retro-item-button {
   padding: 10px 20px;
@@ -1121,6 +1121,17 @@ body {
 
 .linked-item-tag.defect:hover {
   background-color: #b2dfdb;
+}
+
+.linked-item-tag.defect.closed {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+  color: #6c757d;
+  text-decoration: line-through;
+}
+
+.linked-item-tag.defect.closed:hover {
+  background-color: #dee2e6;
 }
 
 .dual-listbox-container {
@@ -1297,7 +1308,6 @@ body {
 
 .tooltip-text-portal {
   position: fixed;
-  transform: translateY(-50%);
   background-color: #5C4033;
   color: #fff;
   text-align: left;
@@ -1316,8 +1326,12 @@ body {
   max-width: 220px;
   padding: 8px 10px;
 }
+/* Positioning for the default "right" tooltip */
+.tooltip-right {
+  transform: translateY(-50%);
+}
 
-.tooltip-text-portal::after {
+.tooltip-right::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -1326,6 +1340,22 @@ body {
   border-width: 6px;
   border-style: solid;
   border-color: transparent #5C4033 transparent transparent;
+}
+
+/* Positioning for the new "bottom" tooltip */
+.tooltip-bottom {
+  transform: translateX(-50%);
+}
+
+.tooltip-bottom::after {
+  content: "";
+  position: absolute;
+  bottom: 100%; /* Position arrow at the top of the tooltip */
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent transparent #5C4033 transparent; /* Make arrow point up */
 }
 
 .tooltip-text-portal strong {
@@ -1449,7 +1479,7 @@ body {
   }
   .notes-sidebar-column {
     grid-row: 2;
-    position: static; 
+    position: static;
     margin-top: 20px;
   }
 }

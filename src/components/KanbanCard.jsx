@@ -90,9 +90,9 @@ const KanbanCard = React.memo(({
                 {requirement.linkedDefects.map(defect => (
                   <button 
                     key={defect.id} 
-                    className="linked-item-tag defect"
+                    className={`linked-item-tag defect ${defect.status === 'Closed' ? 'closed' : ''}`}
                     onClick={() => handleDefectClick(requirement.project)}
-                    title={`Go to defects for project ${requirement.project}`}
+                    title={`Go to defects for project ${requirement.project} (Status: ${defect.status})`}
                   >
                     {defect.title}
                   </button>

@@ -21,10 +21,11 @@ import ConfirmationModal from './components/ConfirmationModal';
 import Toast from './components/Toast';
 import SearchComponent from './components/SearchComponent';
 import UpdateStatusModal from './components/UpdateStatusModal';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
+import Tooltip from './components/Tooltip';
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
-ChartJS.register(ArcElement, Tooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
+ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
 const API_BASE_URL = '/api';
 
@@ -114,6 +115,18 @@ const SprintActivitiesPage = ({
 }) => {
   const [showCharts, setShowCharts] = useState(false);
 
+  const sprintChartTooltipContent = (
+    <>
+      <strong>Sprint Activity Charts</strong>
+      <p>These charts provide a visual summary of the current sprint and release progress.</p>
+      <ul>
+        <li><strong>Current Sprint:</strong> A pie chart showing the completion status ('Done' vs. 'To Be Tested') of requirements in the selected sprint.</li>
+        <li><strong>Active Release:</strong> A pie chart showing the completion status of all requirements assigned to the active release for this project.</li>
+        <li><strong>Scope Changes:</strong> A bar chart that highlights requirements within the current sprint that have undergone scope changes, showing how many times each has been modified.</li>
+      </ul>
+    </>
+  );
+
   const getChartData = (reqs) => {
     if (!reqs || reqs.length === 0) return null;
     let done = 0;
@@ -193,9 +206,9 @@ const SprintActivitiesPage = ({
     ...baseChartOptions,
     plugins: { ...baseChartOptions.plugins, title: { ...baseChartOptions.plugins.title, text: `Current Sprint: ${selectedSprint}` } }
   };
-  
+
   const activeRelease = projectReleases.find(r => r.is_current);
-  const releaseRequirements = activeRelease 
+  const releaseRequirements = activeRelease
     ? allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === activeRelease.id)
     : [];
   const releaseChartData = getChartData(releaseRequirements);
@@ -263,9 +276,12 @@ const SprintActivitiesPage = ({
           />
         </div>
         <div className="page-actions-group">
-           <button onClick={() => setShowCharts(p => !p)} className="defect-action-button" disabled={!selectedProject || !selectedSprint}>
-                {showCharts ? 'Hide' : 'Show'} Charts
-            </button>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+               <Tooltip content={sprintChartTooltipContent} position="bottom" />
+               <button onClick={() => setShowCharts(p => !p)} className="defect-action-button" disabled={!selectedProject || !selectedSprint}>
+                   {showCharts ? 'Hide' : 'Show'} Charts
+               </button>
+           </div>
           <OptionsMenu
             onOpenAddProjectModal={onOpenAddProjectModal}
             onOpenAddModal={onOpenAddModal}
@@ -355,7 +371,7 @@ function App() {
 
   const [isAddReleaseModalOpen, setIsAddReleaseModalOpen] = useState(false);
   const [isEditReleaseModalOpen, setIsEditReleaseModalOpen] = useState(false);
-  
+
   const [isImportConfirmModalOpen, setIsImportConfirmModalOpen] = useState(false);
   const [importConfirmData, setImportConfirmData] = useState(null);
 
@@ -396,7 +412,7 @@ function App() {
         return;
     }
     try {
-        const releasePromises = projects.map(p => 
+        const releasePromises = projects.map(p =>
             fetch(`${API_BASE_URL}/releases/${p}`).then(res => res.json())
         );
         const results = await Promise.all(releasePromises);
@@ -462,15 +478,15 @@ function App() {
       if (!projectsResponse.ok) throw new Error(`Project fetch failed: ${projectsResponse.statusText}`);
       const projectsResult = await projectsResponse.json();
       const officialProjects = projectsResult.data || [];
-      
+
       const freshRequirements = await fetchRequirementsOnly();
       const projectsFromData = getUniqueProjects(freshRequirements);
       const combinedProjects = Array.from(new Set([...officialProjects, ...projectsFromData])).sort();
       setProjects(combinedProjects);
 
-    } catch (err) { 
-        setError(err.message || "Failed to fetch data."); 
-        setAllProcessedRequirements([]); 
+    } catch (err) {
+        setError(err.message || "Failed to fetch data.");
+        setAllProcessedRequirements([]);
         setProjects([]);
     }
     finally { setIsLoading(false); }
@@ -521,7 +537,7 @@ function App() {
 
     const { id, project, requirementUserIdentifier, currentStatusDetails } = editingRequirement;
     const { name, comment, sprint, status, link, isBacklog, type, tags, release_id } = formData;
-    
+
     const newSprintValue = isBacklog ? 'Backlog' : `Sprint ${sprint}`;
 
     let somethingChanged = false;
@@ -554,7 +570,7 @@ function App() {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(activityPayload)
         });
         if (!activityResponse.ok) throw new Error('Failed to update status/sprint.');
-      
+
       } else if (comment !== currentStatusDetails.comment || link !== (currentStatusDetails.link || '') || type !== (currentStatusDetails.type || '') || tags !== (currentStatusDetails.tags || '') || (release_id || null) !== (currentStatusDetails.releaseId || null)) {
         somethingChanged = true;
         const updatePayload = {
@@ -639,7 +655,7 @@ function App() {
       showMainMessage("Project, Requirement Name, and Status are mandatory.", 'error');
       return;
     }
-    
+
     const sprintValue = isBacklog ? 'Backlog' : `Sprint ${sprint}`;
 
     const payload = {
@@ -762,9 +778,9 @@ function App() {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Validation failed');
-        
+
         const { newCount, duplicateCount, skippedCount } = result.data;
-        
+
         if (newCount === 0 && duplicateCount === 0) {
             let message = "Import finished. No valid items found to import.";
             if (skippedCount > 0) message += ` Skipped items: ${skippedCount}.`;
@@ -823,7 +839,7 @@ function App() {
     setIsDeleteConfirmModalOpen(false);
     setItemToDelete(null);
     setDeleteType('');
-    
+
     if (currentType === 'release') {
       setIsEditReleaseModalOpen(false);
       originalReleases = [...allReleases];
@@ -875,7 +891,7 @@ function App() {
                 setDisplayableRequirements(newSearchResults);
             }
         }
-        
+
     } catch (error) {
         showMainMessage(`Error: ${error.message}`, 'error');
         if (currentType === 'release' && originalReleases) {
@@ -897,7 +913,7 @@ function App() {
             return 'Are you sure?';
     }
   };
-  
+
   const handleAddRelease = async (releaseData) => {
     try {
         const response = await fetch(`${API_BASE_URL}/releases`, {
@@ -997,7 +1013,7 @@ function App() {
       return;
     }
     const lowerCaseQuery = query.toLowerCase();
-    
+
     let sourceData = allProcessedRequirements;
     if (selectedProject) {
       sourceData = sourceData.filter(req => req.project === selectedProject);
@@ -1022,7 +1038,7 @@ function App() {
     setSearchSuggestions([]);
 
     const selectedReq = allProcessedRequirements.find(req => req.id === suggestion.id);
-    
+
     if (selectedReq) {
       setDisplayableRequirements([selectedReq]);
       setSelectedProject(selectedReq.project);
@@ -1087,10 +1103,10 @@ function App() {
       <AppNavigationBar />
       <Toast key={toastInfo.key} message={toastInfo.message} type={toastInfo.type} onDismiss={handleDismissToast} />
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            <SprintActivitiesPage 
+            <SprintActivitiesPage
               projects={projects}
               selectedProject={selectedProject}
               onSelectProject={setSelectedProject}
@@ -1119,7 +1135,7 @@ function App() {
               allProcessedRequirements={allProcessedRequirements}
               hasAnyReleases={allReleases.length > 0}
             />
-          } 
+          }
         />
         <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} />} />
         <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
@@ -1131,13 +1147,13 @@ function App() {
       <ImportRequirementsModal isOpen={isImportModalOpen} onClose={handleCloseImportModal} onImport={handleValidateImport} projects={projects} releases={allReleases} currentProject={selectedProject} />
       <AddReleaseModal isOpen={isAddReleaseModalOpen} onClose={() => setIsAddReleaseModalOpen(false)} onAdd={handleAddRelease} projects={projects} currentProject={selectedProject} />
       <EditReleaseModal isOpen={isEditReleaseModalOpen} onClose={() => setIsEditReleaseModalOpen(false)} onSave={handleEditRelease} onDelete={(release) => handleDeleteRequest('release', release)} releases={allReleases} projects={projects} currentProject={selectedProject} />
-      <EditProjectModal 
-        isOpen={isEditProjectModalOpen} 
-        onClose={() => setIsEditProjectModalOpen(false)} 
-        onSave={handleEditProject} 
-        onDelete={(project) => handleDeleteRequest('project', project)} 
-        projects={projects} 
-        currentProject={selectedProject} 
+      <EditProjectModal
+        isOpen={isEditProjectModalOpen}
+        onClose={() => setIsEditProjectModalOpen(false)}
+        onSave={handleEditProject}
+        onDelete={(project) => handleDeleteRequest('project', project)}
+        projects={projects}
+        currentProject={selectedProject}
       />
       {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>

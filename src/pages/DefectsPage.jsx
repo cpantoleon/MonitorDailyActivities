@@ -8,10 +8,11 @@ import DefectHistoryModal from '../components/DefectHistoryModal';
 import SearchComponent from '../components/SearchComponent';
 import UpdateStatusModal from '../components/UpdateStatusModal';
 import ImportDefectsModal from '../components/ImportDefectsModal';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
+import Tooltip from '../components/Tooltip';
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
-ChartJS.register(ArcElement, Tooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
+ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
 const API_BASE_URL = '/api';
 const DEFECT_STATUS_COLUMNS = [
@@ -38,7 +39,7 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal }) => {
     onOpenAddModal();
     setIsOpen(false);
   };
-  
+
   const handleImportClick = () => {
     onOpenImportModal();
     setIsOpen(false);
@@ -93,6 +94,17 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const navigate = useNavigate();
   const location = useLocation();
   const hasFetched = useRef(false);
+
+  const defectChartTooltipContent = (
+    <>
+      <strong>Defect Charts</strong>
+      <p>These charts provide insights into the defects for the selected project.</p>
+      <ul>
+        <li><strong>Distribution by Area:</strong> A pie chart showing the breakdown of defects based on their functional or system area.</li>
+        <li><strong>"Back to Developer" Count:</strong> A bar chart highlighting defects that have been returned to the developer multiple times (2 or more), which can indicate complex issues or misunderstandings.</li>
+      </ul>
+    </>
+  );
 
   const fetchAllDefects = useCallback(async () => {
     setIsLoading(true);
@@ -235,12 +247,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     const isEditing = !!editingDefect;
     const url = isEditing ? `${API_BASE_URL}/defects/${editingDefect.id}` : `${API_BASE_URL}/defects`;
     const method = isEditing ? 'PUT' : 'POST';
-    
+
     try {
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'create'} defect`);
-      
+
       showMessage(`Defect ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
       await fetchAllDefects();
       if (onDefectUpdate) onDefectUpdate();
@@ -263,9 +275,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         throw new Error(result.error || 'Failed to delete defect');
       }
       showMessage('Defect deleted successfully!', 'success');
-      
+
       const freshDefects = await fetchAllDefects();
-      
+
       if (isSearching) {
         const lowerCaseQuery = defectQuery.toLowerCase();
         const sourceData = freshDefects.filter(defect => showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed');
@@ -332,7 +344,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         const response = await fetch(`${API_BASE_URL}/import/defects/validate`, { method: 'POST', body: formData });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Validation failed');
-        
+
         const { newCount, duplicateCount, skippedCount } = result.data;
         if (newCount === 0 && duplicateCount === 0) {
             let message = "Import finished. No valid defects found to import.";
@@ -530,9 +542,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
             />
         </div>
         <div className="page-actions-group">
-            <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
-                {showAreaChart ? 'Hide' : 'Show'} Charts
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Tooltip content={defectChartTooltipContent} position="bottom" />
+                <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
+                    {showAreaChart ? 'Hide' : 'Show'} Charts
+                </button>
+            </div>
             <button onClick={() => setShowClosedView(p => !p)} className="defect-action-button" disabled={isLoading || closedDefects.length === 0} style={{backgroundColor: '#E0D3B6', borderColor: '#C8BBA2'}}>
                 {showClosedView ? 'Show Active Defects' : 'Show Closed Defects'}
             </button>
@@ -554,14 +569,14 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       )}
 
       {!isLoading && (isSearching ? (searchResults.length > 0 ? renderBoard(searchResults) : <div className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(defectsForNormalView) : null))}
-      
+
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} />
       {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
-      
+
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
-      
+
       {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
               <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>

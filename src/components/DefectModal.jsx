@@ -9,7 +9,7 @@ const API_BASE_URL = '/api';
 const DEFECT_STATUSES = ['Assigned to Developer', 'Assigned to Tester', 'Done'];
 
 const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [] }) => {
-  
+
   const getInitialFormState = (project) => ({
     project: project || '',
     title: '',
@@ -27,13 +27,12 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [isCustomArea, setIsCustomArea] = useState(false);
   const [modalAreas, setModalAreas] = useState([]);
-  
+
   const [availableRequirements, setAvailableRequirements] = useState([]);
   const [selectedRequirements, setSelectedRequirements] = useState([]);
   const [toAdd, setToAdd] = useState([]);
   const [toRemove, setToRemove] = useState([]);
 
-  // --- NEW: State for search queries ---
   const [availableSearchQuery, setAvailableSearchQuery] = useState('');
   const [selectedSearchQuery, setSelectedSearchQuery] = useState('');
 
@@ -102,7 +101,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
       setModalAreas([]);
       return;
     }
-    
+
     const fetchAreasForProject = async (project) => {
       try {
         const res = await fetch(`${API_BASE_URL}/defects/${project}?statusType=all`);
@@ -125,8 +124,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
     fetchAreasForProject(formData.project);
   }, [isOpen, formData.project, defect]);
-  
-  // --- UPDATED: useEffect to filter lists based on search queries ---
+
   useEffect(() => {
     if (isOpen) {
       const linkedIdsSet = new Set(formData.linkedRequirementGroupIds);
@@ -134,12 +132,12 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
       let selected = requirementsForSelectedProject.filter(r => linkedIdsSet.has(r.id));
 
       if (availableSearchQuery) {
-        available = available.filter(r => 
+        available = available.filter(r =>
           r.requirementUserIdentifier.toLowerCase().includes(availableSearchQuery.toLowerCase())
         );
       }
       if (selectedSearchQuery) {
-        selected = selected.filter(r => 
+        selected = selected.filter(r =>
           r.requirementUserIdentifier.toLowerCase().includes(selectedSearchQuery.toLowerCase())
         );
       }
@@ -216,7 +214,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   };
 
   if (!isOpen) return null;
-  
+
   const projectOptions = projects.map(p => ({ value: p, label: p }));
   const areaOptions = modalAreas.map(pa => ({ value: pa, label: pa }));
   const statusOptionsList = defect ? [...DEFECT_STATUSES, 'Closed'] : DEFECT_STATUSES;
@@ -291,7 +289,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 <div className="dual-listbox-container">
                   <div className="listbox-wrapper">
                     <label htmlFor="available-requirements-listbox" className="optional-label">Available</label>
-                    {/* --- NEW: Search input for Available list --- */}
                     <input
                       type="text"
                       placeholder="Search available..."
@@ -309,7 +306,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                   </div>
                   <div className="listbox-wrapper">
                     <label htmlFor="selected-requirements-listbox" className="optional-label">Selected</label>
-                    {/* --- NEW: Search input for Selected list --- */}
                     <input
                       type="text"
                       placeholder="Search selected..."
