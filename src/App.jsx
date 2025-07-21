@@ -24,6 +24,7 @@ import UpdateStatusModal from './components/UpdateStatusModal';
 import Tooltip from './components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
+import Chatbot from './components/Chatbot';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
@@ -158,7 +159,7 @@ const SprintActivitiesPage = ({
 
     changedReqs.sort((a, b) => b.changeCount - a.changeCount);
 
-    const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
+    const splitLabelIntoLines = (label, maxCharsPerLine = 22) => {
         const words = label.split(' ');
         const lines = [];
         let currentLine = '';
@@ -1183,6 +1184,7 @@ function App() {
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
+      <Chatbot selectedProject={selectedProject} />
     </div>
   );
 }

@@ -1326,7 +1326,6 @@ body {
   max-width: 220px;
   padding: 8px 10px;
 }
-/* Positioning for the default "right" tooltip */
 .tooltip-right {
   transform: translateY(-50%);
 }
@@ -1342,7 +1341,6 @@ body {
   border-color: transparent #5C4033 transparent transparent;
 }
 
-/* Positioning for the new "bottom" tooltip */
 .tooltip-bottom {
   transform: translateX(-50%);
 }
@@ -1350,12 +1348,12 @@ body {
 .tooltip-bottom::after {
   content: "";
   position: absolute;
-  bottom: 100%; /* Position arrow at the top of the tooltip */
+  bottom: 100%; 
   left: 50%;
   margin-left: -6px;
   border-width: 6px;
   border-style: solid;
-  border-color: transparent transparent #5C4033 transparent; /* Make arrow point up */
+  border-color: transparent transparent #5C4033 transparent; 
 }
 
 .tooltip-text-portal strong {

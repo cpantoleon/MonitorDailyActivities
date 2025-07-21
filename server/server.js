@@ -7,6 +7,26 @@ const path = require('path');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
+// --- NEW RESILIENT CHATBOT LOADING ---
+let syncWithQdrant, handleChatbotQuery;
+let isChatbotEnabled = false;
+
+try {
+  const chatbotModule = require('./chatbot.js');
+  syncWithQdrant = chatbotModule.syncWithQdrant;
+  handleChatbotQuery = chatbotModule.handleChatbotQuery;
+  isChatbotEnabled = true;
+  console.log("Chatbot module loaded successfully.");
+} catch (error) {
+  console.warn("**************************************************");
+  console.warn("WARNING: Chatbot module failed to load.");
+  console.warn("The server will run without chatbot functionality.");
+  console.warn("Reason:", error.message);
+  console.warn("**************************************************");
+  isChatbotEnabled = false;
+}
+// --- END RESILIENT LOADING ---
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -1238,37 +1258,53 @@ app.put("/api/defects/:id", (req, res) => {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
 
-            const deleteLinksSql = `DELETE FROM defect_requirement_links WHERE defect_id = ?`;
-            db.run(deleteLinksSql, [defectId], (deleteErr) => {
-                if(deleteErr) {
-                    db.run("ROLLBACK");
-                    return res.status(500).json({ error: "Failed to update links." });
-                }
-                if (linkedRequirementGroupIds && linkedRequirementGroupIds.length > 0) {
-                    const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                    linkedRequirementGroupIds.forEach(reqId => {
-                        db.run(insertLinkSql, [defectId, reqId]);
+            const handleLinks = (callback) => {
+                if (linkedRequirementGroupIds !== undefined) {
+                    db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
+                        if (deleteErr) return callback(deleteErr);
+                        if (linkedRequirementGroupIds.length > 0) {
+                            const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
+                            let completed = 0;
+                            linkedRequirementGroupIds.forEach(reqId => {
+                                db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
+                                    if(insertErr) console.error("Error inserting link:", insertErr.message);
+                                    completed++;
+                                    if (completed === linkedRequirementGroupIds.length) callback(null);
+                                });
+                            });
+                        } else {
+                            callback(null);
+                        }
                     });
+                } else {
+                    callback(null);
                 }
-            });
-            
-            const historyComment = comment ? comment.trim() : null;
-            if (hasFieldChanges || historyComment) {
-                const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
-                const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
-                db.run(historySql, [defectId, changesSummaryString, historyComment]);
-            }
+            };
 
-            if (hasFieldChanges) {
-                updates.push("updated_at = CURRENT_TIMESTAMP");
-                const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
-                updateParamsList.push(defectId);
-                db.run(sqlUpdate, updateParamsList);
-            }
-            
-            db.run("COMMIT", (commitErr) => {
-                if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
-                res.json({ message: "Defect updated successfully.", defectId: defectId });
+            handleLinks((linkErr) => {
+                if (linkErr) {
+                    db.run("ROLLBACK");
+                    return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
+                }
+
+                const historyComment = comment ? comment.trim() : null;
+                if (hasFieldChanges || historyComment) {
+                    const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
+                    const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
+                    db.run(historySql, [defectId, changesSummaryString, historyComment]);
+                }
+
+                if (hasFieldChanges) {
+                    updates.push("updated_at = CURRENT_TIMESTAMP");
+                    const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
+                    updateParamsList.push(defectId);
+                    db.run(sqlUpdate, updateParamsList);
+                }
+                
+                db.run("COMMIT", (commitErr) => {
+                    if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                    res.json({ message: "Defect updated successfully.", defectId: defectId });
+                });
             });
         });
     });
@@ -1306,6 +1342,20 @@ app.post("/api/settings/weather-location", (req, res) => {
         res.json({ message: "Location saved successfully.", location: location.trim() });
     });
 });
+
+if (isChatbotEnabled) {
+  app.post("/api/chatbot/sync", syncWithQdrant(db));
+  app.post("/api/chatbot", handleChatbotQuery(db, getProjectId, PORT));
+} else {
+  const chatbotDisabledHandler = (req, res) => {
+    res.status(503).json({ 
+      error: "Chatbot functionality is currently disabled.",
+      reply: "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
+    });
+  };
+  app.post("/api/chatbot/sync", chatbotDisabledHandler);
+  app.post("/api/chatbot", chatbotDisabledHandler);
+}
 
 app.use(function(req, res){
     res.status(404).json({"error": "Endpoint not found"});

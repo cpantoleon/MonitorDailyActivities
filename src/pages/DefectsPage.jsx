@@ -79,6 +79,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const [showAreaChart, setShowAreaChart] = useState(false);
   const [areaChartData, setAreaChartData] = useState(null);
   const [returnToDevChartData, setReturnToDevChartData] = useState(null);
+  const [doneNotDoneChartData, setDoneNotDoneChartData] = useState(null);
   const [showClosedView, setShowClosedView] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [defectQuery, setDefectQuery] = useState('');
@@ -100,6 +101,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       <strong>Defect Charts</strong>
       <p>These charts provide insights into the defects for the selected project.</p>
       <ul>
+        <li><strong>Active Defect Status:</strong> A pie chart showing the proportion of active defects that are 'Done' versus 'Not Done'.</li>
         <li><strong>Distribution by Area:</strong> A pie chart showing the breakdown of defects based on their functional or system area.</li>
         <li><strong>"Back to Developer" Count:</strong> A bar chart highlighting defects that have been returned to the developer multiple times (2 or more), which can indicate complex issues or misunderstandings.</li>
       </ul>
@@ -160,7 +162,38 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     if (!selectedProject) {
       setAreaChartData(null);
       setReturnToDevChartData(null);
+      setDoneNotDoneChartData(null);
       return;
+    }
+
+    // Done vs Not-Done Pie Chart for Active Defects
+    if (!showClosedView && activeDefects.length > 0) {
+      let doneCount = 0;
+      let notDoneCount = 0;
+      activeDefects.forEach(defect => {
+        if (defect.status === 'Done') {
+          doneCount++;
+        } else {
+          notDoneCount++;
+        }
+      });
+
+      if (doneCount > 0 || notDoneCount > 0) {
+        setDoneNotDoneChartData({
+          labels: ['Done', 'Not Done'],
+          datasets: [{
+            label: 'Defect Status',
+            data: [doneCount, notDoneCount],
+            backgroundColor: ['#151078', '#b84459'],
+            borderColor: ['#ffffff', '#ffffff'],
+            borderWidth: 1,
+          }],
+        });
+      } else {
+        setDoneNotDoneChartData(null);
+      }
+    } else {
+      setDoneNotDoneChartData(null);
     }
 
     const defectsForChart = showClosedView ? closedDefects : activeDefects;
@@ -196,14 +229,37 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         if (result.data && result.data.length > 0) {
           const filteredData = result.data.filter(d => d.return_count >= 2);
           if (filteredData.length > 0) {
+            
+            const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
+                const words = label.split(' ');
+                const lines = [];
+                let currentLine = '';
+                for (const word of words) {
+                    if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = currentLine ? currentLine + ' ' + word : word;
+                    }
+                }
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                return lines;
+            };
+
+            const fullLabels = filteredData.map(d => d.title);
+            const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
+
             setReturnToDevChartData({
-              labels: filteredData.map(d => d.title),
+              labels: multilineLabels,
               datasets: [{
                 label: 'Times Returned to Developer',
                 data: filteredData.map(d => d.return_count),
                 backgroundColor: 'rgba(255, 159, 64, 0.7)',
                 borderColor: 'rgba(255, 159, 64, 1)',
                 borderWidth: 1,
+                fullLabels: fullLabels,
               }]
             });
           } else {
@@ -487,17 +543,50 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const pieChartOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'right', labels: { boxWidth: 20, padding: 15 } },
+      legend: { position: 'top' },
       title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } },
+      tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
+    },
+  };
+  
+  const doneNotDonePieChartOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } },
       tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
     },
   };
 
   const returnToDevChartOptions = {
     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    layout: {
+        padding: {
+            left: 20
+        }
+    },
     plugins: {
       legend: { display: false },
-      title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }
+      title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } },
+      tooltip: {
+        callbacks: {
+            title: function(context) {
+                const dataIndex = context[0].dataIndex;
+                const fullLabel = context[0].dataset.fullLabels[dataIndex];
+                return fullLabel;
+            },
+            label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                    label += ': ';
+                }
+                if (context.parsed.x !== null) {
+                    label += context.parsed.x;
+                }
+                return label;
+            }
+        }
+      }
     },
     scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
   };
@@ -525,7 +614,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     <div className="main-content-area">
        <style>{`
         .defect-charts-wrapper { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 20px; }
-        .defect-charts-wrapper .defect-chart-container { flex: 1 1 45%; min-width: 400px; max-width: 600px; height: 320px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #fff; }
+        .defect-charts-wrapper .defect-chart-container { flex: 1 1 30%; min-width: 350px; max-width: 500px; height: 320px; padding: 10px; border: 1px solid #DEB887; border-radius: 8px; background-color: #FFF8DC; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
       `}</style>
       <h2>Defect Tracking</h2>
       <div className="selection-controls">
@@ -543,7 +632,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         </div>
         <div className="page-actions-group">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Tooltip content={defectChartTooltipContent} position="bottom" />
+                 <Tooltip content={defectChartTooltipContent} position="bottom" />
                 <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
                     {showAreaChart ? 'Hide' : 'Show'} Charts
                 </button>
@@ -560,11 +649,21 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
 
       {isLoading && <p className="loading-message-defects">Loading defects...</p>}
       {!isLoading && !isSearching && !selectedProject && <p className="select-project-prompt-defects">Please select a project to view defects, or use the search bar for all projects.</p>}
+      
       {showAreaChart && selectedProject && (
         <div className="defect-charts-wrapper">
+          {doneNotDoneChartData && !showClosedView && (
+            <div className="defect-chart-container">
+              <Pie data={doneNotDoneChartData} options={doneNotDonePieChartOptions} />
+            </div>
+          )}
           {areaChartData && <div className="defect-chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
           {returnToDevChartData && <div className="defect-chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
-          {!areaChartData && !returnToDevChartData && !isLoading && <div className="defect-chart-container" style={{ flexBasis: '100%', height: 'auto' }}><p>No chart data available for the selected project.</p></div>}
+          {!areaChartData && !returnToDevChartData && (showClosedView || !doneNotDoneChartData) && !isLoading && (
+            <div className="defect-chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
+              <p>No chart data available for the selected project.</p>
+            </div>
+          )}
         </div>
       )}
 
