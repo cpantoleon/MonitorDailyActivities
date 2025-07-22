@@ -51,7 +51,27 @@
   margin: 0;
   color: #5C4033;
   font-size: 1.1em;
+  flex-grow: 1; /* --- MODIFIED --- Allow h3 to take up available space */
 }
+
+/* --- NEW --- Styles for the clear button */
+.chatbot-clear-btn {
+  background: none;
+  border: 1px solid #DEB887;
+  color: #A0522D;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  font-weight: 500;
+  margin-right: 10px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.chatbot-clear-btn:hover {
+  background-color: #F5DEB3;
+}
+/* --- END NEW --- */
 
 .chatbot-close-btn {
   background: none;
@@ -92,6 +112,11 @@
   border: 1px solid #DEB887;
   border-bottom-left-radius: 3px;
   align-self: flex-start;
+}
+
+/* --- MODIFIED --- Render newlines correctly */
+.message p {
+  margin: 0;
 }
 
 .chatbot-input-form {

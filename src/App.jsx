@@ -30,6 +30,8 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategorySc
 
 const API_BASE_URL = '/api';
 
+// ... (OptionsMenu and SprintActivitiesPage components remain unchanged) ...
+
 const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenAddReleaseModal, onOpenEditReleaseModal, onOpenEditProjectModal, hasProjects, hasAnyReleases }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -492,6 +494,24 @@ function App() {
     }
     finally { setIsLoading(false); }
   }, [fetchRequirementsOnly]);
+
+  // --- NEW: Lightweight data refresh handler for the chatbot ---
+  const handleDataRefresh = useCallback(async (newItemDetails) => {
+      // This function only refetches requirements, avoiding the "flash"
+      await fetchRequirementsOnly(); 
+      
+      // Show a success toast message
+      showMainMessage(`Successfully created: "${newItemDetails.title}"`, 'success');
+      
+      // Automatically switch the view to where the new item was created
+      if (newItemDetails.project) {
+          setSelectedProject(newItemDetails.project);
+      }
+      if (newItemDetails.sprint) {
+          setSelectedSprint(newItemDetails.sprint);
+      }
+  }, [fetchRequirementsOnly, showMainMessage]);
+  // --- END NEW ---
 
   useEffect(() => {
     if (!hasFetched.current) {
@@ -1184,7 +1204,14 @@ function App() {
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
-      <Chatbot selectedProject={selectedProject} />
+      
+      {/* --- MODIFIED: Pass the new handler to the chatbot --- */}
+      <Chatbot 
+        selectedProject={selectedProject} 
+        onDataChange={handleDataRefresh} 
+      />
+      {/* --- END MODIFIED --- */}
+
     </div>
   );
 }

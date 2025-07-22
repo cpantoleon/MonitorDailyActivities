@@ -1,20 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
-const Chatbot = ({ selectedProject }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState([
-        { from: 'bot', text: 'Hello! How can I help you with your project today?' }
-    ]);
+const Chatbot = ({ selectedProject, onDataChange }) => {
+    // Initialize state from sessionStorage to make it persistent
+    const getInitialState = () => {
+        try {
+            const storedMessages = sessionStorage.getItem('chatbotMessages');
+            const storedIsOpen = sessionStorage.getItem('chatbotIsOpen');
+            const messages = storedMessages 
+                ? JSON.parse(storedMessages) 
+                : [{ from: 'bot', text: 'Hello! How can I help you with your project today?' }];
+            const isOpen = storedIsOpen ? JSON.parse(storedIsOpen) : false;
+            return { messages, isOpen };
+        } catch (error) {
+            console.error("Failed to parse chatbot state from sessionStorage", error);
+            return {
+                messages: [{ from: 'bot', text: 'Hello! How can I help you with your project today?' }],
+                isOpen: false
+            };
+        }
+    };
+
+    const [isOpen, setIsOpen] = useState(getInitialState().isOpen);
+    const [messages, setMessages] = useState(getInitialState().messages);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+
+    // Save state to sessionStorage whenever it changes
+    useEffect(() => {
+        sessionStorage.setItem('chatbotIsOpen', JSON.stringify(isOpen));
+    }, [isOpen]);
+
+    useEffect(() => {
+        sessionStorage.setItem('chatbotMessages', JSON.stringify(messages));
+    }, [messages]);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 50);
     };
 
     useEffect(scrollToBottom, [messages]);
+
+    useEffect(() => {
+        if (isOpen) {
+            scrollToBottom();
+            inputRef.current?.focus();
+        }
+    }, [isOpen]);
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -40,13 +76,28 @@ const Chatbot = ({ selectedProject }) => {
             const botMessage = { from: 'bot', text: data.reply || "I'm sorry, I had trouble responding." };
             setMessages(prev => [...prev, botMessage]);
 
+            // --- MODIFIED: Call the lightweight refresh handler from App.jsx ---
+            if (data.data_changed && onDataChange) {
+                // Pass the details of the new item to the handler
+                onDataChange(data.new_item); 
+            }
+            // --- END MODIFIED ---
+
         } catch (error) {
             console.error("Chatbot fetch error:", error);
             const errorMessage = { from: 'bot', text: 'Sorry, something went wrong. Please try again.' };
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
+            inputRef.current?.focus();
         }
+    };
+
+    const handleClearChat = () => {
+        setMessages([
+            { from: 'bot', text: 'Hello! How can I help you with your project today?' }
+        ]);
+        inputRef.current?.focus();
     };
 
     return (
@@ -55,12 +106,15 @@ const Chatbot = ({ selectedProject }) => {
                 <div className="chatbot-window">
                     <div className="chatbot-header">
                         <h3>Project Assistant</h3>
+                        <button onClick={handleClearChat} className="chatbot-clear-btn" title="Clear chat">
+                           Clear
+                        </button>
                         <button onClick={() => setIsOpen(false)} className="chatbot-close-btn">×</button>
                     </div>
                     <div className="chatbot-messages">
                         {messages.map((msg, index) => (
                             <div key={index} className={`message ${msg.from}`}>
-                                <p>{msg.text}</p>
+                                <p dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }} />
                             </div>
                         ))}
                         {isLoading && (
@@ -72,17 +126,36 @@ const Chatbot = ({ selectedProject }) => {
                     </div>
                     <form className="chatbot-input-form" onSubmit={handleSendMessage}>
                         <input
+                            ref={inputRef}
+                            id="chatbot-input"
+                            name="chatbotInput"
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             placeholder="Ask a question or give a command..."
                             disabled={isLoading}
+                            autoComplete="off"
+                            aria-label="Chatbot input field"
                         />
-                        <button type="submit" disabled={isLoading}>Send</button>
+                        <button
+                            type="submit"
+                            id="chatbot-send-button"
+                            name="chatbotSendButton"
+                            disabled={isLoading || !inputValue.trim()}
+                        >
+                            Send
+                        </button>
                     </form>
                 </div>
             )}
-            <button onClick={() => setIsOpen(!isOpen)} className="chatbot-toggle-button">
+            <button
+                id="chatbot-toggle-button"
+                name="chatbotToggleButton"
+                type="button"
+                className="chatbot-toggle-button"
+                onClick={() => setIsOpen(!isOpen)}
+                aria-label="Toggle chatbot window"
+            >
                 🤖
             </button>
         </div>
