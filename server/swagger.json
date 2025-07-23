@@ -43,6 +43,10 @@
     {
       "name": "Settings",
       "description": "Operations for managing application settings"
+    },
+    {
+      "name": "Chatbot",
+      "description": "Operations for the AI Chatbot"
     }
   ],
   "paths": {
@@ -1292,6 +1296,70 @@
           }
         }
       }
+    },
+    "/chatbot/sync": {
+      "post": {
+        "summary": "Synchronize data with the vector database",
+        "description": "Triggers a full synchronization of project data (requirements, defects, etc.) with the vector database for the chatbot to use. This can be a long-running process. The server will respond immediately while the sync runs in the background.",
+        "tags": [
+          "Chatbot"
+        ],
+        "responses": {
+          "202": {
+            "description": "Synchronization process has been accepted and started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatbotSyncResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ChatbotDisabled"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/chatbot": {
+      "post": {
+        "summary": "Send a query to the chatbot",
+        "description": "Asks a question to the AI chatbot. The chatbot uses the synchronized data to answer questions about projects, requirements, defects, and more.",
+        "tags": [
+          "Chatbot"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatbotQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response from the chatbot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatbotResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ChatbotDisabled"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1981,6 +2049,44 @@
           }
         }
       },
+      "ChatbotQuery": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The natural language question for the chatbot.",
+            "example": "What is the status of requirement 'REQ-123'?"
+          }
+        }
+      },
+      "ChatbotResponse": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "The chatbot's answer to the query."
+          },
+          "sources": {
+            "type": "array",
+            "description": "A list of data sources used to generate the reply.",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "ChatbotSyncResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Sync process started."
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "required": [
@@ -2095,6 +2201,26 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ChatbotDisabled": {
+        "description": "Chatbot functionality is disabled on the server.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Chatbot functionality is currently disabled."
+                },
+                "reply": {
+                  "type": "string",
+                  "example": "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
+                }
+              }
             }
           }
         }
