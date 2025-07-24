@@ -7,7 +7,6 @@ const path = require('path');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
-// --- NEW RESILIENT CHATBOT LOADING ---
 let syncWithQdrant, handleChatbotQuery;
 let isChatbotEnabled = false;
 
@@ -25,7 +24,6 @@ try {
   console.warn("**************************************************");
   isChatbotEnabled = false;
 }
-// --- END RESILIENT LOADING ---
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -93,7 +91,6 @@ const processExcelData = (fileBuffer) => {
         
         let link = null;
         if (keyColumn) {
-
             const excelRowNumber = index + 2; 
             const keyCellAddress = `${keyColumn}${excelRowNumber}`;
             const keyCell = worksheet[keyCellAddress];
@@ -1036,7 +1033,23 @@ app.delete("/api/releases/:id", (req, res) => {
 });
 
 app.get("/api/defects/all", (req, res) => {
-    const defectsSql = "SELECT d.*, p.name as project FROM defects d JOIN projects p ON d.project_id = p.id ORDER BY d.created_at DESC";
+    const defectsSql = `
+        WITH LastComment AS (
+            SELECT
+                defect_id,
+                comment,
+                ROW_NUMBER() OVER(PARTITION BY defect_id ORDER BY changed_at DESC) as rn
+            FROM defect_history
+        )
+        SELECT
+            d.*,
+            p.name as project,
+            lc.comment as last_comment
+        FROM defects d
+        JOIN projects p ON d.project_id = p.id
+        LEFT JOIN LastComment lc ON d.id = lc.defect_id AND lc.rn = 1
+        ORDER BY d.created_at DESC
+    `;
     const linksSql = `SELECT l.defect_id, l.requirement_group_id, a.requirementUserIdentifier, a.sprint
                       FROM defect_requirement_links l
                       JOIN activities a ON l.requirement_group_id = a.requirementGroupId
@@ -1060,6 +1073,7 @@ app.get("/api/defects/all", (req, res) => {
 
         const defectsWithLinks = defectRows.map(defect => ({
             ...defect,
+            lastComment: defect.last_comment,
             linkedRequirements: linksMap.get(defect.id) || []
         }));
 
@@ -1075,12 +1089,29 @@ app.get("/api/defects/:project", async (req, res) => {
 
     try {
         const projectId = await getProjectId(project);
-        let defectsSql;
+        let statusCondition = "d.status != 'Closed'";
+        let orderBy = "d.created_at DESC";
         if (statusType === 'closed') {
-            defectsSql = "SELECT * FROM defects WHERE project_id = ? AND status = 'Closed' ORDER BY updated_at DESC";
-        } else {
-            defectsSql = "SELECT * FROM defects WHERE project_id = ? AND status != 'Closed' ORDER BY created_at DESC";
+            statusCondition = "d.status = 'Closed'";
+            orderBy = "d.updated_at DESC";
         }
+
+        const defectsSql = `
+            WITH LastComment AS (
+                SELECT
+                    defect_id,
+                    comment,
+                    ROW_NUMBER() OVER(PARTITION BY defect_id ORDER BY changed_at DESC) as rn
+                FROM defect_history
+            )
+            SELECT
+                d.*,
+                lc.comment as last_comment
+            FROM defects d
+            LEFT JOIN LastComment lc ON d.id = lc.defect_id AND lc.rn = 1
+            WHERE d.project_id = ? AND ${statusCondition}
+            ORDER BY ${orderBy}
+        `;
         
         const linksSql = `SELECT l.defect_id, l.requirement_group_id, a.requirementUserIdentifier, a.sprint
                           FROM defect_requirement_links l
@@ -1106,6 +1137,7 @@ app.get("/api/defects/:project", async (req, res) => {
             const defectsWithLinks = defectRows.map(defect => ({
                 ...defect,
                 project: project,
+                lastComment: defect.last_comment,
                 linkedRequirements: linksMap.get(defect.id) || []
             }));
 

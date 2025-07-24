@@ -1052,7 +1052,7 @@ body {
 .retrospective-card { border-color: #8B4513; }
 
 .defect-card-title { font-size: 1.05em; font-weight: 600; color: #5C4033; margin-top: 0; margin-bottom: 8px; }
-.defect-card-area, .defect-card-description, .defect-card-link, .defect-card-date, .defect-card-updated { font-size: 0.85em; color: #704214; margin-bottom: 6px; word-break: break-word; }
+.defect-card-area, .defect-card-description, .defect-card-comment, .defect-card-link, .defect-card-date, .defect-card-updated { font-size: 0.85em; color: #704214; margin-bottom: 6px; word-break: break-word; }
 .defect-card-description { white-space: pre-wrap; }
 .defect-card-link a { color: #007bff; text-decoration: none; }
 .defect-card-link a:hover { text-decoration: underline; }
