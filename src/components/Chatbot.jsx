@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
 const Chatbot = ({ selectedProject, onDataChange }) => {
-    // Initialize state from sessionStorage to make it persistent
     const getInitialState = () => {
         try {
             const storedMessages = sessionStorage.getItem('chatbotMessages');
@@ -28,7 +27,6 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
-    // Save state to sessionStorage whenever it changes
     useEffect(() => {
         sessionStorage.setItem('chatbotIsOpen', JSON.stringify(isOpen));
     }, [isOpen]);
@@ -76,12 +74,9 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
             const botMessage = { from: 'bot', text: data.reply || "I'm sorry, I had trouble responding." };
             setMessages(prev => [...prev, botMessage]);
 
-            // --- MODIFIED: Call the lightweight refresh handler from App.jsx ---
             if (data.data_changed && onDataChange) {
-                // Pass the details of the new item to the handler
                 onDataChange(data.new_item); 
             }
-            // --- END MODIFIED ---
 
         } catch (error) {
             console.error("Chatbot fetch error:", error);
@@ -89,7 +84,10 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
-            inputRef.current?.focus();
+            // --- MODIFIED LINE ---
+            // Use a timeout to ensure focus happens after the re-render from setIsLoading.
+            setTimeout(() => inputRef.current?.focus(), 0);
+            // --- END MODIFIED LINE ---
         }
     };
 

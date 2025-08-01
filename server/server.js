@@ -38,6 +38,45 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+let isSyncing = false;
+let syncIsPending = false;
+
+const scheduleQdrantSync = () => {
+    if (!isChatbotEnabled) return;
+
+    if (isSyncing) {
+        console.log("Sync is already in progress. Queuing another sync.");
+        syncIsPending = true;
+        return;
+    }
+
+    isSyncing = true;
+
+    const runSync = async () => {
+        console.log("Starting Qdrant sync...");
+        const dummyRes = { 
+            status: () => ({ 
+                json: (data) => console.log("Background sync completed.", data) 
+            }) 
+        };
+        try {
+            await syncWithQdrant(db)({}, dummyRes);
+        } catch (error) {
+            console.error("Background Qdrant sync failed:", error.message);
+        } finally {
+            if (syncIsPending) {
+                syncIsPending = false;
+                console.log("Pending sync found. Running again immediately.");
+                runSync();
+            } else {
+                isSyncing = false;
+            }
+        }
+    };
+
+    runSync();
+};
+
 const swaggerDocument = JSON.parse(fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8'));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
@@ -174,6 +213,7 @@ app.post("/api/projects", (req, res) => {
             if (err.message.includes("UNIQUE constraint failed")) return res.status(409).json({ "error": `Project '${trimmedName}' already exists.` });
             return res.status(400).json({ "error": err.message });
         }
+        scheduleQdrantSync();
         res.status(201).json({ message: "Project added successfully", data: { id: this.lastID, name: trimmedName } });
     });
 });
@@ -186,6 +226,7 @@ app.delete("/api/projects/:name", (req, res) => {
     db.run(sql, [projectName], function(err) {
         if (err) return res.status(500).json({ error: `Failed to delete project '${projectName}': ${err.message}` });
         if (this.changes === 0) return res.status(404).json({ error: `Project '${projectName}' not found.` });
+        scheduleQdrantSync();
         res.json({ message: `Project '${projectName}' and all its associated data have been deleted.`, changes: this.changes });
     });
 });
@@ -211,6 +252,7 @@ app.put("/api/projects/:name", (req, res) => {
         if (this.changes === 0) {
             return res.status(404).json({ error: `Project '${currentName}' not found.` });
         }
+        scheduleQdrantSync();
         res.json({ 
             message: `Project '${currentName}' was successfully renamed to '${trimmedNewName}'.`,
             data: { oldName: currentName, newName: trimmedNewName }
@@ -335,6 +377,7 @@ app.post("/api/activities", async (req, res) => {
                     db.run(updateOldSql, [finalRequirementGroupId, newActivityDbId], (updateOldErr) => {
                         if (updateOldErr) console.error("Error updating old current status:", updateOldErr.message);
                         
+                        scheduleQdrantSync();
                         res.json({
                             message: "success",
                             data: {
@@ -373,6 +416,7 @@ app.put("/api/activities/:activityId", (req, res) => {
     db.run(sql, params, function(err) {
         if (err) return res.status(400).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Activity with id ${activityDbId} not found.` });
+        scheduleQdrantSync();
         res.json({ message: "success", data: { id: activityDbId, changes: this.changes }});
     });
 });
@@ -403,6 +447,7 @@ app.post("/api/requirements/:requirementGroupId/changes", (req, res) => {
         if (err) {
             return res.status(500).json({ error: "Database error while logging change." });
         }
+        scheduleQdrantSync();
         res.status(201).json({
             message: "Change logged successfully.",
             data: { id: this.lastID, requirement_group_id: groupId, reason }
@@ -428,6 +473,7 @@ app.put("/api/requirements/:requirementGroupId/rename", (req, res) => {
         if (this.changes === 0) {
             return res.status(404).json({ error: `Requirement group with ID ${groupId} not found or name unchanged.` });
         }
+        scheduleQdrantSync();
         res.json({
             message: `Requirement name updated for group ${groupId}. New name: '${trimmedNewName}'. Rows affected: ${this.changes}`,
             changes: this.changes
@@ -447,6 +493,7 @@ app.put("/api/requirements/:requirementGroupId/set-release", (req, res) => {
         if (this.changes === 0) {
             return res.status(404).json({ error: `Requirement group with ID ${groupId} not found.` });
         }
+        scheduleQdrantSync();
         res.json({
             message: `Release updated for requirement group ${groupId}.`,
             changes: this.changes
@@ -486,10 +533,13 @@ app.delete("/api/requirements/:requirementGroupId", (req, res) => {
                         db.run("ROLLBACK");
                         return res.status(404).json({ error: `Requirement group with ID ${groupId} not found.` });
                     }
-                    db.run("COMMIT");
-                    res.json({
-                        message: `Requirement group ${groupId} and its associated data deleted.`,
-                        changes: this.changes
+                    db.run("COMMIT", (commitErr) => {
+                        if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                        scheduleQdrantSync();
+                        res.json({
+                            message: `Requirement group ${groupId} and its associated data deleted.`,
+                            changes: this.changes
+                        });
                     });
                 });
             });
@@ -602,7 +652,8 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
                                 let messageParts = [`Import complete. Imported: ${successfulInserts}`];
                                 if (renamedCount > 0) messageParts.push(`Renamed ${renamedCount} duplicate(s)`);
                                 if (skippedCount > 0) messageParts.push(`Skipped: ${skippedCount}`);
-
+                                
+                                scheduleQdrantSync();
                                 res.status(201).json({
                                     message: messageParts.join('. ') + '.',
                                     data: { imported: successfulInserts, renamed: renamedCount, skipped: skippedCount }
@@ -728,6 +779,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                                 if (renamedCount > 0) message += `. Renamed ${renamedCount} duplicate(s)`;
                                 if (skippedCount > 0) message += `. Skipped: ${skippedCount}`;
 
+                                scheduleQdrantSync();
                                 res.status(201).json({
                                     message: message + '.',
                                     data: { imported: successfulInserts, renamed: renamedCount, skipped: skippedCount }
@@ -771,6 +823,7 @@ app.post("/api/notes", async (req, res) => {
             db.run(deleteSql, [projectId, noteDate], function(err) {
                 if (err) return res.status(400).json({ error: err.message });
                 if (this.changes > 0) {
+                    scheduleQdrantSync();
                     res.json({ message: "Note deleted successfully.", action: "deleted", data: { project, noteDate } });
                 } else {
                     res.json({ message: "No note found to delete.", action: "none", data: { project, noteDate } });
@@ -781,6 +834,7 @@ app.post("/api/notes", async (req, res) => {
                                ON CONFLICT(project_id, noteDate) DO UPDATE SET noteText = excluded.noteText;`;
             db.run(upsertSql, [projectId, noteDate, trimmedNoteText], function(err) {
                 if (err) return res.status(400).json({ error: err.message });
+                scheduleQdrantSync();
                 res.json({ message: "Note saved successfully.", action: "saved", data: { project, noteDate, noteText: trimmedNoteText } });
             });
         }
@@ -813,6 +867,7 @@ app.post("/api/retrospective", async (req, res) => {
         const sql = `INSERT INTO retrospective_items (project_id, column_type, description, item_date) VALUES (?,?,?,?)`;
         db.run(sql, [projectId, column_type, description, item_date], function (err) {
             if (err) return res.status(400).json({ "error": err.message });
+            scheduleQdrantSync();
             res.json({ message: "success", data: { id: this.lastID, project, column_type, description, item_date } });
         });
     } catch (error) {
@@ -836,6 +891,7 @@ app.put("/api/retrospective/:id", (req, res) => {
     db.run(sql, params, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.`});
+        scheduleQdrantSync();
         res.json({ message: "success", data: { id: itemId, changes: this.changes } });
     });
 });
@@ -846,6 +902,7 @@ app.delete("/api/retrospective/:id", (req, res) => {
     db.run(sql, itemId, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.`});
+        scheduleQdrantSync();
         res.json({ message: "deleted", changes: this.changes });
     });
 });
@@ -899,6 +956,7 @@ app.post("/api/releases", async (req, res) => {
                     }
                     db.run("COMMIT", (commitErr) => {
                         if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                        scheduleQdrantSync();
                         res.status(201).json({ message: "Release created successfully", data: { id: newId, project, name, release_date, is_current } });
                     });
                 });
@@ -966,6 +1024,7 @@ app.put("/api/releases/:id", (req, res) => {
                                 }
                                 db.run("COMMIT", (commitErr) => {
                                     if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                                    scheduleQdrantSync();
                                     res.json({ message: "Release updated successfully" });
                                 });
                             });
@@ -989,6 +1048,7 @@ app.put("/api/releases/:id", (req, res) => {
                 } else {
                     db.run("COMMIT", (commitErr) => {
                         if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                        scheduleQdrantSync();
                         res.json({ message: "Release updated successfully" });
                     });
                 }
@@ -1025,6 +1085,7 @@ app.delete("/api/releases/:id", (req, res) => {
 
                 db.run("COMMIT", (commitErr) => {
                     if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                    scheduleQdrantSync();
                     res.json({ message: "Release deleted successfully", changes: this.changes });
                 });
             });
@@ -1244,8 +1305,11 @@ app.post("/api/defects", async (req, res) => {
                     if (histErr) console.error("Error inserting initial defect history:", histErr.message);
                 });
 
-                db.run("COMMIT");
-                res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_date } });
+                db.run("COMMIT", (commitErr) => {
+                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                    scheduleQdrantSync();
+                    res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_date } });
+                });
             });
         });
     } catch (error) {
@@ -1335,6 +1399,7 @@ app.put("/api/defects/:id", (req, res) => {
                 
                 db.run("COMMIT", (commitErr) => {
                     if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                    scheduleQdrantSync();
                     res.json({ message: "Defect updated successfully.", defectId: defectId });
                 });
             });
@@ -1348,6 +1413,7 @@ app.delete("/api/defects/:id", (req, res) => {
     db.run(sql, defectId, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Defect with id ${defectId} not found.`});
+        scheduleQdrantSync();
         res.json({ message: "Defect deleted successfully", changes: this.changes });
     });
 });

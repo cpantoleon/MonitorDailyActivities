@@ -14,11 +14,12 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@qdrant/js-client-rest": "^1.15.0",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
-    "express": "^4.17.1",
-    "sqlite3": "^5.1.7",
     "dotenv": "^16.4.5",
+    "express": "^4.17.1",
     "multer": "^1.4.5-lts.1",
+    "sqlite3": "^5.1.7",
     "swagger-ui-express": "^5.0.1",
     "xlsx": "^0.18.5"
   },
