@@ -19,18 +19,15 @@ function extractProjectFromMessage(message, intent) {
     let regex;
     switch (intent) {
         case 'get_release_date':
-            // Captures anything after "release date for "
             regex = /release date for\s+(.+)/i;
             break;
         case 'get_project_summary':
-            // Captures anything after "summary for " or "everything for "
             regex = /(?:summary for|everything for)\s+(.+)/i;
             break;
         default:
             return null;
     }
     const match = message.match(regex);
-    // If a match is found, return the captured group, otherwise null
     return match ? match[1].trim() : null;
 }
 
@@ -289,6 +286,9 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             return res.json({ reply: `Today is ${today}.` });
         }
+        if (lowerCaseMessage.includes('release') && !lowerCaseMessage.includes('date')) {
+            return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try asking again using the words 'release date'." });
+        }
 
         const intentPrompt = `
         Analyze the user's message to determine their primary intent and extract key parameters.
@@ -322,6 +322,12 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             intentData = JSON.parse(cleanedText);
         } catch (apiError) {
             console.error("Error calling Google Generative AI:", apiError);
+            if (apiError.status === 400) {
+                return res.json({ reply: "I'm sorry, I can't process that request. API key not valid. Please pass a valid API key." });
+            }
+            if (apiError.status === 429) {
+                return res.json({ reply: "The AI service is currently busy. Please wait a moment and try your request again." });
+            }
             if (apiError.status === 503) {
                 return res.json({ reply: "The AI service is temporarily unavailable. Please try again in a moment." });
             }
@@ -456,7 +462,6 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                         return res.json({ reply: `I couldn't find any information for the ID "${item_id}".` });
                     }
                 } else {
-                    // --- ISOLATED AND ROBUST PROJECT LOGIC ---
                     const manualProjectName = extractProjectFromMessage(message, intent);
                     const projectToQuery = manualProjectName || parameters.project_name || projectContext;
 
@@ -474,13 +479,19 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                         });
                         if (scrollResult.points && scrollResult.points.length > 0) {
                             const release = scrollResult.points[0].payload;
-                            return res.json({ reply: `The current release for ${exactProjectName} is "${release.name}", scheduled for ${release.date}.` });
+                            if (release && release.name && release.date) {
+                                return res.json({ reply: `The current release for ${exactProjectName} is "${release.name}", scheduled for ${release.date}.` });
+                            } else if (release && release.name) {
+                                return res.json({ reply: `I found the release "${release.name}" for project ${exactProjectName}, but it does not have a date assigned.` });
+                            } else {
+                                return res.json({ reply: `I found release information for ${exactProjectName}, but the data seems to be incomplete.` });
+                            }
                         } else {
                             return res.json({ reply: `I couldn't find an active release date for the project "${exactProjectName}".` });
                         }
                     } else if (match.suggestion) {
                         return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
-                    } else { // noMatch
+                    } else {
                         return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
                     }
                 }
