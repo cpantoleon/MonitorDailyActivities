@@ -26,6 +26,7 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
 
   return (
     <div 
+      id={`defect-card-${defect.id}`} // Unique ID for scrolling
       className="defect-card"
       draggable={isDraggable}
       onDragStart={(e) => handleDragStart(e, defect)}
@@ -54,7 +55,8 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
               <button 
                 key={req.groupId} 
                 className="linked-item-tag requirement"
-                onClick={() => onNavigate(defect.project, req.sprint)}
+                // Pass the requirement's groupId to the navigation handler
+                onClick={() => onNavigate(defect.project, req.sprint, req.groupId)}
                 title={`Go to requirement in Sprint: ${req.sprint}`}
               >
                 {req.name}

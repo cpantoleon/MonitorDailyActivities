@@ -30,8 +30,6 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategorySc
 
 const API_BASE_URL = '/api';
 
-// ... (OptionsMenu and SprintActivitiesPage components remain unchanged) ...
-
 const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenAddReleaseModal, onOpenEditReleaseModal, onOpenEditProjectModal, hasProjects, hasAnyReleases }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -349,21 +347,16 @@ function App() {
   const [displayableRequirements, setDisplayableRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [allReleases, setAllReleases] = useState([]);
   const [projectReleases, setProjectReleases] = useState([]);
-
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [requirementForHistory, setRequirementForHistory] = useState(null);
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState(null);
-
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newReqFormState, setNewReqFormState] = useState({
     project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: ''
   });
-
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -371,21 +364,17 @@ function App() {
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [deleteType, setDeleteType] = useState('');
-
   const [isAddReleaseModalOpen, setIsAddReleaseModalOpen] = useState(false);
   const [isEditReleaseModalOpen, setIsEditReleaseModalOpen] = useState(false);
-
   const [isImportConfirmModalOpen, setIsImportConfirmModalOpen] = useState(false);
   const [importConfirmData, setImportConfirmData] = useState(null);
-
   const [isSearching, setIsSearching] = useState(false);
   const [requirementQuery, setRequirementQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
-
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '' });
-
   const [selectedDefectProject, setSelectedDefectProject] = useState('');
+  const [highlightedReqId, setHighlightedReqId] = useState(null);
 
   const hasFetched = useRef(false);
   const location = useLocation();
@@ -395,11 +384,45 @@ function App() {
     const params = new URLSearchParams(location.search);
     const projectParam = params.get('project');
     const sprintParam = params.get('sprint');
+    const highlightId = params.get('highlight');
+    let urlWasChanged = false;
 
-    if (projectParam) setSelectedProject(projectParam);
-    if (sprintParam) setSelectedSprint(sprintParam);
-    if (projectParam || sprintParam) navigate(location.pathname, { replace: true });
+    if (projectParam) {
+      setSelectedProject(projectParam);
+      urlWasChanged = true;
+    }
+    if (sprintParam) {
+      setSelectedSprint(sprintParam);
+      urlWasChanged = true;
+    }
+    if (highlightId) {
+      setHighlightedReqId(highlightId);
+      urlWasChanged = true;
+    }
+    
+    if (urlWasChanged) {
+      navigate(location.pathname, { replace: true });
+    }
   }, [location.search, navigate]);
+
+  useEffect(() => {
+    if (highlightedReqId && displayableRequirements.length > 0) {
+        const timer = setTimeout(() => {
+            const element = document.getElementById(`req-card-${highlightedReqId}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.classList.add('highlight-item');
+
+                setTimeout(() => {
+                    element.classList.remove('highlight-item');
+                }, 3000);
+            }
+            setHighlightedReqId(null);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }
+  }, [highlightedReqId, displayableRequirements]);
 
   const showMainMessage = useCallback((text, type = 'success') => {
     setToastInfo({ message: text, type: type, key: Date.now() });
@@ -495,15 +518,9 @@ function App() {
     finally { setIsLoading(false); }
   }, [fetchRequirementsOnly]);
 
-  // --- NEW: Lightweight data refresh handler for the chatbot ---
   const handleDataRefresh = useCallback(async (newItemDetails) => {
-      // This function only refetches requirements, avoiding the "flash"
       await fetchRequirementsOnly(); 
-      
-      // Show a success toast message
       showMainMessage(`Successfully created: "${newItemDetails.title}"`, 'success');
-      
-      // Automatically switch the view to where the new item was created
       if (newItemDetails.project) {
           setSelectedProject(newItemDetails.project);
       }
@@ -511,7 +528,6 @@ function App() {
           setSelectedSprint(newItemDetails.sprint);
       }
   }, [fetchRequirementsOnly, showMainMessage]);
-  // --- END NEW ---
 
   useEffect(() => {
     if (!hasFetched.current) {
@@ -1204,14 +1220,10 @@ function App() {
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
-      
-      {/* --- MODIFIED: Pass the new handler to the chatbot --- */}
       <Chatbot 
         selectedProject={selectedProject} 
         onDataChange={handleDataRefresh} 
       />
-      {/* --- END MODIFIED --- */}
-
     </div>
   );
 }

@@ -1134,6 +1134,22 @@ body {
   background-color: #dee2e6;
 }
 
+@keyframes breathing-highlight {
+  0% {
+    box-shadow: 0 0 4px 2px rgba(139, 69, 19, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 18px 7px rgba(139, 69, 19, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 4px 2px rgba(139, 69, 19, 0.4);
+  }
+}
+
+.highlight-item {
+  animation: breathing-highlight 1.5s ease-in-out 2;
+}
+
 .dual-listbox-container {
   display: flex;
   justify-content: space-between;

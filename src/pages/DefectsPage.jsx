@@ -87,10 +87,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ defect: null, newStatus: '' });
-
   const [isImportDefectsModalOpen, setIsImportDefectsModalOpen] = useState(false);
   const [isImportConfirmModalOpen, setIsImportConfirmModalOpen] = useState(false);
   const [importConfirmData, setImportConfirmData] = useState(null);
+  const [highlightedDefectId, setHighlightedDefectId] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -139,22 +139,51 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       const currentClosedDefects = projectDefects.filter(d => d.status === 'Closed');
       setActiveDefects(projectDefects.filter(d => d.status !== 'Closed'));
       setClosedDefects(currentClosedDefects);
-
-      if (showClosedView && currentClosedDefects.length === 0) {
-        setShowClosedView(false);
-      }
     } else {
       setActiveDefects([]);
       setClosedDefects([]);
     }
-  }, [allDefects, selectedProject, showClosedView]);
+  }, [allDefects, selectedProject]);
+
+  useEffect(() => {
+    if (highlightedDefectId && allDefects.length > 0) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`defect-card-${highlightedDefectId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('highlight-item');
+          
+          setTimeout(() => {
+            element.classList.remove('highlight-item');
+          }, 3000);
+        }
+        setHighlightedDefectId(null);
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedDefectId, allDefects]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const projectParam = params.get('project');
+    const viewParam = params.get('view');
+    const highlightId = params.get('highlight');
+    let urlWasChanged = false;
+
     if (projectParam && projects.includes(projectParam)) {
-        onSelectProject(projectParam);
-        navigate('/defects', { replace: true });
+      onSelectProject(projectParam);
+      setShowClosedView(viewParam === 'closed');
+      urlWasChanged = true;
+    }
+    
+    if (highlightId) {
+      setHighlightedDefectId(highlightId);
+      urlWasChanged = true;
+    }
+
+    if (urlWasChanged) {
+      navigate(location.pathname, { replace: true });
     }
   }, [location.search, navigate, projects, onSelectProject]);
 
@@ -166,7 +195,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       return;
     }
 
-    // Done vs Not-Done Pie Chart for Active Defects
     if (!showClosedView && activeDefects.length > 0) {
       let doneCount = 0;
       let notDoneCount = 0;
@@ -197,10 +225,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
 
     const defectsForChart = showClosedView ? closedDefects : activeDefects;
-
-    const defectsForAreaChart = defectsForChart.filter(
-      defect => defect.area !== 'Imported'
-    );
+    const defectsForAreaChart = defectsForChart.filter(defect => defect.area !== 'Imported');
 
     if (defectsForAreaChart.length > 0) {
       const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
@@ -211,46 +236,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         labels: Object.keys(areaCounts),
         datasets: [{
           label: '# of Defects', data: Object.values(areaCounts),
-          backgroundColor: ['rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-            'rgba(255, 159, 64, 0.7)',
-            'rgba(199, 199, 199, 0.7)',
-            'rgba(83, 102, 255, 0.7)',
-            'rgba(102, 255, 83, 0.7)',
-            'rgba(143, 255, 193, 0.7)',
-            'rgba(255, 173, 191, 0.7)',
-            'rgba(221, 171, 255, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(43, 63, 63, 0.7)',
-            'rgba(65, 5, 23, 0.7)',
-            'rgba(224, 255, 51, 0.7)',
-            'rgba(70, 145, 114, 0.36)',
-            'rgba(35, 47, 134, 0.7)',
-            'rgba(102, 20, 98, 0.7)',
-            'rgba(90, 45, 15, 0.7)'],
-          borderColor: ['rgba(255,99,132,1)',
-            'rgba(54,162,235,1)',
-            'rgba(255,206,86,1)',
-            'rgba(75,192,192,1)',
-            'rgba(153,102,255,1)',
-            'rgba(255,159,64,1)',
-            'rgba(199,199,199,1)',
-            'rgba(83,102,255,1)',
-            'rgba(102,255,83,1)',
-            'rgba(143, 255, 193, 1)',
-            'rgba(255, 173, 191, 1)',
-            'rgba(221, 171, 255, 1)',
-            'rgba(255, 206, 86, 1)',
-            'rgba(43, 63, 63, 1)',
-            'rgba(65, 5, 23, 1)',
-            'rgba(224, 255, 51, 1)',
-            'rgba(70, 145, 114, 1)',
-            'rgba(35, 47, 134, 1)',
-            'rgba(102, 20, 98, 1)',
-            'rgba(90, 45, 15, 1)'],
+          backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)','rgba(153, 102, 255, 0.7)','rgba(255, 159, 64, 0.7)','rgba(199, 199, 199, 0.7)','rgba(83, 102, 255, 0.7)','rgba(102, 255, 83, 0.7)','rgba(143, 255, 193, 0.7)','rgba(255, 173, 191, 0.7)','rgba(221, 171, 255, 0.7)','rgba(255, 206, 86, 0.7)','rgba(43, 63, 63, 0.7)','rgba(65, 5, 23, 0.7)','rgba(224, 255, 51, 0.7)','rgba(70, 145, 114, 0.36)','rgba(35, 47, 134, 0.7)','rgba(102, 20, 98, 0.7)','rgba(90, 45, 15, 0.7)'],
+          borderColor: ['rgba(255,99,132,1)','rgba(54,162,235,1)','rgba(255,206,86,1)','rgba(75,192,192,1)','rgba(153,102,255,1)','rgba(255,159,64,1)','rgba(199,199,199,1)','rgba(83,102,255,1)','rgba(102,255,83,1)','rgba(143, 255, 193, 1)','rgba(255, 173, 191, 1)','rgba(221, 171, 255, 1)','rgba(255, 206, 86, 1)','rgba(43, 63, 63, 1)','rgba(65, 5, 23, 1)','rgba(224, 255, 51, 1)','rgba(70, 145, 114, 1)','rgba(35, 47, 134, 1)','rgba(102, 20, 98, 1)','rgba(90, 45, 15, 1)'],
           borderWidth: 1,
         }],
       });
@@ -267,7 +254,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         if (result.data && result.data.length > 0) {
           const filteredData = result.data.filter(d => d.return_count >= 2);
           if (filteredData.length > 0) {
-            
             const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
                 const words = label.split(' ');
                 const lines = [];
@@ -285,10 +271,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
                 }
                 return lines;
             };
-
             const fullLabels = filteredData.map(d => d.title);
             const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
-
             setReturnToDevChartData({
               labels: multilineLabels,
               datasets: [{
@@ -321,22 +305,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   }, [showAreaChart, updateChartData]);
 
-  const handleToggleCharts = () => {
-    setShowAreaChart(prev => !prev);
-  };
-
-  const handleOpenModal = (defect = null) => {
-    setEditingDefect(defect); setIsModalOpen(true);
-  };
-  const handleCloseModal = () => {
-    setIsModalOpen(false); setEditingDefect(null);
-  };
+  const handleToggleCharts = () => setShowAreaChart(prev => !prev);
+  const handleOpenModal = (defect = null) => { setEditingDefect(defect); setIsModalOpen(true); };
+  const handleCloseModal = () => { setIsModalOpen(false); setEditingDefect(null); };
 
   const handleSubmitDefect = async (formData) => {
     const projectForSubmit = formData.project || selectedProject;
-    if (!projectForSubmit) {
-        showMessage("Please select a project.", "error"); return;
-    }
+    if (!projectForSubmit) { showMessage("Please select a project.", "error"); return; }
     const payload = { ...formData, project: projectForSubmit };
     const isEditing = !!editingDefect;
     const url = isEditing ? `${API_BASE_URL}/defects/${editingDefect.id}` : `${API_BASE_URL}/defects`;
@@ -346,7 +321,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'create'} defect`);
-
       showMessage(`Defect ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
       await fetchAllDefects();
       if (onDefectUpdate) onDefectUpdate();
@@ -356,9 +330,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   };
 
-  const handleDeleteRequest = (defect) => {
-    setDefectToDelete(defect); setIsDeleteConfirmModalOpen(true);
-  };
+  const handleDeleteRequest = (defect) => { setDefectToDelete(defect); setIsDeleteConfirmModalOpen(true); };
 
   const handleConfirmDelete = async () => {
     if (!defectToDelete) return;
@@ -369,16 +341,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         throw new Error(result.error || 'Failed to delete defect');
       }
       showMessage('Defect deleted successfully!', 'success');
-
       const freshDefects = await fetchAllDefects();
-
       if (isSearching) {
         const lowerCaseQuery = defectQuery.toLowerCase();
         const sourceData = freshDefects.filter(defect => showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed');
         const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
         setSearchResults(newSearchResults);
       }
-
       if (onDefectUpdate) onDefectUpdate();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
@@ -400,15 +369,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     finally { setIsLoading(false); }
   };
 
-  const handleNavigateToRequirement = useCallback((project, sprint) => {
-    navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`);
+  const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
+    navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
   }, [navigate]);
 
   const handleOpenImportModal = useCallback(() => setIsImportDefectsModalOpen(true), []);
-  const handleCloseImportModal = useCallback(() => {
-    setIsImportDefectsModalOpen(false);
-    setImportConfirmData(null);
-  }, []);
+  const handleCloseImportModal = useCallback(() => { setIsImportDefectsModalOpen(false); setImportConfirmData(null); }, []);
 
   const executeDefectImport = useCallback(async (file, project, importMode = 'all') => {
     const formData = new FormData();
@@ -438,7 +404,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         const response = await fetch(`${API_BASE_URL}/import/defects/validate`, { method: 'POST', body: formData });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Validation failed');
-
         const { newCount, duplicateCount, skippedCount } = result.data;
         if (newCount === 0 && duplicateCount === 0) {
             let message = "Import finished. No valid defects found to import.";
@@ -447,7 +412,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
             handleCloseImportModal();
             return;
         }
-
         if (duplicateCount > 0) {
             setImportConfirmData({ file, project, ...result.data });
             setIsImportConfirmModalOpen(true);
@@ -478,9 +442,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
 
   const handleDefectSearch = (query) => {
     const finalQuery = query || defectQuery;
-    if (!finalQuery) {
-      handleClearDefectSearch(); return;
-    }
+    if (!finalQuery) { handleClearDefectSearch(); return; }
     setIsSearching(true);
     setSearchSuggestions([]);
     const lowerCaseQuery = finalQuery.toLowerCase();
@@ -505,9 +467,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
 
   const handleDefectQueryChange = (query) => {
     setDefectQuery(query);
-    if (query.length < 3) {
-      setSearchSuggestions([]); return;
-    }
+    if (query.length < 3) { setSearchSuggestions([]); return; }
     const lowerCaseQuery = query.toLowerCase();
     let sourceData = allDefects;
     if (selectedProject) {
@@ -565,9 +525,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   };
 
-  const handleDragStart = (e, defect) => {
-    e.dataTransfer.setData("defectId", defect.id);
-  };
+  const handleDragStart = (e, defect) => { e.dataTransfer.setData("defectId", defect.id); };
 
   const handleDrop = (e, targetStatus) => {
     const defectId = e.dataTransfer.getData("defectId");
@@ -578,56 +536,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   };
 
-  const pieChartOptions = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } },
-      tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
-    },
-  };
-  
-  const doneNotDonePieChartOptions = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } },
-      tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
-    },
-  };
-
-  const returnToDevChartOptions = {
-    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-    layout: {
-        padding: {
-            left: 20
-        }
-    },
-    plugins: {
-      legend: { display: false },
-      title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } },
-      tooltip: {
-        callbacks: {
-            title: function(context) {
-                const dataIndex = context[0].dataIndex;
-                const fullLabel = context[0].dataset.fullLabels[dataIndex];
-                return fullLabel;
-            },
-            label: function(context) {
-                let label = context.dataset.label || '';
-                if (label) {
-                    label += ': ';
-                }
-                if (context.parsed.x !== null) {
-                    label += context.parsed.x;
-                }
-                return label;
-            }
-        }
-      }
-    },
-    scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
-  };
+  const pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
+  const doneNotDonePieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
+  const returnToDevChartOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 20 } }, plugins: { legend: { display: false }, title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { title: function(context) { const dataIndex = context[0].dataIndex; const fullLabel = context[0].dataset.fullLabels[dataIndex]; return fullLabel; }, label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.x !== null) { label += context.parsed.x; } return label; } } } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } };
 
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {
@@ -711,9 +622,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} />
       {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
-
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
-
       {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
               <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>

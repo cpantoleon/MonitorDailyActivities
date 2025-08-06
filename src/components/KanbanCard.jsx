@@ -11,8 +11,13 @@ const KanbanCard = React.memo(({
   const { comment, link, type, tags, releaseName, releaseDate } = requirement.currentStatusDetails;
   const navigate = useNavigate();
 
-  const handleDefectClick = (project) => {
-    navigate(`/defects?project=${encodeURIComponent(project)}`);
+  const handleDefectClick = (project, defect) => {
+    // Add the defect's ID to the URL as a 'highlight' parameter
+    let url = `/defects?project=${encodeURIComponent(project)}&highlight=${defect.id}`;
+    if (defect.status === 'Closed') {
+      url += '&view=closed';
+    }
+    navigate(url);
   };
 
   const handleDragStart = (e, req) => {
@@ -31,12 +36,12 @@ const KanbanCard = React.memo(({
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    // Add 'T00:00:00' to treat the date string as local, not UTC
     return new Date(dateString + 'T00:00:00').toLocaleDateString();
   };
 
   return (
     <div 
+      id={`req-card-${requirement.id}`} // Unique ID for scrolling
       className="kanban-card"
       draggable="true"
       onDragStart={(e) => handleDragStart(e, requirement)}
@@ -91,7 +96,7 @@ const KanbanCard = React.memo(({
                   <button 
                     key={defect.id} 
                     className={`linked-item-tag defect ${defect.status === 'Closed' ? 'closed' : ''}`}
-                    onClick={() => handleDefectClick(requirement.project)}
+                    onClick={() => handleDefectClick(requirement.project, defect)}
                     title={`Go to defects for project ${requirement.project} (Status: ${defect.status})`}
                   >
                     {defect.title}
