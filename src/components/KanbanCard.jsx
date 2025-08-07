@@ -39,6 +39,17 @@ const KanbanCard = React.memo(({
     return new Date(dateString + 'T00:00:00').toLocaleDateString();
   };
 
+  const getDefectStatusClass = (status) => {
+    switch (status) {
+      case 'Closed':
+        return 'closed';
+      case 'Done':
+        return 'done';
+      default:
+        return '';
+    }
+  };
+
   return (
     <div 
       id={`req-card-${requirement.id}`} // Unique ID for scrolling
@@ -95,7 +106,7 @@ const KanbanCard = React.memo(({
                 {requirement.linkedDefects.map(defect => (
                   <button 
                     key={defect.id} 
-                    className={`linked-item-tag defect ${defect.status === 'Closed' ? 'closed' : ''}`}
+                    className={`linked-item-tag defect ${getDefectStatusClass(defect.status)}`}
                     onClick={() => handleDefectClick(requirement.project, defect)}
                     title={`Go to defects for project ${requirement.project} (Status: ${defect.status})`}
                   >

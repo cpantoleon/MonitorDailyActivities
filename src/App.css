@@ -1134,6 +1134,16 @@ body {
   background-color: #dee2e6;
 }
 
+.linked-item-tag.defect.done {
+  background-color: #e6e0f2;
+  border-color: #b3a1d9;
+  color: #5a3e9b;
+}
+
+.linked-item-tag.defect.done:hover {
+  background-color: #d9d1e9;
+}
+
 @keyframes breathing-highlight {
   0% {
     box-shadow: 0 0 4px 2px rgba(139, 69, 19, 0.4);
