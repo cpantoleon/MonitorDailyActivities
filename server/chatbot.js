@@ -24,6 +24,10 @@ function extractProjectFromMessage(message, intent) {
         case 'get_project_summary':
             regex = /(?:summary for|everything for)\s+(.+)/i;
             break;
+        case 'get_defects_list':
+        case 'get_defects_count':
+            regex = /(?:defects|counter of the defects|undone defects|not done defects|done defects|closed defects)(?: for| in)\s+(.+)/i;
+            break;
         default:
             return null;
     }
@@ -289,21 +293,27 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         if (lowerCaseMessage.includes('release') && !lowerCaseMessage.includes('date')) {
             return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try asking again using the words 'release date'." });
         }
+        if (lowerCaseMessage.includes('date') && !lowerCaseMessage.includes('release date') && !lowerCaseMessage.includes('today') && !lowerCaseMessage.includes('nameday')) {
+            return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try again using the phrase 'release date for [project name]'." });
+        }
 
         const intentPrompt = `
         Analyze the user's message to determine their primary intent and extract key parameters.
         Your response must be ONLY a single JSON object.
         **INTENTS:**
+        - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm", "list all the closed defects".
+        - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?", "count the done defects for crm-project".
         - "create_item": User wants to create a requirement, defect, note, or retrospective.
         - "get_joke": User asks for a joke.
         - "get_weather": User wants to know the current or future weather.
         - "get_nameday": User wants to know who is celebrating their nameday (e.g., "eortologio", "nameday today").
         - "get_release_date": User is asking for the release date of a project or a specific item.
-        - "get_project_summary": User wants a summary of a project's data (e.g., "show me everything for oipp").
-        - "get_general_info": A general question that requires searching the database.
+        - "get_project_summary": User wants a summary of a project's data (e.g., "show me everything for crm-project").
+        - "get_general_info": A general question that requires searching the database that does not match any other intent.
         - "unknown": The intent is unclear.
         **PARAMETERS TO EXTRACT:**
-        - "project_name": The name of the project (e.g., "oipp", "crm-project").
+        - "project_name": The name of the project (e.g., "crm-project", "crm-projectv2").
+        - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". If the user just asks for "defects", the filter is "all". If they ask for "undone" or "not done", the filter is "undone".
         - "item_type": The type of item, must be one of: "requirement", "defect", "note", "retrospective".
         - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
         - "title": The title for an item to be created.
@@ -463,10 +473,10 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     }
                 } else {
                     const manualProjectName = extractProjectFromMessage(message, intent);
-                    const projectToQuery = manualProjectName || parameters.project_name || projectContext;
+                    const projectToQuery = manualProjectName || (parameters || {}).project_name;
 
                     if (!projectToQuery) {
-                        return res.json({ reply: "Which project's release date are you asking about?" });
+                        return res.json({ reply: "Please specify a project for the release date. For example, 'what is the release date for crm-project?'" });
                     }
                     
                     const match = await findProjectMatch(db, projectToQuery);
@@ -581,13 +591,11 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 const finalProjectName = match.exact;
 
                 const [reqs, defects] = await Promise.all([
-                    qdrantClient.scroll({
-                        collection: QDRANT_COLLECTION_NAME,
+                    qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
                         filter: { must: [{ key: "project", match: { value: finalProjectName } }, { key: "type", match: { value: "requirement" } }] },
                         limit: 50, with_payload: true
                     }),
-                    qdrantClient.scroll({
-                        collection: QDRANT_COLLECTION_NAME,
+                    qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
                         filter: { 
                             must: [{ key: "project", match: { value: finalProjectName } }, { key: "type", match: { value: "defect" } }],
                             must_not: [{ key: "status", match: { any: ["Done", "Closed"] } }]
@@ -618,6 +626,109 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 return res.json({ reply: finalResult.response.text() });
             }
             
+            case "get_defects_list":
+            case "get_defects_count": {
+                const { project_name, defect_status_filter } = parameters || {};
+                const manualProjectName = extractProjectFromMessage(message, intent);
+                const projectToQuery = manualProjectName || project_name;
+            
+                if (!projectToQuery) {
+                    return res.json({ reply: "Please specify a project. For example, 'show me the defects for crm-project'." });
+                }
+            
+                const match = await findProjectMatch(db, projectToQuery);
+                if (match.suggestion) {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
+                } else if (match.noMatch) {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
+                }
+                const finalProjectName = match.exact;
+            
+                let qdrantFilter = {
+                    must: [
+                        { key: "project", match: { value: finalProjectName } },
+                        { key: "type", match: { value: "defect" } }
+                    ]
+                };
+                let replyDescription = "";
+            
+                let derivedFilter = (defect_status_filter || "").toLowerCase();
+                if (!derivedFilter) {
+                    if (lowerCaseMessage.includes("undone") || lowerCaseMessage.includes("not done")) derivedFilter = "undone";
+                    else if (lowerCaseMessage.includes("done")) derivedFilter = "done";
+                    else if (lowerCaseMessage.includes("closed")) derivedFilter = "closed";
+                    else if (lowerCaseMessage.includes("all the defects")) derivedFilter = "all_including_closed";
+                    else if (lowerCaseMessage.includes("defects")) derivedFilter = "all";
+                }
+            
+                switch(derivedFilter) {
+                    case "undone":
+                        qdrantFilter.must.push({
+                            key: "status",
+                            match: { any: ["Assigned to Developer", "Assigned to Tester"] }
+                        });
+                        replyDescription = "undone";
+                        break;
+                    case "done":
+                        qdrantFilter.must.push({
+                            key: "status",
+                            match: { value: "Done" }
+                        });
+                        replyDescription = "done";
+                        break;
+                    case "closed":
+                        qdrantFilter.must.push({
+                            key: "status",
+                            match: { value: "Closed" }
+                        });
+                        replyDescription = "closed";
+                        break;
+                    case "all":
+                        qdrantFilter.must_not = [{
+                            key: "status",
+                            match: { any: ["Done", "Closed"] }
+                        }];
+                        replyDescription = "in-progress";
+                        break;
+                    case "all_including_closed":
+                        replyDescription = "total (including closed)";
+                        break;
+                    default:
+                         qdrantFilter.must_not = [{
+                            key: "status",
+                            match: { any: ["Done", "Closed"] }
+                        }];
+                        replyDescription = "in-progress";
+                }
+            
+                if (intent === "get_defects_count") {
+                    const countResult = await qdrantClient.count(QDRANT_COLLECTION_NAME, {
+                        filter: qdrantFilter,
+                        exact: true
+                    });
+                    const count = countResult.count;
+                    return res.json({ reply: `There are ${count} ${replyDescription} defects in project "${finalProjectName}".` });
+            
+                } else {
+                    const scrollResult = await qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
+                        filter: qdrantFilter,
+                        limit: 100,
+                        with_payload: true
+                    });
+            
+                    if (!scrollResult.points || scrollResult.points.length === 0) {
+                        return res.json({ reply: `I couldn't find any ${replyDescription} defects for project "${finalProjectName}".` });
+                    }
+            
+                    const defects = scrollResult.points.map(p => p.payload);
+                    let replyText = `Here are the ${replyDescription} defects for "${finalProjectName}":\n\n`;
+                    defects.forEach(defect => {
+                        replyText += `- **${defect.title}** (Status: ${defect.status})\n`;
+                    });
+                    return res.json({ reply: replyText });
+                }
+            }
+
             case "get_general_info":
             default: {
                 const manualProjectName = extractProjectFromMessage(message, intent);
