@@ -28,10 +28,23 @@ function extractProjectFromMessage(message, intent) {
         case 'get_defects_count':
             regex = /(?:defects|counter of the defects|undone defects|not done defects|done defects|closed defects)(?: for| in)\s+(.+)/i;
             break;
+        case 'create_item':
+            regex = /(?:for|in)\s+project\s+([a-zA-Z0-9-]+)/i;
+            break;
         default:
             return null;
     }
     const match = message.match(regex);
+    return match ? match[1].trim() : null;
+}
+
+function extractTitleFromMessage(message) {
+    const match = message.match(/(?:titled|title|with title)\s+(['"]?)(.*?)\1(?: for| in| on| with|$)/i);
+    return match ? match[2].trim() : null;
+}
+
+function extractSprintFromMessage(message) {
+    const match = message.match(/(?:sprint)\s+(\d+)/i);
     return match ? match[1].trim() : null;
 }
 
@@ -264,7 +277,11 @@ const findProjectMatch = async (db, userInput) => {
     }
 
     if (bestMatch && minDistance <= 1) {
-        return { suggestion: bestMatch };
+        return { exact: bestMatch, suggestion: bestMatch };
+    }
+    
+    if (bestMatch && minDistance > 1) {
+        return { noMatch: true, suggestion: bestMatch };
     }
 
     return { noMatch: true };
@@ -303,7 +320,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         **INTENTS:**
         - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm", "list all the closed defects".
         - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?", "count the done defects for crm-project".
-        - "create_item": User wants to create a requirement, defect, note, or retrospective.
+        - "create_item": User wants to create an item. Examples: "create a requirement titled 'New Login Page' for project crm-project in sprint 7", "add a defect with title 'API timeout' in the bod project", "for project bod create requirement with title my-new-feature in sprint 1", "create for project crm-project a requirement with title 'User Dashboard' for sprint 8".
         - "get_joke": User asks for a joke.
         - "get_weather": User wants to know the current or future weather.
         - "get_nameday": User wants to know who is celebrating their nameday (e.g., "eortologio", "nameday today").
@@ -312,9 +329,9 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         - "get_general_info": A general question that requires searching the database that does not match any other intent.
         - "unknown": The intent is unclear.
         **PARAMETERS TO EXTRACT:**
-        - "project_name": The name of the project (e.g., "crm-project", "crm-projectv2").
+        - "project_name": The name of the project (e.g., "crm-project", "bod").
         - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". If the user just asks for "defects", the filter is "all". If they ask for "undone" or "not done", the filter is "undone".
-        - "item_type": The type of item, must be one of: "requirement", "defect", "note", "retrospective".
+        - "item_type": The type of item, must be one of: "requirement", "defect".
         - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
         - "title": The title for an item to be created.
         - "sprint": The name or number of the sprint.
@@ -508,30 +525,47 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             }
 
             case "create_item": {
-                const { item_type, title, sprint, project_name } = parameters || {};
-                const projectToQuery = project_name || projectContext;
+                let { item_type, title, sprint } = parameters || {};
+                const manualProjectName = extractProjectFromMessage(message, intent);
+                const projectToQuery = manualProjectName || (parameters || {}).project_name;
 
-                if (!title) {
-                    return res.json({ reply: "I can create items, but I need a title. What would you like to call it?" });
-                }
                 if (!item_type) {
-                    return res.json({ reply: `I can create a requirement, defect, note, or retrospective. Please specify what type of item you want to create for '${title}'.` });
+                    if (lowerCaseMessage.includes('requirement')) item_type = 'requirement';
+                    else if (lowerCaseMessage.includes('defect')) item_type = 'defect';
+                }
+                if (!title) {
+                    title = extractTitleFromMessage(message);
+                }
+                if (item_type === 'requirement' && !sprint) {
+                    sprint = extractSprintFromMessage(message);
+                }
+
+                if (!item_type) {
+                    return res.json({ reply: `Please specify if you want to create a requirement or a defect. For example: 'create a **requirement** titled "My New Feature"'` });
+                }
+                if (!title) {
+                    return res.json({ reply: `I can create a ${item_type}, but I need a title. For example: 'create a ${item_type} titled "My New Feature"'` });
                 }
                 if (!projectToQuery) {
-                    return res.json({ reply: `OK, I can create the ${item_type} "${title}". Which project should I add it to?` });
+                    return res.json({ reply: `Please specify a project for the ${item_type}. For example: 'create a ${item_type} titled "${title}" for project crm-project'` });
                 }
                 
                 const match = await findProjectMatch(db, projectToQuery);
-                if (match.suggestion) {
-                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
-                } else if (match.noMatch) {
+                let finalProjectName;
+
+                if (match.exact) {
+                    finalProjectName = match.exact;
+                } else if (match.suggestion && !match.noMatch) {
+                    finalProjectName = match.suggestion;
+                } else {
+                    if (match.noMatch && match.suggestion) {
+                         return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
+                    }
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
                 }
-                
-                const finalProjectName = match.exact;
 
                 if (item_type === 'requirement' && !sprint) {
-                    return res.json({ reply: `OK, I can create the requirement "${title}" for project "${finalProjectName}". Which sprint should it be in?` });
+                    return res.json({ reply: `OK, I can create the requirement "${title}" for project "${finalProjectName}". Which sprint should it be in? For example: '...in sprint 7'.` });
                 }
 
                 try {
@@ -575,14 +609,14 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
             case "get_project_summary": {
                 const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || parameters.project_name || projectContext;
+                const projectToQuery = manualProjectName || (parameters || {}).project_name || projectContext;
 
                 if (!projectToQuery) {
                    return res.json({ reply: "Which project would you like a summary for?" });
                 }
 
                 const match = await findProjectMatch(db, projectToQuery);
-                if (match.suggestion) {
+                if (match.suggestion && !match.exact) {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
                 } else if (match.noMatch) {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
@@ -637,7 +671,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 }
             
                 const match = await findProjectMatch(db, projectToQuery);
-                if (match.suggestion) {
+                if (match.suggestion && !match.exact) {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
                 } else if (match.noMatch) {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
@@ -732,7 +766,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             case "get_general_info":
             default: {
                 const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || parameters.project_name || projectContext;
+                const projectToQuery = manualProjectName || (parameters || {}).project_name || projectContext;
                 let finalProjectName = null;
 
                 if (projectToQuery) {
