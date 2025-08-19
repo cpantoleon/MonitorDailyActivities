@@ -26,7 +26,7 @@ function extractProjectFromMessage(message, intent) {
             break;
         case 'get_defects_list':
         case 'get_defects_count':
-            regex = /(?:defects|counter of the defects|undone defects|not done defects|done defects|closed defects)(?: for| in)\s+(.+)/i;
+            regex = /(?:defects|counter of the defects|undone defects|not done defects|done defects|closed defects)(?:.*)(?: for| in| have| of)\s+([a-zA-Z0-9-]+)(?:\?|$)/i;
             break;
         case 'create_item':
             regex = /(?:for|in)\s+project\s+([a-zA-Z0-9-]+)/i;
@@ -35,6 +35,11 @@ function extractProjectFromMessage(message, intent) {
             return null;
     }
     const match = message.match(regex);
+    if (!match && (intent === 'get_defects_list' || intent === 'get_defects_count')) {
+        const alternativeRegex = /defects\s+([a-zA-Z0-9-]+)/i;
+        const altMatch = message.match(alternativeRegex);
+        return altMatch ? altMatch[1].trim() : null;
+    }
     return match ? match[1].trim() : null;
 }
 
@@ -64,10 +69,10 @@ async function fetchNamedaysFromWidget() {
             const dateText = $(row).find('td#date').text().trim();
             const namesText = $(row).find('td#maintd').text().trim();
 
-            if (dateText && namesText && namesText !== '-') {
+            if (dateText) {
                 namedays.push({
                     date: dateText,
-                    names: namesText
+                    names: (namesText && namesText !== '-') ? namesText : ""
                 });
             }
         });
@@ -297,6 +302,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
         const lowerCaseMessage = message.toLowerCase().trim();
         
+        let preDeterminedIntent = null;
         if (['hello', 'hi', 'hey'].includes(lowerCaseMessage)) {
             return res.json({ reply: "Hello! How can I help you with your project data today?" });
         }
@@ -307,6 +313,16 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             return res.json({ reply: `Today is ${today}.` });
         }
+        if (lowerCaseMessage.includes('eortologio') || lowerCaseMessage.includes('nameday')) {
+            preDeterminedIntent = 'get_nameday';
+        }
+        if (lowerCaseMessage.includes('joke')) {
+            preDeterminedIntent = 'get_joke';
+        }
+        if (lowerCaseMessage.includes('weather')) {
+            preDeterminedIntent = 'get_weather';
+        }
+
         if (lowerCaseMessage.includes('release') && !lowerCaseMessage.includes('date')) {
             return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try asking again using the words 'release date'." });
         }
@@ -314,51 +330,61 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try again using the phrase 'release date for [project name]'." });
         }
 
-        const intentPrompt = `
-        Analyze the user's message to determine their primary intent and extract key parameters.
-        Your response must be ONLY a single JSON object.
-        **INTENTS:**
-        - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm", "list all the closed defects".
-        - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?", "count the done defects for crm-project".
-        - "create_item": User wants to create an item. Examples: "create a requirement titled 'New Login Page' for project crm-project in sprint 7", "add a defect with title 'API timeout' in the bod project", "for project bod create requirement with title my-new-feature in sprint 1", "create for project crm-project a requirement with title 'User Dashboard' for sprint 8".
-        - "get_joke": User asks for a joke.
-        - "get_weather": User wants to know the current or future weather.
-        - "get_nameday": User wants to know who is celebrating their nameday (e.g., "eortologio", "nameday today").
-        - "get_release_date": User is asking for the release date of a project or a specific item.
-        - "get_project_summary": User wants a summary of a project's data (e.g., "show me everything for crm-project").
-        - "get_general_info": A general question that requires searching the database that does not match any other intent.
-        - "unknown": The intent is unclear.
-        **PARAMETERS TO EXTRACT:**
-        - "project_name": The name of the project (e.g., "crm-project", "bod").
-        - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". If the user just asks for "defects", the filter is "all". If they ask for "undone" or "not done", the filter is "undone".
-        - "item_type": The type of item, must be one of: "requirement", "defect".
-        - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
-        - "title": The title for an item to be created.
-        - "sprint": The name or number of the sprint.
-        - "location": The city/place for the weather forecast (e.g., "Athens", "London").
-        - "timeframe": When the user wants something for (e.g., "today", "tomorrow", "next 7 days").
-        - "query": The user's core question for general info searches.
-        User message: "${message}"
-        `;
+        let intentData = {};
 
-        let intentData;
-        try {
-            const intentResult = await generativeModel.generateContent(intentPrompt);
-            const responseText = intentResult.response.text();
-            const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-            intentData = JSON.parse(cleanedText);
-        } catch (apiError) {
-            console.error("Error calling Google Generative AI:", apiError);
-            if (apiError.status === 400) {
-                return res.json({ reply: "I'm sorry, I can't process that request. API key not valid. Please pass a valid API key." });
+        if (!preDeterminedIntent) {
+            const intentPrompt = `
+            Analyze the user's message to determine their primary intent and extract key parameters.
+            Your response must be ONLY a single JSON object.
+            **INTENTS:**
+            - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm", "list all the closed defects".
+            - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?", "count the done defects for crm-project".
+            - "create_item": User wants to create an item. Examples: "create a requirement titled 'New Login Page' for project crm-project in sprint 7", "add a defect with title 'API timeout' in the bod project", "for project bod create requirement with title my-new-feature in sprint 1", "create for project crm-project a requirement with title 'User Dashboard' for sprint 8".
+            - "get_joke": User asks for a joke.
+            - "get_weather": User wants to know the current or future weather.
+            - "get_nameday": User wants to know who is celebrating their nameday (e.g., "eortologio", "nameday today").
+            - "get_release_date": User is asking for the release date of a project or a specific item.
+            - "get_project_summary": User wants a summary of a project's data (e.g., "show me everything for crm-project").
+            - "get_general_info": A general question that requires searching the database that does not match any other intent.
+            - "unknown": The intent is unclear.
+            **PARAMETERS TO EXTRACT:**
+            - "project_name": The name of the project (e.g., "crm-project", "bod").
+            - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". If the user just asks for "defects", the filter is "all". If they ask for "undone" or "not done", the filter is "undone".
+            - "item_type": The type of item, must be one of: "requirement", "defect".
+            - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
+            - "title": The title for an item to be created.
+            - "sprint": The name or number of the sprint.
+            - "location": The city/place for the weather forecast (e.g., "Athens", "London").
+            - "timeframe": When the user wants something for (e.g., "today", "tomorrow", "next 7 days").
+            - "query": The user's core question for general info searches.
+            User message: "${message}"
+            `;
+            try {
+                // --- START: THE CRITICAL FIX ---
+                // Start a new, stateless chat session for every intent detection call.
+                // This prevents the AI from remembering previous turns and returning non-JSON responses.
+                const chat = generativeModel.startChat({ history: [] });
+                const result = await chat.sendMessage(intentPrompt);
+                const responseText = result.response.text();
+                // --- END: THE CRITICAL FIX ---
+
+                const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                intentData = JSON.parse(cleanedText);
+            } catch (apiError) {
+                console.error("Error calling Google Generative AI:", apiError);
+                if (apiError.status === 400) {
+                    return res.json({ reply: "I'm sorry, I can't process that request. API key not valid. Please pass a valid API key." });
+                }
+                if (apiError.status === 429) {
+                    return res.json({ reply: "The AI service is currently busy. Please wait a moment and try your request again." });
+                }
+                if (apiError.status === 503) {
+                    return res.json({ reply: "The AI service is temporarily unavailable. Please try again in a moment." });
+                }
+                return res.json({ reply: "Sorry, I encountered an issue with an external service. Please try again." });
             }
-            if (apiError.status === 429) {
-                return res.json({ reply: "The AI service is currently busy. Please wait a moment and try your request again." });
-            }
-            if (apiError.status === 503) {
-                return res.json({ reply: "The AI service is temporarily unavailable. Please try again in a moment." });
-            }
-            return res.json({ reply: "Sorry, I encountered an issue with an external service. Please try again." });
+        } else {
+            intentData = { intent: preDeterminedIntent, parameters: {} };
         }
         
         const { intent, parameters } = intentData;
@@ -370,6 +396,32 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     "I told my computer I needed a break, and now it won’t stop sending me Kit-Kat ads.",
                     "Why did the scarecrow win an award? Because he was outstanding in his field!",
                     "What do you call a fake noodle? An Impasta!",
+                    "Why did the programmer get stuck in the shower? Because the instructions said “lather, rinse, repeat”!",
+                    "Why do programmers prefer dark mode? Because light attracts bugs!",
+                    "Why do Java developers wear glasses? Because they don't see sharp.",
+                    "Why was the developer unhappy at their job? They wanted arrays.",
+                    "Why do Python programmers prefer using snakes? Because they can’t find a good ‘list’!",
+                    "Why did the web developer go broke? Because they used up all their cache.",
+                    "Why did the developer go broke? Because they lost their domain in a bet.",
+                    "Why do Java programmers wear glasses? Because they don’t C#!",
+                    "Why did the developer go broke? Because they used up all their cache.",
+                    "What kind of shoes to frogs wear? Open-toad sandals.",
+                    "I just built an ATM that only gives out coins. I don’t know why no one’s thought of it before: it just makes cents!",
+                    "Did I ever tell you about the time I went mushroom foraging? It’s a story with a morel at the end.",
+                    "What happened when two slices of bread went on a date? It was loaf at first sight.",
+                    "I had a quiet game of tennis today. There was no racket.",
+                    "Why did the electric car feel discriminated against? Because the rules weren't current.",
+                    "Watch what you say around the egg whites. They can't take a yolk.",
+                    "I got a new pen that can write under water. It can write other words too.",
+                    "My boss said “dress for the job you want, not for the job you have.” So I went in as Batman.",
+                    "What do you call a sheep who can sing and dance? Lady Ba Ba.",
+                    "Why can't dinosaurs clap their hands? Because they're extinct.",
+                    "Where do rainbows go when they've been bad? To prism, so they have time to reflect on what they've done.",
+                    "What did the skillet eat on its birthday? Pan-cakes.",
+                    "How is my wallet like an onion? Every time I open it, I cry.",
+                    "What do you call a dog who meditates? Aware wolf.",
+                    "What kind of fish do penguins catch at night? Star fish.",
+                    "Can a frog jump higher than a house? Of course, a house can't jump at all!",
                     "Why was the JavaScript developer sad? Because he didn't Node how to Express himself."
                 ];
                 const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
@@ -377,34 +429,71 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             }
 
             case "get_nameday": {
-                const { timeframe } = parameters || {};
-                const isTodayOnly = (timeframe && timeframe.toLowerCase().includes('today')) || lowerCaseMessage.includes('today');
-                const isTomorrowOnly = (timeframe && timeframe.toLowerCase().includes('tomorrow')) || lowerCaseMessage.includes('tomorrow');
+                const timeframe = (parameters || {}).timeframe || '';
+                const isTodayOnly = timeframe.toLowerCase().includes('today') || lowerCaseMessage.includes('today');
+                const isTomorrowOnly = timeframe.toLowerCase().includes('tomorrow') || lowerCaseMessage.includes('tomorrow');
 
                 try {
                     const allNamedays = await fetchNamedaysFromWidget();
                     if (!allNamedays || allNamedays.length === 0) {
                         return res.json({ reply: "I couldn't retrieve the nameday list at the moment." });
                     }
+
+                    const dateOptions = { timeZone: 'Europe/Athens', day: 'numeric', month: 'short' };
+                    const formatter = new Intl.DateTimeFormat('el-GR', dateOptions);
+
+                    const now = new Date();
+                    const tomorrowDate = new Date();
+                    tomorrowDate.setDate(now.getDate() + 1);
+
+                    const todayString = formatter.format(now).replace('.', '');
+                    const tomorrowString = formatter.format(tomorrowDate).replace('.', '');
+
+                    const todayEntry = allNamedays.find(day => day.date.startsWith(todayString));
+                    const tomorrowEntry = allNamedays.find(day => day.date.startsWith(tomorrowString));
+
                     if (isTodayOnly) {
-                        const today = allNamedays[0];
-                        return res.json({ reply: `Today (${today.date}) the namedays are: ${today.names}.` });
-                    } else if (isTomorrowOnly) {
-                        if (allNamedays.length > 1) {
-                            const tomorrow = allNamedays[1];
-                            return res.json({ reply: `Tomorrow (${tomorrow.date}) the namedays are: ${tomorrow.names}.` });
+                        if (todayEntry) {
+                            if (todayEntry.names) {
+                                return res.json({ reply: `Today (${todayEntry.date}) the namedays are: ${todayEntry.names}.` });
+                            } else {
+                                return res.json({ reply: `There are no namedays listed for today (${todayEntry.date}).` });
+                            }
                         } else {
-                            return res.json({ reply: "I found today's nameday, but couldn't retrieve tomorrow's information." });
+                            return res.json({ reply: "I couldn't find today's nameday information in the calendar." });
                         }
-                    } else {
-                        const upcomingNamedays = allNamedays.slice(0, 7);
-                        let replyText = "Here are the namedays for the next 7 days:\n\n";
-                        upcomingNamedays.forEach(day => {
-                            const namesArray = day.names.split(', ');
-                            replyText += `**${day.date}:**\n- ${namesArray.join('\n- ')}\n\n`;
-                        });
-                        return res.json({ reply: replyText });
+                    } 
+                    
+                    if (isTomorrowOnly) {
+                        if (tomorrowEntry) {
+                             if (tomorrowEntry.names) {
+                                return res.json({ reply: `Tomorrow (${tomorrowEntry.date}) the namedays are: ${tomorrowEntry.names}.` });
+                            } else {
+                                return res.json({ reply: `There are no namedays listed for tomorrow (${tomorrowEntry.date}).` });
+                            }
+                        } else {
+                            return res.json({ reply: "I couldn't retrieve tomorrow's nameday information." });
+                        }
                     }
+
+                    // Logic for the 7-day list
+                    const todayIndex = allNamedays.findIndex(day => day.date.startsWith(todayString));
+                    
+                    const upcomingNamedays = todayIndex !== -1
+                        ? allNamedays.slice(todayIndex, todayIndex + 7)
+                        : allNamedays.slice(0, 7); // Fallback if today isn't found
+
+                    let replyText = "Here are the namedays for the next 7 days:\n\n";
+                    upcomingNamedays.forEach(day => {
+                        if (day.names) {
+                            const namesArray = day.names.split(', ');
+                            replyText += `${day.date}:\n- ${namesArray.join('\n- ')}\n\n`;
+                        } else {
+                            replyText += `${day.date}:\n- No namedays listed.\n\n`;
+                        }
+                    });
+                    return res.json({ reply: replyText });
+
                 } catch (apiError) {
                     console.error("Eortologio Scraping Error:", apiError);
                     return res.json({ reply: "Sorry, I was unable to connect to the nameday service at the moment." });
@@ -757,7 +846,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     const defects = scrollResult.points.map(p => p.payload);
                     let replyText = `Here are the ${replyDescription} defects for "${finalProjectName}":\n\n`;
                     defects.forEach(defect => {
-                        replyText += `- **${defect.title}** (Status: ${defect.status})\n`;
+                        replyText += `- ${defect.title} (Status: ${defect.status})\n`;
                     });
                     return res.json({ reply: replyText });
                 }

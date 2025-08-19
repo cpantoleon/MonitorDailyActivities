@@ -1305,8 +1305,8 @@
           "Chatbot"
         ],
         "responses": {
-          "202": {
-            "description": "Synchronization process has been accepted and started.",
+          "200": {
+            "description": "Synchronization successful.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1336,7 +1336,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatbotQuery"
+                "$ref": "#/components/schemas/ChatbotQueryInput"
               }
             }
           }
@@ -2049,16 +2049,21 @@
           }
         }
       },
-      "ChatbotQuery": {
+      "ChatbotQueryInput": {
         "type": "object",
         "required": [
-          "query"
+          "message"
         ],
         "properties": {
-          "query": {
+          "message": {
             "type": "string",
             "description": "The natural language question for the chatbot.",
             "example": "What is the status of requirement 'REQ-123'?"
+          },
+          "projectContext": {
+            "type": "string",
+            "description": "Optional project name to provide context for the query.",
+            "example": "crm-project"
           }
         }
       },
@@ -2069,11 +2074,24 @@
             "type": "string",
             "description": "The chatbot's answer to the query."
           },
-          "sources": {
-            "type": "array",
-            "description": "A list of data sources used to generate the reply.",
-            "items": {
-              "type": "object"
+          "data_changed": {
+            "type": "boolean",
+            "description": "Indicates if the query resulted in a database modification.",
+            "example": true
+          },
+          "new_item": {
+            "type": "object",
+            "description": "Details of the newly created item, if any.",
+            "properties": {
+              "project": {
+                "type": "string"
+              },
+              "sprint": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
             }
           }
         }
@@ -2083,7 +2101,12 @@
         "properties": {
           "message": {
             "type": "string",
-            "example": "Sync process started."
+            "example": "Sync successful!"
+          },
+          "synced": {
+            "type": "integer",
+            "description": "The number of documents successfully synchronized.",
+            "example": 152
           }
         }
       },

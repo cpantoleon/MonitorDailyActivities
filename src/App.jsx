@@ -1223,6 +1223,7 @@ function App() {
       <Chatbot 
         selectedProject={selectedProject} 
         onDataChange={handleDataRefresh} 
+        firstProjectName={projects.length > 0 ? projects[0] : ''}
       />
     </div>
   );

@@ -51,10 +51,9 @@
   margin: 0;
   color: #5C4033;
   font-size: 1.1em;
-  flex-grow: 1; /* --- MODIFIED --- Allow h3 to take up available space */
+  flex-grow: 1;
 }
 
-/* --- NEW --- Styles for the clear button */
 .chatbot-clear-btn {
   background: none;
   border: 1px solid #DEB887;
@@ -71,7 +70,6 @@
 .chatbot-clear-btn:hover {
   background-color: #F5DEB3;
 }
-/* --- END NEW --- */
 
 .chatbot-close-btn {
   background: none;
@@ -114,10 +112,38 @@
   align-self: flex-start;
 }
 
-/* --- MODIFIED --- Render newlines correctly */
 .message p {
   margin: 0;
 }
+
+/* --- MODIFIED --- Styles for suggestions */
+.chatbot-suggestions {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  align-items: flex-end; /* Align items to the right */
+  gap: 8px;
+  align-self: flex-end;
+  width: 100%;
+  margin-top: 10px; /* Add space above the suggestions */
+}
+
+.suggestion-chip {
+  background-color: #F5DEB3; /* New, more noticeable color */
+  border: 1px solid #D2B48C;  /* Stronger border */
+  color: #5C4033;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  font-family: inherit;
+}
+
+.suggestion-chip:hover {
+  background-color: #E3C9A6; /* Darker hover for better feedback */
+  transform: translateY(-1px);
+}
+/* --- END MODIFIED --- */
 
 .chatbot-input-form {
   display: flex;

@@ -66,6 +66,9 @@ These commands allow you to query your project data. For many commands, you must
 - **List Closed Defects:**
   - `show me the closed defects for TEST`
 
+- **List All Defects (including closed):**
+  - `show me all the defects for TEST`
+
 - **Without Specifying a Project:**
   - `give me the defects`
   > **Bot Response:** Please specify a project. For example, 'show me the defects for TEST'.
@@ -86,6 +89,9 @@ These commands allow you to query your project data. For many commands, you must
 
 - **Count Closed Defects:**
   - `count the closed defects for TEST`
+
+- **Count All Defects (including closed):**
+  - `count all the defects for TEST`
 
 - **Without Specifying a Project:**
   - `how many defects are there?`

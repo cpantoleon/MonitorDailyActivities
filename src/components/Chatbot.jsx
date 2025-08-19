@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
-const Chatbot = ({ selectedProject, onDataChange }) => {
+const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
     const getInitialState = () => {
         try {
             const storedMessages = sessionStorage.getItem('chatbotMessages');
@@ -50,11 +50,10 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
         }
     }, [isOpen]);
 
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+    const submitMessage = async (messageText) => {
+        if (!messageText.trim() || isLoading) return;
 
-        const userMessage = { from: 'user', text: inputValue };
+        const userMessage = { from: 'user', text: messageText };
         setMessages(prev => [...prev, userMessage]);
         setInputValue('');
         setIsLoading(true);
@@ -63,7 +62,7 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
             const response = await fetch('/api/chatbot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: inputValue, projectContext: selectedProject }),
+                body: JSON.stringify({ message: messageText, projectContext: selectedProject }),
             });
 
             if (!response.ok) {
@@ -84,11 +83,17 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
-            // --- MODIFIED LINE ---
-            // Use a timeout to ensure focus happens after the re-render from setIsLoading.
             setTimeout(() => inputRef.current?.focus(), 0);
-            // --- END MODIFIED LINE ---
         }
+    };
+
+    const handleSendMessage = (e) => {
+        e.preventDefault();
+        submitMessage(inputValue);
+    };
+
+    const handleSuggestionClick = (suggestionText) => {
+        submitMessage(suggestionText);
     };
 
     const handleClearChat = () => {
@@ -118,6 +123,23 @@ const Chatbot = ({ selectedProject, onDataChange }) => {
                         {isLoading && (
                             <div className="message bot">
                                 <p className="typing-indicator"><span>.</span><span>.</span><span>.</span></p>
+                            </div>
+                        )}
+                        
+                        {/* --- MOVED SUGGESTIONS HERE --- */}
+                        {messages.length === 1 && !isLoading && (
+                            <div className="chatbot-suggestions">
+                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me a joke')}>
+                                    Tell me a joke
+                                </button>
+                                {firstProjectName && (
+                                    <button className="suggestion-chip" onClick={() => handleSuggestionClick(`Tell me the defects for ${firstProjectName}`)}>
+                                        Defects for {firstProjectName}
+                                    </button>
+                                )}
+                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me the weather')}>
+                                    Tell me the weather
+                                </button>
                             </div>
                         )}
                         <div ref={messagesEndRef} />
