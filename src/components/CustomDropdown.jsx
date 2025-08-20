@@ -11,16 +11,30 @@ const CustomDropdown = ({ options, value, onChange, id, name, placeholder, disab
   // We use a separate ref for the click-outside logic to avoid conflicts
   const dropdownContainerRef = useClickOutside(() => setIsOpen(false));
 
-  // Use useLayoutEffect to calculate position before the browser paints
   useLayoutEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setCoords({
-        top: rect.bottom + window.scrollY, // Position below the button
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
+    const updatePosition = () => {
+      if (isOpen && buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    };
+
+    if (isOpen) {
+      updatePosition();
+      // Add event listeners to handle scrolling and resizing
+      window.addEventListener('scroll', updatePosition, true); // Use capture phase
+      window.addEventListener('resize', updatePosition);
     }
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [isOpen]);
 
   const handleSelect = (optionValue) => {

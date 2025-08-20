@@ -140,6 +140,9 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
                                 <button className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me the weather')}>
                                     Tell me the weather
                                 </button>
+                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('eortologio today')}>
+                                    Eortologio Today
+                                </button>
                             </div>
                         )}
                         <div ref={messagesEndRef} />

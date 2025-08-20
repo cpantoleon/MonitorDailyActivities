@@ -449,7 +449,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     const todayString = formatter.format(now).replace('.', '');
                     const tomorrowString = formatter.format(tomorrowDate).replace('.', '');
 
-                    const todayEntry = allNamedays.find(day => day.date.startsWith(todayString));
+                    const todayEntry = allNamedays.find(day => day.date === 'Σήμερα' || day.date.startsWith(todayString));
                     const tomorrowEntry = allNamedays.find(day => day.date.startsWith(tomorrowString));
 
                     if (isTodayOnly) {

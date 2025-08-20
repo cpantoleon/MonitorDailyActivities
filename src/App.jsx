@@ -540,10 +540,31 @@ function App() {
     if (selectedProject && allProcessedRequirements.length > 0) {
       const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
       setAvailableSprints(sprints);
-      if (selectedSprint && !sprints.includes(selectedSprint)) setSelectedSprint('');
-      if (sprints.length === 0) setSelectedSprint('');
+
+      if (sprints.length === 1) {
+        setSelectedSprint(sprints[0]);
+      } else if (sprints.length > 1) {
+        const sortedSprints = [...sprints].sort((a, b) => {
+          const numA = parseInt(a.match(/\d+/)?.[0], 10);
+          const numB = parseInt(b.match(/\d+/)?.[0], 10);
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+          }
+          if (isNaN(numA) && !isNaN(numB)) {
+            return -1;
+          }
+          if (!isNaN(numA) && isNaN(numB)) {
+            return 1;
+          }
+          return a.localeCompare(b);
+        });
+        setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+      } else {
+        setSelectedSprint('');
+      }
     } else { setAvailableSprints([]); setSelectedSprint(''); }
-  }, [selectedProject, allProcessedRequirements, selectedSprint]);
+  }, [selectedProject, allProcessedRequirements]);
 
   useEffect(() => {
     if (isSearching) return;

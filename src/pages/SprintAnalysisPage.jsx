@@ -23,9 +23,7 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  
 
 
   const fetchRetrospectiveItems = useCallback(async (project) => {
@@ -148,48 +146,12 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
     }
   };
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    setIsSearching(!!query);
-    setSearchSuggestions([]);
-  };
+  
 
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setIsSearching(false);
-    setSearchSuggestions([]);
-  };
-
-  const handleQueryChange = (query) => {
-    setSearchQuery(query);
-    if (query.length < 2) {
-      setSearchSuggestions([]);
-      return;
-    }
-    const lowerCaseQuery = query.toLowerCase();
-    const suggestions = retrospectiveItems
-      .filter(item => item.description.toLowerCase().includes(lowerCaseQuery))
-      .map(item => ({ id: item.id, name: item.description, context: item.column_type }))
-      .slice(0, 5);
-    setSearchSuggestions(suggestions);
-  };
-
-  const handleSuggestionSelect = (suggestion) => {
-    setSearchQuery(suggestion.name);
-    setIsSearching(true);
-    setSearchSuggestions([]);
-  };
-
-  const displayedItems = useMemo(() => {
-    if (!isSearching || !searchQuery) return retrospectiveItems;
-    const lowerCaseQuery = searchQuery.toLowerCase();
-    return retrospectiveItems.filter(item => 
-        item.description.toLowerCase().includes(lowerCaseQuery)
-    );
-  }, [isSearching, searchQuery, retrospectiveItems]);
+  
 
   const getItemsForColumn = (columnType) => {
-    return displayedItems.filter(item => item.column_type === columnType);
+    return retrospectiveItems.filter(item => item.column_type === columnType);
   };
 
   return (
@@ -202,15 +164,7 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
             selectedProject={selectedProject}
             onSelectProject={setSelectedProject}
           />
-          <SearchComponent
-            query={searchQuery}
-            onQueryChange={handleQueryChange}
-            onSearch={handleSearch}
-            onClear={handleClearSearch}
-            onSuggestionSelect={handleSuggestionSelect}
-            suggestions={searchSuggestions}
-            placeholder="Search retrospective items..."
-          />
+          
         </div>
         <div className="page-actions-group">
           <button
@@ -224,10 +178,9 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
       </div>
 
       {isLoading && <p className="loading-message-retro">Loading items...</p>}
-      {!isLoading && !selectedProject && !isSearching && <p className="select-project-prompt-retro">Please select a project to view retrospective items.</p>}
-      {!isLoading && isSearching && displayedItems.length === 0 && <p className="empty-column-message">No items found for your search.</p>}
+      {!isLoading && !selectedProject && <p className="select-project-prompt-retro">Please select a project to view retrospective items.</p>}
 
-      {!isLoading && (selectedProject || isSearching) && (
+      {!isLoading && selectedProject && (
         <div className="retrospective-board">
           {COLUMN_TYPES.map(column => (
             <RetrospectiveColumn

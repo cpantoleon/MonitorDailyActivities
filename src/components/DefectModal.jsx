@@ -8,7 +8,7 @@ import ConfirmationModal from './ConfirmationModal';
 const API_BASE_URL = '/api';
 const DEFECT_STATUSES = ['Assigned to Developer', 'Assigned to Tester', 'Done'];
 
-const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [] }) => {
+const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [], allDefects = [] }) => {
 
   const getInitialFormState = (project) => ({
     project: project || '',
@@ -97,33 +97,20 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   const modalRef = useClickOutside(handleCloseRequest);
 
   useEffect(() => {
-    if (!isOpen || !formData.project) {
-      setModalAreas([]);
-      return;
-    }
+    if (isOpen && formData.project) {
+      const projectDefects = allDefects.filter(d => d.project === formData.project);
+      const areas = [...new Set(projectDefects.map(d => d.area).filter(Boolean))].sort();
+      setModalAreas(areas);
 
-    const fetchAreasForProject = async (project) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/defects/${project}?statusType=all`);
-        if (!res.ok) throw new Error('Failed to fetch areas');
-        const result = await res.json();
-        const areas = [...new Set(result.data.map(d => d.area).filter(Boolean))].sort();
-        setModalAreas(areas);
-
-        if (defect && defect.project === project) {
-          setIsCustomArea(!areas.includes(defect.area));
-        } else {
-          setIsCustomArea(areas.length === 0);
-        }
-      } catch (error) {
-        console.error("Could not fetch areas for project:", error);
-        setModalAreas([]);
-        setIsCustomArea(true);
+      if (defect && defect.project === formData.project) {
+        setIsCustomArea(!areas.includes(defect.area));
+      } else {
+        setIsCustomArea(areas.length === 0);
       }
-    };
-
-    fetchAreasForProject(formData.project);
-  }, [isOpen, formData.project, defect]);
+    } else {
+      setModalAreas([]);
+    }
+  }, [isOpen, formData.project, defect, allDefects]);
 
   useEffect(() => {
     if (isOpen) {
