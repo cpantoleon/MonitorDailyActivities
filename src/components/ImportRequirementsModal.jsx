@@ -100,7 +100,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
     <>
       <strong>Excel File Format Guide:</strong>
       <ul>
-        <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story'.</li>
+        <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story', 'Incident'.</li>
         <li>The 'Summary' column is required and will become the requirement's title.</li>
         <li>The 'Key' column (e.g., 'PROJ-123') is used for JIRA links and duplicate checking.</li>
         <li>If a requirement with the same 'Key' already exists, it will be imported with a modified title (e.g., "Title (1)").</li>

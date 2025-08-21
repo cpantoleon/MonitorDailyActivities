@@ -799,8 +799,8 @@ body {
 }
 
 .note-dot {
-  height: 6px;
-  width: 6px;
+  height: 5px;
+  width: 5px;
   background-color: #000000;
   border-radius: 50%;
   display: inline-block;
@@ -816,10 +816,11 @@ body {
   margin-right: 0;
 }
 
-.note-dot-release { background-color: #007bff; }
-.note-dot-fat { background-color: #20c997; }
-.note-dot-regression { background-color: #17a2b8; }
-.note-dot-security { background-color: #6f42c1; }
+.note-dot-release { background-color: #c14ba1; }
+.note-dot-fat { background-color: #46d8ac; }
+.note-dot-regression { background-color: #5aa142; }
+.note-dot-euipo { background-color:  #41d51c;}
+.note-dot-security { background-color: #0015ff; }
 .note-dot-demo { background-color: #fd7e14; }
 .note-dot-event { background-color: #ffc107; }
 .note-dot-call { background-color: #dc3545; }

@@ -51,7 +51,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
 
   const projectOptions = projects.map(p => ({ value: p, label: p }));
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
-  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story'].map(t => ({ value: t, label: t }));
+  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'].map(t => ({ value: t, label: t }));
   const sprintNumberOptions = Array.from({ length: 20 }, (_, i) => ({
     value: `${i + 1}`,
     label: `${i + 1}`

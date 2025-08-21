@@ -11,6 +11,7 @@ import CustomDropdown from '../components/CustomDropdown';
 
 const KEYWORD_CONFIG = [
   { keyword: 'release date', type: 'release', label: 'Release Date' },
+  { keyword: 'euipo', type: 'euipo', label: 'EUIPO' },
   { keyword: 'FAT', type: 'fat', label: 'FAT' },
   { keyword: 'regression', type: 'regression', label: 'Regression' },
   { keyword: 'security', type: 'security', label: 'Security' },

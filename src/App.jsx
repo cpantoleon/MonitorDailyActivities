@@ -379,6 +379,7 @@ function App() {
   const hasFetched = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const prevSelectedProject = useRef();
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -537,33 +538,42 @@ function App() {
   }, [fetchData]);
 
   useEffect(() => {
-    if (selectedProject && allProcessedRequirements.length > 0) {
+    if (selectedProject) {
       const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
       setAvailableSprints(sprints);
-
-      if (sprints.length === 1) {
-        setSelectedSprint(sprints[0]);
-      } else if (sprints.length > 1) {
-        const sortedSprints = [...sprints].sort((a, b) => {
-          const numA = parseInt(a.match(/\d+/)?.[0], 10);
-          const numB = parseInt(b.match(/\d+/)?.[0], 10);
-
-          if (!isNaN(numA) && !isNaN(numB)) {
-            return numA - numB;
-          }
-          if (isNaN(numA) && !isNaN(numB)) {
-            return -1;
-          }
-          if (!isNaN(numA) && isNaN(numB)) {
-            return 1;
-          }
-          return a.localeCompare(b);
-        });
-        setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+    } else {
+      setAvailableSprints([]);
+    }
+  
+    if (prevSelectedProject.current !== selectedProject) {
+      if (selectedProject) {
+        const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
+        if (sprints.length > 0) {
+          const sortedSprints = [...sprints].sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)?.[0], 10);
+            const numB = parseInt(b.match(/\d+/)?.[0], 10);
+  
+            if (!isNaN(numA) && !isNaN(numB)) {
+              return numA - numB;
+            }
+            if (isNaN(numA) && !isNaN(numB)) {
+              return -1;
+            }
+            if (!isNaN(numA) && isNaN(numB)) {
+              return 1;
+            }
+            return a.localeCompare(b);
+          });
+          setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+        } else {
+          setSelectedSprint('');
+        }
       } else {
         setSelectedSprint('');
       }
-    } else { setAvailableSprints([]); setSelectedSprint(''); }
+    }
+  
+    prevSelectedProject.current = selectedProject;
   }, [selectedProject, allProcessedRequirements]);
 
   useEffect(() => {

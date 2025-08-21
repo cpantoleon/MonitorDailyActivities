@@ -91,7 +91,7 @@ const getProjectId = (projectName) => {
 };
 
 const processExcelData = (fileBuffer) => {
-    const validTypes = ['Change Request', 'Task', 'Bug', 'Story'];
+    const validTypes = ['Change Request', 'Task', 'Bug', 'Story', "Incident"];
     const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
