@@ -26,7 +26,7 @@ function extractProjectFromMessage(message, intent) {
             break;
         case 'get_defects_list':
         case 'get_defects_count':
-            regex = /(?:defects|counter of the defects|undone defects|not done defects|done defects|closed defects)(?:.*)(?: for| in| have| of)\s+([a-zA-Z0-9-]+)(?:\?|$)/i;
+            regex = /(?:defects|counter of(?: the)? defects|number of(?: the)? defects|undone defects|not done defects|done defects|closed defects)(?:.*?)(?: for| in| have| of)\s+(?:the\s+)?([a-zA-Z0-9\s-]+)(?:\?|$)/i;
             break;
         case 'create_item':
             regex = /(?:for|in)\s+project\s+([a-zA-Z0-9-]+)/i;
