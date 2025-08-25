@@ -546,7 +546,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                             return res.json({ reply: `I couldn't find weather data for "${locationToFetch}". Please check the location name.` });
                         }
                         const { name, main, weather } = weatherData;
-                        const reply = `Currently in ${name}, it's ${main.temp.toFixed(1)}°C and feels like ${main.feels_like.toFixed(1)}°C. The sky has ${weather[0].description}.`;
+                        const reply = `Currently in ${name}, it's ${main.temp.toFixed(1)}°C and feels like ${main.feels_like.toFixed(1)}°C, with ${weather[0].description}.`;
                         return res.json({ reply });
                     } catch (apiError) {
                         console.error("Weather API Error:", apiError);

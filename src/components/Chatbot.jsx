@@ -1,6 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
+const TtsEnabledIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+);
+
+const TtsDisabledIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+        <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v-2"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+);
+
 const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
     const getInitialState = () => {
         try {
@@ -24,8 +43,11 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
     const [messages, setMessages] = useState(getInitialState().messages);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isTtsEnabled, setIsTtsEnabled] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const utteranceRef = useRef(null);
 
     useEffect(() => {
         sessionStorage.setItem('chatbotIsOpen', JSON.stringify(isOpen));
@@ -49,6 +71,41 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
             inputRef.current?.focus();
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isTtsEnabled) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+    }, [isTtsEnabled]);
+
+    const handleSpeak = (text) => {
+        if (isSpeaking && utteranceRef.current?.text === text) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+            utteranceRef.current = null;
+            return;
+        }
+
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onend = () => {
+            setIsSpeaking(false);
+            utteranceRef.current = null;
+        };
+        utterance.onerror = (event) => {
+            console.error("Speech synthesis error", event);
+            setIsSpeaking(false);
+            utteranceRef.current = null;
+        };
+        
+        utteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+        setIsSpeaking(true);
+    };
 
     const submitMessage = async (messageText) => {
         if (!messageText.trim() || isLoading) return;
@@ -100,6 +157,8 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
         setMessages([
             { from: 'bot', text: 'Hello! How can I help you with your project today?' }
         ]);
+        window.speechSynthesis.cancel();
+        setIsSpeaking(false);
         inputRef.current?.focus();
     };
 
@@ -109,15 +168,36 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
                 <div className="chatbot-window">
                     <div className="chatbot-header">
                         <h3>Project Assistant</h3>
-                        <button onClick={handleClearChat} className="chatbot-clear-btn" title="Clear chat">
-                           Clear
-                        </button>
-                        <button onClick={() => setIsOpen(false)} className="chatbot-close-btn">×</button>
+                        <div className="chatbot-header-controls">
+                            <button 
+                                onClick={() => setIsTtsEnabled(!isTtsEnabled)} 
+                                className="chatbot-tts-toggle"
+                                title={isTtsEnabled ? "Disable Text-to-Speech" : "Enable Text-to-Speech"}
+                            >
+                                {isTtsEnabled ? <TtsEnabledIcon /> : <TtsDisabledIcon />}
+                            </button>
+                            <button onClick={handleClearChat} className="chatbot-clear-btn" title="Clear chat">
+                               Clear
+                            </button>
+                            <button onClick={() => setIsOpen(false)} className="chatbot-close-btn">×</button>
+                        </div>
                     </div>
                     <div className="chatbot-messages">
                         {messages.map((msg, index) => (
-                            <div key={index} className={`message ${msg.from}`}>
+                            <div key={index} className={`message ${msg.from} ${msg.from === 'bot' && !isTtsEnabled ? 'bot-tts-disabled' : ''}`}>
                                 <p dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }} />
+                                {isTtsEnabled && msg.from === 'bot' && msg.text !== 'Hello! How can I help you with your project today?' && (
+                                    <button 
+                                        onClick={() => handleSpeak(msg.text.replace(/<[^>]+>/g, ''))} 
+                                        className="speak-btn"
+                                        aria-label="Speak message"
+                                    >
+                                        {isSpeaking && utteranceRef.current?.text === msg.text.replace(/<[^>]+>/g, '') 
+                                            ? <img src="/stop-icon.svg" alt="Stop" className="speak-icon" />
+                                            : <img src="/play-icon.svg" alt="Play" className="speak-icon" />
+                                        }
+                                    </button>
+                                )}
                             </div>
                         ))}
                         {isLoading && (
