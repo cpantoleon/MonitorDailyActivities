@@ -16,7 +16,7 @@ const GifPlayerModal = ({ isOpen, onClose, gifSrc }) => {
         className="gif-modal-content"
         onClick={(e) => e.stopPropagation()}
       >
-        <img src={gifSrc} alt="How to export from JIRA" />
+        {isOpen && <img src={`${gifSrc}?${new Date().getTime()}`} alt="How to export from JIRA" />}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
+// This is the original, reliable function for simple, intent-specific queries.
 function extractProjectFromMessage(message, intent) {
     let regex;
     switch (intent) {
@@ -26,31 +27,84 @@ function extractProjectFromMessage(message, intent) {
             break;
         case 'get_defects_list':
         case 'get_defects_count':
-            regex = /(?:defects|counter of(?: the)? defects|number of(?: the)? defects|undone defects|not done defects|done defects|closed defects)(?:.*?)(?: for| in| have| of)\s+(?:the\s+)?([a-zA-Z0-9\s-]+)(?:\?|$)/i;
-            break;
-        case 'create_item':
-            regex = /(?:for|in)\s+project\s+([a-zA-Z0-9-]+)/i;
+            regex = /(?:defects?|counter of(?: the)? defects?|number of(?: the)? defects?|undone defects?|not done defects?|done defects?|closed defects?)(?:.*?)(?: for| in| have| of)\s+(?:the\s+)?(.+)/i;
             break;
         default:
             return null;
     }
+
     const match = message.match(regex);
-    if (!match && (intent === 'get_defects_list' || intent === 'get_defects_count')) {
-        const alternativeRegex = /defects\s+([a-zA-Z0-9-]+)/i;
-        const altMatch = message.match(alternativeRegex);
-        return altMatch ? altMatch[1].trim() : null;
+    let projectName = null;
+
+    if (match && match[1]) {
+        projectName = match[1].trim().replace(/\?$/, '').trim();
     }
-    return match ? match[1].trim() : null;
+
+    if (!projectName && (intent === 'get_defects_list' || intent === 'get_defects_count')) {
+        const alternativeRegex = /defects?\s+([a-zA-Z0-9-]+)/i;
+        const altMatch = message.match(alternativeRegex);
+        if (altMatch && altMatch[1]) {
+            projectName = altMatch[1].trim();
+        }
+    }
+    
+    if (projectName && projectName.toLowerCase().endsWith(' project')) {
+        projectName = projectName.slice(0, -' project'.length).trim();
+    }
+
+    return projectName;
 }
 
+function extractConversationalProject(message) {
+    // This regex looks for a project name but stops before it hits another keyword.
+    const pattern = /(?:for|in|on|to|project)\s+(?:the\s+)?(['"]?)([\w\s-]+?)\1(?=\s|,\s|\.\s|\?\s|sprint|title|titled|called|requirement|defect|$)/i;
+    
+    let match = message.match(pattern);
+
+    // If the first pattern fails, try a simpler one for when the project name starts the sentence.
+    if (!match) {
+        const startPattern = /^(['"]?)([\w\s-]+?)\1\s+(?:requirement|defect)/i;
+        match = message.match(startPattern);
+    }
+
+    if (match && (match[2] || match[1])) {
+        let projectName = (match[2] || match[1]).trim();
+        if (projectName.toLowerCase().endsWith(' project')) {
+            projectName = projectName.slice(0, -' project'.length).trim();
+        }
+        return projectName;
+    }
+    
+    return null;
+}
+
+
 function extractTitleFromMessage(message) {
-    const match = message.match(/(?:titled|title|with title)\s+(['"]?)(.*?)\1(?: for| in| on| with|$)/i);
-    return match ? match[2].trim() : null;
+    const patterns = [
+        /(?:titled|title is|title|with title|called|call it|the title should be)\s+(['"]?)(.+?)\1(?=[.,]?(\s+for|\s+in|\s+on|\s+sprint|project|$))/i,
+        /:\s+(['"]?)(.+?)\1$/i,
+        /(['"])(.+?)\1\s+title/i
+    ];
+    
+    for (const pattern of patterns) {
+        const match = message.match(pattern);
+        if (match && match[2]) {
+            let title = match[2].trim();
+            if (/[.,?!"']$/.test(title)) {
+                title = title.slice(0, -1);
+            }
+            if (title.startsWith('"') && title.endsWith('"')) {
+                title = title.slice(1, -1);
+            }
+            return title;
+        }
+    }
+    return null;
 }
 
 function extractSprintFromMessage(message) {
-    const match = message.match(/(?:sprint)\s+(\d+)/i);
-    return match ? match[1].trim() : null;
+    const match = message.match(/(?:in\s+)?sprint\s+([a-zA-Z0-9_.-]+)|([a-zA-Z0-9_.-]+)\s+sprint/i);
+    return match ? (match[1] || match[2]).trim() : null;
 }
 
 async function fetchNamedaysFromWidget() {
@@ -112,13 +166,22 @@ function initializeClients() {
 const syncWithQdrant = (db) => async (req, res) => {
     try {
         initializeClients();
+
         try {
-            await qdrantClient.getCollection(QDRANT_COLLECTION_NAME);
+            const collectionExists = await qdrantClient.getCollection(QDRANT_COLLECTION_NAME).catch(() => null);
+            if (collectionExists) {
+                console.log("Existing collection found. Deleting to perform a clean sync...");
+                await qdrantClient.deleteCollection(QDRANT_COLLECTION_NAME);
+            }
         } catch (e) {
-            await qdrantClient.createCollection(QDRANT_COLLECTION_NAME, {
-                vectors: { size: 768, distance: 'Cosine' },
-            });
+            console.log("Could not delete collection (it may not have existed), proceeding with creation.");
         }
+
+        console.log("Creating new collection and indexes...");
+        await qdrantClient.createCollection(QDRANT_COLLECTION_NAME, {
+            vectors: { size: 768, distance: 'Cosine' },
+        });
+
         await qdrantClient.createPayloadIndex(QDRANT_COLLECTION_NAME, { field_name: 'project', field_schema: 'keyword', wait: true });
         await qdrantClient.createPayloadIndex(QDRANT_COLLECTION_NAME, { field_name: 'type', field_schema: 'keyword', wait: true });
         await qdrantClient.createPayloadIndex(QDRANT_COLLECTION_NAME, { field_name: 'status', field_schema: 'keyword', wait: true });
@@ -131,6 +194,7 @@ const syncWithQdrant = (db) => async (req, res) => {
             wait: true 
         });
         
+        console.log("Fetching latest data from the database...");
         const requirementsSql = `
             SELECT 
                 a.id as activityDbId, a.requirementGroupId, a.requirementUserIdentifier, 
@@ -207,9 +271,11 @@ const syncWithQdrant = (db) => async (req, res) => {
         ].filter(doc => doc.id && !doc.id.includes('_null') && !doc.id.includes('_undefined'));
 
         if (documents.length === 0) {
+            console.log("No documents to sync.");
             return res.status(200).json({ message: "No valid documents to sync." });
         }
 
+        console.log(`Embedding and upserting ${documents.length} documents...`);
         const BATCH_SIZE = 100;
         for (let i = 0; i < documents.length; i += BATCH_SIZE) {
             const batchDocuments = documents.slice(i, i + BATCH_SIZE);
@@ -223,8 +289,10 @@ const syncWithQdrant = (db) => async (req, res) => {
                 points: batchDocuments.map((doc, index) => ({ id: doc.id, vector: embeddings[index], payload: doc.payload })),
             });
         }
-        res.status(200).json({ message: "Sync successful!", synced: documents.length });
+        console.log("Sync successful!");
+        res.status(200).json({ message: "Sync successful! Collection was rebuilt.", synced: documents.length });
     } catch (error) {
+        console.error("Failed to sync data with Qdrant:", error);
         res.status(500).json({ error: "Failed to sync data with Qdrant.", details: error.message });
     }
 };
@@ -282,11 +350,11 @@ const findProjectMatch = async (db, userInput) => {
     }
 
     if (bestMatch && minDistance <= 1) {
-        return { exact: bestMatch, suggestion: bestMatch };
+        return { autocorrect: bestMatch };
     }
     
-    if (bestMatch && minDistance > 1) {
-        return { noMatch: true, suggestion: bestMatch };
+    if (bestMatch && minDistance <= 2) {
+        return { suggestion: bestMatch };
     }
 
     return { noMatch: true };
@@ -337,19 +405,19 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             Analyze the user's message to determine their primary intent and extract key parameters.
             Your response must be ONLY a single JSON object.
             **INTENTS:**
-            - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm", "list all the closed defects".
-            - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?", "count the done defects for crm-project".
-            - "create_item": User wants to create an item. Examples: "create a requirement titled 'New Login Page' for project crm-project in sprint 7", "add a defect with title 'API timeout' in the bod project", "for project bod create requirement with title my-new-feature in sprint 1", "create for project crm-project a requirement with title 'User Dashboard' for sprint 8".
+            - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm".
+            - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?".
+            - "create_item": User wants to create a new item (requirement or defect). The parameters can appear in any order. Examples: "for the crm-project project, please create a requirement in sprint 7 called 'API Rate Limiting'", "I need a new requirement with the title 'User Profile V2' for the crm-project project, please put it in sprint 10", "crm-project project requirement, 3 sprint, 'Password Reset UI' title", "In sprint 12 for the crm-project project, I need a new requirement with the title 'Add GDPR Compliance Banner'", "Let's make a new requirement in sprint 4 for the crm-project project. Call it 'Implement Two-Factor Authentication'.", "Hey, I found a bug. Can you log a defect in the crm-project project? The title should be 'Session timeout is too short'.", "I'm reporting a defect in the crm-project project. It's called 'Incorrect calculation in summary report'.", "Log a defect in project 'crm-project project', title is 'Submit button is disabled incorrectly'.".
             - "get_joke": User asks for a joke.
             - "get_weather": User wants to know the current or future weather.
-            - "get_nameday": User wants to know who is celebrating their nameday (e.g., "eortologio", "nameday today").
+            - "get_nameday": User wants to know who is celebrating their nameday.
             - "get_release_date": User is asking for the release date of a project or a specific item.
-            - "get_project_summary": User wants a summary of a project's data (e.g., "show me everything for crm-project").
+            - "get_project_summary": User wants a summary of a project's data.
             - "get_general_info": A general question that requires searching the database that does not match any other intent.
             - "unknown": The intent is unclear.
             **PARAMETERS TO EXTRACT:**
-            - "project_name": The name of the project (e.g., "crm-project", "bod").
-            - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". If the user just asks for "defects", the filter is "all". If they ask for "undone" or "not done", the filter is "undone".
+            - "project_name": The name of the project (e.g., "crm-project", "test project").
+            - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". Default is "all".
             - "item_type": The type of item, must be one of: "requirement", "defect".
             - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
             - "title": The title for an item to be created.
@@ -360,13 +428,9 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             User message: "${message}"
             `;
             try {
-                // --- START: THE CRITICAL FIX ---
-                // Start a new, stateless chat session for every intent detection call.
-                // This prevents the AI from remembering previous turns and returning non-JSON responses.
                 const chat = generativeModel.startChat({ history: [] });
                 const result = await chat.sendMessage(intentPrompt);
                 const responseText = result.response.text();
-                // --- END: THE CRITICAL FIX ---
 
                 const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
                 intentData = JSON.parse(cleanedText);
@@ -476,12 +540,11 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                         }
                     }
 
-                    // Logic for the 7-day list
                     const todayIndex = allNamedays.findIndex(day => day.date.startsWith(todayString));
                     
                     const upcomingNamedays = todayIndex !== -1
                         ? allNamedays.slice(todayIndex, todayIndex + 7)
-                        : allNamedays.slice(0, 7); // Fallback if today isn't found
+                        : allNamedays.slice(0, 7);
 
                     let replyText = "Here are the namedays for the next 7 days:\n\n";
                     upcomingNamedays.forEach(day => {
@@ -578,56 +641,61 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                         return res.json({ reply: `I couldn't find any information for the ID "${item_id}".` });
                     }
                 } else {
-                    const manualProjectName = extractProjectFromMessage(message, intent);
-                    const projectToQuery = manualProjectName || (parameters || {}).project_name;
+                    const projectToQuery = (parameters || {}).project_name || extractProjectFromMessage(message, intent);
 
                     if (!projectToQuery) {
                         return res.json({ reply: "Please specify a project for the release date. For example, 'what is the release date for crm-project?'" });
                     }
                     
+                    let finalProjectName = null;
                     const match = await findProjectMatch(db, projectToQuery);
 
-                    if (match.exact) {
-                        const exactProjectName = match.exact;
-                        const scrollResult = await qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
-                            limit: 1, with_payload: true,
-                            filter: { must: [{ key: "project", match: { value: exactProjectName } }, { key: "type", match: { value: "release" } }, { key: "status", match: { value: "Active" } }] }
-                        });
-                        if (scrollResult.points && scrollResult.points.length > 0) {
-                            const release = scrollResult.points[0].payload;
-                            if (release && release.name && release.date) {
-                                return res.json({ reply: `The current release for ${exactProjectName} is "${release.name}", scheduled for ${release.date}.` });
-                            } else if (release && release.name) {
-                                return res.json({ reply: `I found the release "${release.name}" for project ${exactProjectName}, but it does not have a date assigned.` });
-                            } else {
-                                return res.json({ reply: `I found release information for ${exactProjectName}, but the data seems to be incomplete.` });
-                            }
-                        } else {
-                            return res.json({ reply: `I couldn't find an active release date for the project "${exactProjectName}".` });
-                        }
+                    if (match.exact || match.autocorrect) {
+                        finalProjectName = match.exact || match.autocorrect;
                     } else if (match.suggestion) {
-                        return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
+                        return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
                     } else {
                         return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
+                    }
+
+                    const scrollResult = await qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
+                        limit: 25, 
+                        with_payload: true,
+                        filter: { 
+                            must: [
+                                { key: "project", match: { value: finalProjectName } }, 
+                                { key: "type", match: { value: "release" } }
+                            ] 
+                        }
+                    });
+
+                    if (scrollResult.points && scrollResult.points.length > 0) {
+                        const allReleases = scrollResult.points.map(p => p.payload);
+                        allReleases.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        
+                        const latestRelease = allReleases[0];
+
+                        if (latestRelease && latestRelease.name && latestRelease.date) {
+                            const statusInfo = latestRelease.status === 'Active' ? 'current' : 'latest';
+                            return res.json({ reply: `The ${statusInfo} release for ${finalProjectName} is "${latestRelease.name}", scheduled for ${latestRelease.date}.` });
+                        } else {
+                            return res.json({ reply: `I found release information for ${finalProjectName}, but the data seems to be incomplete.` });
+                        }
+                    } else {
+                        return res.json({ reply: `I couldn't find any release information for the project "${finalProjectName}".` });
                     }
                 }
             }
 
             case "create_item": {
-                let { item_type, title, sprint } = parameters || {};
-                const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || (parameters || {}).project_name;
+                // NEW HYBRID PARAMETER LOGIC
+                let { item_type, title, sprint, project_name } = parameters || {};
 
-                if (!item_type) {
-                    if (lowerCaseMessage.includes('requirement')) item_type = 'requirement';
-                    else if (lowerCaseMessage.includes('defect')) item_type = 'defect';
-                }
-                if (!title) {
-                    title = extractTitleFromMessage(message);
-                }
-                if (item_type === 'requirement' && !sprint) {
-                    sprint = extractSprintFromMessage(message);
-                }
+                // AI-first, Regex-backup
+                item_type = item_type || (message.match(/\b(requirement|defect)\b/i) || [])[1]?.toLowerCase();
+                title = title || extractTitleFromMessage(message);
+                project_name = project_name || extractConversationalProject(message);
+                sprint = sprint || (item_type === 'requirement' ? extractSprintFromMessage(message) : null);
 
                 if (!item_type) {
                     return res.json({ reply: `Please specify if you want to create a requirement or a defect. For example: 'create a **requirement** titled "My New Feature"'` });
@@ -635,22 +703,19 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 if (!title) {
                     return res.json({ reply: `I can create a ${item_type}, but I need a title. For example: 'create a ${item_type} titled "My New Feature"'` });
                 }
-                if (!projectToQuery) {
+                if (!project_name) {
                     return res.json({ reply: `Please specify a project for the ${item_type}. For example: 'create a ${item_type} titled "${title}" for project crm-project'` });
                 }
                 
-                const match = await findProjectMatch(db, projectToQuery);
-                let finalProjectName;
+                let finalProjectName = null;
+                const match = await findProjectMatch(db, project_name);
 
-                if (match.exact) {
-                    finalProjectName = match.exact;
-                } else if (match.suggestion && !match.noMatch) {
-                    finalProjectName = match.suggestion;
+                if (match.exact || match.autocorrect) {
+                    finalProjectName = match.exact || match.autocorrect;
+                } else if (match.suggestion) {
+                    return res.json({ reply: `I couldn't find a project named "${project_name}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
                 } else {
-                    if (match.noMatch && match.suggestion) {
-                         return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
-                    }
-                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
+                    return res.json({ reply: `I couldn't find a project named "${project_name}". Please check the name and try again.` });
                 }
 
                 if (item_type === 'requirement' && !sprint) {
@@ -697,21 +762,22 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             }
 
             case "get_project_summary": {
-                const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || (parameters || {}).project_name || projectContext;
+                const projectToQuery = (parameters || {}).project_name || extractProjectFromMessage(message, intent) || projectContext;
 
                 if (!projectToQuery) {
                    return res.json({ reply: "Which project would you like a summary for?" });
                 }
 
+                let finalProjectName = null;
                 const match = await findProjectMatch(db, projectToQuery);
-                if (match.suggestion && !match.exact) {
-                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
-                } else if (match.noMatch) {
+
+                if (match.exact || match.autocorrect) {
+                    finalProjectName = match.exact || match.autocorrect;
+                } else if (match.suggestion) {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
+                } else {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
                 }
-
-                const finalProjectName = match.exact;
 
                 const [reqs, defects] = await Promise.all([
                     qdrantClient.scroll(QDRANT_COLLECTION_NAME, {
@@ -752,20 +818,22 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             case "get_defects_list":
             case "get_defects_count": {
                 const { project_name, defect_status_filter } = parameters || {};
-                const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || project_name;
+                const projectToQuery = project_name || extractProjectFromMessage(message, intent);
             
                 if (!projectToQuery) {
                     return res.json({ reply: "Please specify a project. For example, 'show me the defects for crm-project'." });
                 }
             
+                let finalProjectName = null;
                 const match = await findProjectMatch(db, projectToQuery);
-                if (match.suggestion && !match.exact) {
-                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". If you meant "${match.suggestion}", please ask your question again with the correct name.` });
-                } else if (match.noMatch) {
+
+                if (match.exact || match.autocorrect) {
+                    finalProjectName = match.exact || match.autocorrect;
+                } else if (match.suggestion) {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"? Please ask your question again with the correct name.` });
+                } else {
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Please check the name and try again.` });
                 }
-                const finalProjectName = match.exact;
             
                 let qdrantFilter = {
                     must: [
@@ -854,14 +922,13 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
             case "get_general_info":
             default: {
-                const manualProjectName = extractProjectFromMessage(message, intent);
-                const projectToQuery = manualProjectName || (parameters || {}).project_name || projectContext;
+                const projectToQuery = (parameters || {}).project_name || extractProjectFromMessage(message, intent) || projectContext;
                 let finalProjectName = null;
 
                 if (projectToQuery) {
                     const match = await findProjectMatch(db, projectToQuery);
-                    if (match.exact) {
-                        finalProjectName = match.exact;
+                    if (match.exact || match.autocorrect) {
+                        finalProjectName = match.exact || match.autocorrect;
                     }
                 }
 
