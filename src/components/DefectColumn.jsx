@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import DefectCard from './DefectCard';
 
-const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onDrop }) => {
+const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onDrop, onMoveToClosed }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
 
@@ -56,6 +56,7 @@ const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteReq
             onDeleteRequest={onDeleteRequest}
             onNavigate={onNavigate}
             onDragStart={onDragStart}
+            onMoveToClosed={onMoveToClosed}
           />
         ))}
       </div>

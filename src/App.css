@@ -1513,3 +1513,13 @@ body {
     -moz-appearance: textfield;
     appearance: textfield;
 }
+.defect-action-button.move {
+  background-color: #f0f0f0;
+  color: #555;
+  border-color: #ccc;
+}
+
+.defect-action-button.move:hover {
+  background-color: #e0e0e0;
+  border-color: #bbb;
+}

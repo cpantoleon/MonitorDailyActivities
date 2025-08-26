@@ -64,7 +64,7 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal }) => {
   );
 };
 
-const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, selectedProject, onSelectProject }) => {
+const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, selectedProject, onSelectProject, onSwitchProject }) => {
   const [allDefects, setAllDefects] = useState([]);
   const [activeDefects, setActiveDefects] = useState([]);
   const [closedDefects, setClosedDefects] = useState([]);
@@ -91,6 +91,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const [isImportConfirmModalOpen, setIsImportConfirmModalOpen] = useState(false);
   const [importConfirmData, setImportConfirmData] = useState(null);
   const [highlightedDefectId, setHighlightedDefectId] = useState(null);
+  const [isMoveToClosedConfirmModalOpen, setIsMoveToClosedConfirmModalOpen] = useState(false);
+  const [defectToMove, setDefectToMove] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -370,8 +372,11 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   };
 
   const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
+    if (onSwitchProject) {
+      onSwitchProject(project);
+    }
     navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
-  }, [navigate]);
+  }, [navigate, onSwitchProject]);
 
   const handleOpenImportModal = useCallback(() => setIsImportDefectsModalOpen(true), []);
   const handleCloseImportModal = useCallback(() => { setIsImportDefectsModalOpen(false); setImportConfirmData(null); }, []);
@@ -536,6 +541,45 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     }
   };
 
+  const proceedWithMoveToClosed = async (defect) => {
+    const payload = { ...defect, status: 'Closed', comment: 'Moved to closed' };
+    try {
+      const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to move defect to closed.');
+      showMessage('Defect moved to closed successfully!', 'success');
+      await fetchAllDefects();
+      if (onDefectUpdate) onDefectUpdate();
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleMoveToClosed = (defect) => {
+    if (defect.status !== 'Done') {
+      setDefectToMove(defect);
+      setIsMoveToClosedConfirmModalOpen(true);
+    } else {
+      proceedWithMoveToClosed(defect);
+    }
+  };
+
+  const handleConfirmMoveToClosed = () => {
+    if (defectToMove) {
+      proceedWithMoveToClosed(defectToMove);
+    }
+    setIsMoveToClosedConfirmModalOpen(false);
+    setDefectToMove(null);
+  };
+
+  const handleCancelMoveToClosed = () => {
+    setIsMoveToClosedConfirmModalOpen(false);
+    setDefectToMove(null);
+  };
+
   const pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
   const doneNotDonePieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
   const returnToDevChartOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 20 } }, plugins: { legend: { display: false }, title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { title: function(context) { const dataIndex = context[0].dataIndex; const fullLabel = context[0].dataset.fullLabels[dataIndex]; return fullLabel; }, label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.x !== null) { label += context.parsed.x; } return label; } } } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } };
@@ -551,7 +595,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
     return (
       <div className="defects-board-container">
         {DEFECT_STATUS_COLUMNS.map(column => (
-          <DefectColumn key={column.status} title={column.title} defects={defectsToDisplay.filter(d => d.status === column.status)} onEditDefect={handleOpenModal} onShowHistory={handleShowHistory} onDeleteRequest={handleDeleteRequest} onNavigate={handleNavigateToRequirement} onDragStart={handleDragStart} onDrop={handleDrop} />
+          <DefectColumn key={column.status} title={column.title} defects={defectsToDisplay.filter(d => d.status === column.status)} onEditDefect={handleOpenModal} onShowHistory={handleShowHistory} onDeleteRequest={handleDeleteRequest} onNavigate={handleNavigateToRequirement} onDragStart={handleDragStart} onDrop={handleDrop} onMoveToClosed={handleMoveToClosed} />
         ))}
       </div>
     );
@@ -622,6 +666,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
       {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
+      <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
       {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>

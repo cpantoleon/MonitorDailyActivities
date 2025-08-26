@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart }) => {
+const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed }) => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString + 'T00:00:00').toLocaleDateString();
@@ -76,6 +76,15 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
         >
           Delete
         </button>
+        {defect.status !== 'Closed' && (
+            <button 
+                onClick={() => onMoveToClosed(defect)} 
+                className="defect-action-button move"
+                title="Move defect to Closed"
+            >
+                Move to Closed
+            </button>
+        )}
       </div>
     </div>
   );

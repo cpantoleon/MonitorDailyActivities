@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = 'Yes', cancelText = 'No' }) => {
   if (!isOpen) return null;
 
   const handleOverlayClick = (e) => {
@@ -19,8 +19,8 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
         <h3>{title || 'Confirm Action'}</h3>
         <p>{message || 'Are you sure?'}</p>
         <div className="modal-actions">
-          <button onClick={onConfirm} className="modal-button-confirm">Yes</button>
-          <button onClick={onClose} className="modal-button-cancel">No</button>
+          <button onClick={onConfirm} className="modal-button-confirm">{confirmText}</button>
+          <button onClick={onClose} className="modal-button-cancel">{cancelText}</button>
         </div>
       </div>
     </div>

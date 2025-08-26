@@ -1205,7 +1205,7 @@ function App() {
             />
           }
         />
-        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} />} />
+        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} onSwitchProject={setSelectedProject} />} />
         <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
         <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
       </Routes>
