@@ -57,7 +57,7 @@ function extractProjectFromMessage(message, intent) {
 
 function extractConversationalProject(message) {
     // This regex looks for a project name but stops before it hits another keyword.
-    const pattern = /(?:for|in|on|to|project)\s+(?:the\s+)?(['"]?)([\w\s-]+?)\1(?=\s|,\s|\.\s|\?\s|sprint|title|titled|called|requirement|defect|$)/i;
+    const pattern = /(?:(?:for|in|on|to)\s+project|project|for|in|on|to)\s+(?:the\s+)?(['"]?)([\w\s-]+?)\1(?=\s|,\s|\.\s|\?\s|sprint|title|titled|called|requirement|defect|$)/i;
     
     let match = message.match(pattern);
 

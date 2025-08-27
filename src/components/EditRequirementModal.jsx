@@ -4,12 +4,21 @@ import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 
-const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, onLogChange }) => {
+const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, onLogChange, showMessage }) => {
   const [formData, setFormData] = useState({});
   const [initialFormData, setInitialFormData] = useState(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [changeReason, setChangeReason] = useState('');
   const [isLogChangeVisible, setIsLogChangeVisible] = useState(false);
+  const [acknowledgeDefects, setAcknowledgeDefects] = useState(false);
+
+  const openDefects = useMemo(() => {
+    if (!requirement || formData.status !== 'Done') return [];
+    return requirement.linkedDefects?.filter(
+      (defect) => defect.status === 'Assigned to Developer' || defect.status === 'Assigned to Tester'
+    ) || [];
+  }, [requirement, formData.status]);
+
 
   useEffect(() => {
     if (requirement && isOpen) {
@@ -36,6 +45,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       setInitialFormData(initialData);
       setChangeReason('');
       setIsLogChangeVisible(false);
+      setAcknowledgeDefects(false); 
     }
   }, [requirement, isOpen]);
 
@@ -62,6 +72,10 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (openDefects.length > 0 && !acknowledgeDefects) {
+      showMessage('Please acknowledge the open defects before proceeding.', 'error');
+      return;
+    }
     onSave(formData);
   };
 
@@ -140,6 +154,26 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
                 options={statusOptions}
               />
             </div>
+
+            {openDefects.length > 0 && (
+              <div className="form-group" style={{ marginTop: '15px', backgroundColor: '#FFF8DC', padding: '10px', borderRadius: '4px' }}>
+                <p style={{ marginTop: 0, color: '#8B4513', fontSize: '0.9em' }}>
+                  <strong>Warning:</strong> This item has {openDefects.length} open defect(s).
+                </p>
+                <div className="new-project-toggle">
+                  <input
+                    type="checkbox"
+                    id="editAcknowledgeDefectsCheckbox"
+                    checked={acknowledgeDefects}
+                    onChange={(e) => setAcknowledgeDefects(e.target.checked)}
+                  />
+                  <label htmlFor="editAcknowledgeDefectsCheckbox" className="checkbox-label" style={{ fontSize: '0.9em' }}>
+                    I acknowledge the open defect(s) and want to proceed.
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <label id="editReqRelease-label" htmlFor="editReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
@@ -164,7 +198,12 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               <input type="url" id="editReqLink" name="link" value={formData.link || ''} onChange={handleChange} placeholder="https://example.com/issue/123" />
             </div>
             <div className="modal-actions">
-              <button type="submit" className="modal-button-save">Save Changes</button>
+              <button 
+                type="submit" 
+                className="modal-button-save"
+              >
+                Save Changes
+              </button>
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
           </form>

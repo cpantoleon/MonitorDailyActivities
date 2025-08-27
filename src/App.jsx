@@ -1248,8 +1248,8 @@ function App() {
               </div>
           </div>
       )}
-      <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} />
-      <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} />
+      <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} />
+      <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} showMessage={showMainMessage} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
       <Chatbot 
         selectedProject={selectedProject} 
