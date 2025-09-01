@@ -25,6 +25,8 @@ import Tooltip from './components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 import Chatbot from './components/Chatbot';
+import FilterSidebar from './components/FilterSidebar';
+import './components/FilterSidebar.css';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
@@ -104,6 +106,7 @@ const SprintActivitiesPage = ({
   onOpenAddReleaseModal,
   onOpenEditReleaseModal,
   onOpenEditProjectModal,
+  onToggleFilterSidebar,
   isSearching,
   displayableRequirements,
   onShowHistory,
@@ -275,6 +278,9 @@ const SprintActivitiesPage = ({
             suggestions={searchSuggestions}
             placeholder="Search requirements..."
           />
+          <button onClick={onToggleFilterSidebar} className="defect-action-button filter-toggle-button" disabled={!selectedProject || !selectedSprint}>
+            Filter
+          </button>
         </div>
         <div className="page-actions-group">
            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -375,6 +381,19 @@ function App() {
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '' });
   const [selectedDefectProject, setSelectedDefectProject] = useState('');
   const [highlightedReqId, setHighlightedReqId] = useState(null);
+  const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
+  const [availableTypes, setAvailableTypes] = useState([]);
+
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [linkedDefectsFilter, setLinkedDefectsFilter] = useState(null);
+  const [selectedReleases, setSelectedReleases] = useState([]);
+
+  const [filterOptions, setFilterOptions] = useState({
+    enabledTypes: [],
+    enabledReleases: [],
+    isLinkedDefectsYesEnabled: false,
+    isLinkedDefectsNoEnabled: false,
+  });
 
   const hasFetched = useRef(false);
   const location = useLocation();
@@ -577,11 +596,79 @@ function App() {
   }, [selectedProject, allProcessedRequirements]);
 
   useEffect(() => {
+    if (allProcessedRequirements.length > 0) {
+      const types = [...new Set(allProcessedRequirements.map(req => req.currentStatusDetails?.type).filter(Boolean))].sort();
+      setAvailableTypes(types);
+    }
+  }, [allProcessedRequirements]);
+
+  useEffect(() => {
     if (isSearching) return;
     if (selectedProject && selectedSprint && allProcessedRequirements.length > 0) {
-      setDisplayableRequirements(allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint));
+      let filteredRequirements = allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint);
+      
+      if (selectedTypes.length > 0) {
+        filteredRequirements = filteredRequirements.filter(req => selectedTypes.includes(req.currentStatusDetails?.type));
+      }
+
+      if (linkedDefectsFilter) {
+        if (linkedDefectsFilter === 'yes') {
+          filteredRequirements = filteredRequirements.filter(req => Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0);
+        } else {
+          filteredRequirements = filteredRequirements.filter(req => !Array.isArray(req.linkedDefects) || req.linkedDefects.length === 0);
+        }
+      }
+
+      if (selectedReleases.length > 0) {
+        filteredRequirements = filteredRequirements.filter(req => selectedReleases.includes(req.currentStatusDetails.releaseId));
+      }
+
+      setDisplayableRequirements(filteredRequirements);
     } else { setDisplayableRequirements([]); }
-  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching]);
+  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching, selectedTypes, linkedDefectsFilter, selectedReleases]);
+
+  useEffect(() => {
+    if (!selectedProject || !selectedSprint) {
+      setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
+      return;
+    }
+
+    const baseItems = allProcessedRequirements.filter(
+      req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint
+    );
+
+    const applyFilters = (items, filtersToSkip = []) => {
+      let filtered = items;
+      if (!filtersToSkip.includes('types') && selectedTypes.length > 0) {
+        filtered = filtered.filter(req => selectedTypes.includes(req.currentStatusDetails?.type));
+      }
+      if (!filtersToSkip.includes('defects') && linkedDefectsFilter) {
+        if (linkedDefectsFilter === 'yes') {
+          filtered = filtered.filter(req => Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0);
+        } else {
+          filtered = filtered.filter(req => !Array.isArray(req.linkedDefects) || req.linkedDefects.length === 0);
+        }
+      }
+      if (!filtersToSkip.includes('releases') && selectedReleases.length > 0) {
+        filtered = filtered.filter(req => selectedReleases.includes(req.currentStatusDetails.releaseId));
+      }
+      return filtered;
+    };
+
+    const typesItems = applyFilters(baseItems, ['types']);
+    const enabledTypes = [...new Set(typesItems.map(req => req.currentStatusDetails?.type).filter(Boolean))];
+
+    const defectsItems = applyFilters(baseItems, ['defects']);
+    const isLinkedDefectsYesEnabled = defectsItems.some(req => Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0);
+    const isLinkedDefectsNoEnabled = defectsItems.some(req => !Array.isArray(req.linkedDefects) || req.linkedDefects.length === 0);
+
+    const releasesItems = applyFilters(baseItems, ['releases']);
+    const enabledReleases = [...new Set(releasesItems.map(req => req.currentStatusDetails.releaseId).filter(Boolean))];
+
+    setFilterOptions({ enabledTypes, enabledReleases, isLinkedDefectsYesEnabled, isLinkedDefectsNoEnabled });
+
+  }, [selectedProject, selectedSprint, allProcessedRequirements, selectedTypes, linkedDefectsFilter, selectedReleases]);
+
 
   const handleShowHistory = useCallback((requirementGroup) => {
     setRequirementForHistory(requirementGroup); setIsHistoryModalOpen(true);
@@ -1031,6 +1118,26 @@ function App() {
     }
   }, [allProcessedRequirements, isHistoryModalOpen, requirementForHistory]);
 
+  const handleTypeChange = (type) => {
+    setSelectedTypes(prevSelectedTypes =>
+      prevSelectedTypes.includes(type)
+        ? prevSelectedTypes.filter(t => t !== type)
+        : [...prevSelectedTypes, type]
+    );
+  };
+
+  const handleLinkedDefectsChange = (value) => {
+    setLinkedDefectsFilter(prev => (prev === value ? null : value));
+  };
+
+  const handleReleaseChange = (releaseId) => {
+    setSelectedReleases(prev =>
+      prev.includes(releaseId)
+        ? prev.filter(id => id !== releaseId)
+        : [...prev, releaseId]
+    );
+  };
+
   const handleRequirementSearch = (query) => {
     const finalQuery = query || requirementQuery;
     if (!finalQuery) {
@@ -1072,6 +1179,9 @@ function App() {
     setSelectedProject('');
     setSelectedSprint('');
     setDisplayableRequirements([]);
+    setSelectedTypes([]);
+    setLinkedDefectsFilter(null);
+    setSelectedReleases([]);
   };
 
   const handleRequirementQueryChange = (query) => {
@@ -1193,6 +1303,7 @@ function App() {
               onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}
               onOpenEditReleaseModal={() => setIsEditReleaseModalOpen(true)}
               onOpenEditProjectModal={() => setIsEditProjectModalOpen(true)}
+              onToggleFilterSidebar={() => setIsFilterSidebarOpen(prev => !prev)}
               isSearching={isSearching}
               displayableRequirements={displayableRequirements}
               onShowHistory={handleShowHistory}
@@ -1251,6 +1362,22 @@ function App() {
       <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} />
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} showMessage={showMainMessage} />
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
+      <FilterSidebar
+        isOpen={isFilterSidebarOpen}
+        onClose={() => setIsFilterSidebarOpen(false)}
+        types={availableTypes}
+        selectedTypes={selectedTypes}
+        onTypeChange={handleTypeChange}
+        enabledTypes={filterOptions.enabledTypes}
+        linkedDefectsFilter={linkedDefectsFilter}
+        onLinkedDefectsChange={handleLinkedDefectsChange}
+        isLinkedDefectsYesEnabled={filterOptions.isLinkedDefectsYesEnabled}
+        isLinkedDefectsNoEnabled={filterOptions.isLinkedDefectsNoEnabled}
+        releases={projectReleases}
+        selectedReleases={selectedReleases}
+        onReleaseChange={handleReleaseChange}
+        enabledReleases={filterOptions.enabledReleases}
+      />
       <Chatbot 
         selectedProject={selectedProject} 
         onDataChange={handleDataRefresh} 

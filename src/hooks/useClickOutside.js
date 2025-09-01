@@ -5,6 +5,10 @@ const useClickOutside = (handler) => {
 
   useEffect(() => {
     const maybeHandler = (event) => {
+      if (event.target.closest('.filter-toggle-button')) {
+        return;
+      }
+
       const portalSelectors = [
         '.react-datepicker-popper',
         '.custom-dropdown-options',

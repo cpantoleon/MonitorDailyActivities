@@ -164,8 +164,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
 
     return (
         <div className="chatbot-container">
-            {isOpen && (
-                <div className="chatbot-window">
+            <div className={`chatbot-window ${isOpen ? 'open' : ''}`}>
                     <div className="chatbot-header">
                         <h3>Project Assistant</h3>
                         <div className="chatbot-header-controls">
@@ -250,12 +249,11 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
                         </button>
                     </form>
                 </div>
-            )}
             <button
                 id="chatbot-toggle-button"
                 name="chatbotToggleButton"
                 type="button"
-                className="chatbot-toggle-button"
+                className={`chatbot-toggle-button ${isOpen ? 'open' : ''}`}
                 onClick={() => setIsOpen(!isOpen)}
                 aria-label="Toggle chatbot window"
             >

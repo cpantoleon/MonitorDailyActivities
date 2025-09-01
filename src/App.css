@@ -1074,7 +1074,12 @@ body {
 .defect-chart-container p { text-align: center; color: #5C4033; font-style: italic; }
 .defect-chart-container.small-chart { max-width: 350px; height: 280px; margin-top: 15px; }
 .defect-chart-container.small-chart canvas { max-height: 260px; }
-.selection-controls .defect-action-button { padding: 10px 15px; font-size: 0.95em; }
+.selection-controls .defect-action-button {
+    padding: 10px 15px;
+    font-size: 0.95em;
+    border: 1px solid #DEB887;
+}
+
 
 .date-picker-wrapper .react-datepicker-wrapper, .date-picker-wrapper .react-datepicker__input-container, .date-picker-wrapper .notes-datepicker { width: 100%; }
 
