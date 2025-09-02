@@ -17,6 +17,9 @@ const AppNavigationBar = () => {
       <NavLink to="/notes" className={({ isActive }) => isActive ? "nav-tab active" : "nav-tab"}>
         Notes
       </NavLink>
+      <NavLink to="/releases" className={({ isActive }) => isActive ? "nav-tab active" : "nav-tab"}>
+        Releases
+      </NavLink>
     </nav>
   );
 };

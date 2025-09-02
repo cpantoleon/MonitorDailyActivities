@@ -910,7 +910,7 @@ app.delete("/api/retrospective/:id", (req, res) => {
 app.get("/api/releases/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
-        const sql = "SELECT id, name, release_date, is_current FROM releases WHERE project_id = ? ORDER BY release_date DESC";
+        const sql = "SELECT id, name, release_date, is_current FROM releases WHERE project_id = ? AND status = 'active' ORDER BY release_date DESC";
         db.all(sql, [projectId], (err, rows) => {
             if (err) return res.status(400).json({ "error": err.message });
             const data = rows.map(r => ({...r, project: req.params.project}));
@@ -1066,8 +1066,8 @@ app.delete("/api/releases/:id", (req, res) => {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             
-            db.run('DELETE FROM releases WHERE id = ?', releaseId, function(deleteErr) {
-                if (deleteErr) { db.run("ROLLBACK"); return res.status(400).json({ "error": deleteErr.message }); }
+            db.run('DELETE FROM releases WHERE id = ?', releaseId, function(deleteErr) { 
+                if (deleteErr) { db.run("ROLLBACK"); return res.status(400).json({ "error": deleteErr.message }); } 
                 if (this.changes === 0) { db.run("ROLLBACK"); return res.status(404).json({ error: `Release with id ${releaseId} not found.` }); }
 
                 const noteTextToRemove = `release date: ${releaseToDelete.name}`;
@@ -1092,6 +1092,191 @@ app.delete("/api/releases/:id", (req, res) => {
         });
     });
 });
+
+app.post("/api/releases/:id/close", async (req, res) => {
+    const releaseId = req.params.id;
+    const { closeAction } = req.body; // 'archive_only' or 'archive_and_complete'
+
+    if (!['archive_only', 'archive_and_complete'].includes(closeAction)) {
+        return res.status(400).json({ error: "Invalid closeAction specified." });
+    }
+
+    db.get("SELECT * FROM releases WHERE id = ?", [releaseId], (err, release) => {
+        if (err) return res.status(500).json({ error: "DB error fetching release info." });
+        if (!release) return res.status(404).json({ error: "Release not found." });
+
+        const requirementsSql = `
+            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status
+            FROM activities a
+            WHERE a.release_id = ? AND a.isCurrent = 1
+        `;
+
+        db.all(requirementsSql, [releaseId], (err, requirements) => {
+            if (err) return res.status(500).json({ error: "DB error fetching requirements for release." });
+
+            const doneCount = requirements.filter(r => r.status === 'Done').length;
+            const notDoneCount = requirements.length - doneCount;
+            const metrics = { doneCount, notDoneCount };
+            const metricsJson = JSON.stringify(metrics);
+            const closedAt = new Date().toISOString();
+
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
+
+                const archiveSql = `
+                    INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json)
+                    VALUES (?, ?, ?, ?, ?)
+                `;
+                db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson], function(err) {
+                    if (err) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: "Failed to create archive record." });
+                    }
+                    
+                    const archiveId = this.lastID;
+                    const archiveItemsSql = `
+                        INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status)
+                        VALUES (?, ?, ?, ?)
+                    `;
+                    
+                    let itemsProcessed = 0;
+                    if (requirements.length === 0) {
+                        finalizeProcess(archiveId);
+                    } else {
+                        requirements.forEach(req => {
+                            db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status], (err) => {
+                                if (err) {
+                                    db.run("ROLLBACK");
+                                    // This response might not be sent if another error occurs first.
+                                    if (!res.headersSent) {
+                                        res.status(500).json({ error: "Failed to archive requirement item." });
+                                    }
+                                    return;
+                                }
+                                itemsProcessed++;
+                                if (itemsProcessed === requirements.length) {
+                                    finalizeProcess(archiveId);
+                                }
+                            });
+                        });
+                    }
+
+                    function finalizeProcess(archiveId) {
+                        const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
+                        db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
+                            if (err) {
+                                db.run("ROLLBACK");
+                                if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
+                                return;
+                            }
+
+                            if (closeAction === 'archive_only') {
+                                const updateActivitiesSql = "UPDATE activities SET release_id = NULL WHERE release_id = ?";
+                                db.run(updateActivitiesSql, [releaseId], (err) => {
+                                    if (err) {
+                                        db.run("ROLLBACK");
+                                        if (!res.headersSent) res.status(500).json({ error: "Failed to unlink requirements." });
+                                        return;
+                                    }
+                                    commitTransaction();
+                                });
+                            } else if (closeAction === 'archive_and_complete') {
+                                const now = new Date().toISOString();
+                                const statusDate = now.split('T')[0];
+                                const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
+                                
+                                const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
+                                                           VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
+                                const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+
+                                let activitiesProcessed = 0;
+                                if (requirements.length === 0) {
+                                    commitTransaction();
+                                } else {
+                                    requirements.forEach(req => {
+                                        db.run(updateOldSql, [req.requirementGroupId], function(err) {
+                                            if (err) {
+                                                db.run("ROLLBACK");
+                                                if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
+                                                return;
+                                            }
+                                            const comment = `Item completed as part of finalizing release '${release.name}'`;
+                                            db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, now, now], function(err) {
+                                                if (err) {
+                                                    db.run("ROLLBACK");
+                                                    if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                    return;
+                                                }
+                                                activitiesProcessed++;
+                                                if (activitiesProcessed === requirements.length) {
+                                                    commitTransaction();
+                                                }
+                                            });
+                                        });
+                                    });
+                                }
+                            }
+                        });
+                    }
+
+                    function commitTransaction() {
+                        db.run("COMMIT", (err) => {
+                            if (err) {
+                                if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
+                                return;
+                            }
+                            scheduleQdrantSync();
+                            if (!res.headersSent) res.json({ message: `Release '${release.name}' has been successfully finalized and archived.` });
+                        });
+                    }
+                });
+            });
+        });
+    });
+});
+
+app.get("/api/archives/:project", async (req, res) => {
+    try {
+        const projectId = await getProjectId(req.params.project);
+        const sql = `
+            SELECT id, original_release_id, name, closed_at, metrics_json 
+            FROM archived_releases 
+            WHERE project_id = ? 
+            ORDER BY closed_at DESC
+        `;
+        db.all(sql, [projectId], (err, rows) => {
+            if (err) return res.status(400).json({ "error": err.message });
+            const archives = rows.map(row => {
+                try {
+                    return {
+                        ...row,
+                        metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {}
+                    };
+                } catch (e) {
+                    console.error("Failed to parse metrics_json for archive:", row.id, e);
+                    return { ...row, metrics: {} };
+                }
+            });
+            res.json({ message: "success", data: archives });
+        });
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
+    }
+});
+
+app.get("/api/archives/details/:archiveId", (req, res) => {
+    const archiveId = req.params.archiveId;
+    const itemsSql = `
+        SELECT id, requirement_group_id, requirement_title, final_status 
+        FROM archived_release_items 
+        WHERE archive_id = ?
+    `;
+    db.all(itemsSql, [archiveId], (err, items) => {
+        if (err) return res.status(400).json({ "error": err.message });
+        res.json({ message: "success", data: items });
+    });
+});
+
 
 app.get("/api/defects/all", (req, res) => {
     const defectsSql = `

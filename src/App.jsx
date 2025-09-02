@@ -16,6 +16,7 @@ import EditProjectModal from './components/EditProjectModal';
 import NotesPage from './pages/NotesPage';
 import DefectsPage from './pages/DefectsPage';
 import SprintAnalysisPage from './pages/SprintAnalysisPage';
+import ReleasesPage from './pages/ReleasesPage';
 import { getUniqueProjects, getSprintsForProject } from './utils/dataHelpers';
 import ConfirmationModal from './components/ConfirmationModal';
 import Toast from './components/Toast';
@@ -308,11 +309,6 @@ const SprintActivitiesPage = ({
           {sprintChartData && (
             <div className="chart-container">
               <Pie data={sprintChartData} options={sprintChartOptions} />
-            </div>
-          )}
-          {releaseChartData && (
-            <div className="chart-container">
-              <Pie data={releaseChartData} options={releaseChartOptions} />
             </div>
           )}
           {changeChartData && (
@@ -1273,6 +1269,23 @@ function App() {
     }
   };
 
+  const handleNavigateToRequirement = (req) => {
+    if (!req || !req.project || !req.currentStatusDetails?.sprint || !req.id) {
+      showMainMessage("Could not navigate. Requirement data is incomplete.", "error");
+      return;
+    }
+    const targetPath = `/?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`;
+    
+    if (location.pathname === '/') {
+        setSelectedProject(req.project);
+        setSelectedSprint(req.currentStatusDetails.sprint);
+        setHighlightedReqId(req.id);
+        navigate(targetPath, { replace: true });
+    } else {
+        navigate(targetPath);
+    }
+  };
+
   if (isLoading) { return (<div className="app-container"><AppNavigationBar /><div className="loading-message">Loading data...</div></div>); }
   if (error && !isLoading) { return (<div className="app-container"><AppNavigationBar /><div className="error-message-global full-page-error">{error} <button onClick={fetchData}>Try Again</button></div></div>); }
 
@@ -1319,6 +1332,19 @@ function App() {
         <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} onSwitchProject={setSelectedProject} />} />
         <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
         <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
+        <Route path="/releases" element={
+          <ReleasesPage
+            projects={projects}
+            selectedProject={selectedProject}
+            onSelectProject={setSelectedProject}
+            allProcessedRequirements={allProcessedRequirements}
+            showMainMessage={showMainMessage}
+            onNavigateToRequirement={handleNavigateToRequirement}
+            onEditRelease={handleEditRelease}
+            onDeleteRelease={(release) => handleDeleteRequest('release', release)}
+            fetchData={fetchData}
+          />
+        } />
       </Routes>
       <HistoryModal requirement={requirementForHistory} isOpen={isHistoryModalOpen} onClose={handleCloseHistoryModal} onSaveHistoryEntry={handleSaveHistoryEntry} apiBaseUrl={API_BASE_URL} />
       <AddNewRequirementModal isOpen={isAddModalOpen} onClose={handleCloseAddModal} formData={newReqFormState} onFormChange={handleNewReqFormChange} onSubmit={handleAddNewRequirement} projects={projects} releases={allReleases} />

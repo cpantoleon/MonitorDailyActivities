@@ -21,6 +21,10 @@
       "description": "Operations for managing project releases"
     },
     {
+      "name": "Archives",
+      "description": "Operations for managing archived releases"
+    },
+    {
       "name": "Requirements",
       "description": "Operations related to sprint requirements and activities"
     },
@@ -245,7 +249,7 @@
     },
     "/releases/{project}": {
       "get": {
-        "summary": "Get all releases for a project",
+        "summary": "Get all active releases for a project",
         "tags": [
           "Releases"
         ],
@@ -256,7 +260,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A list of releases for the specified project.",
+            "description": "A list of active releases for the specified project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -382,6 +386,124 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/releases/{id}/close": {
+      "post": {
+        "summary": "Close and archive a release",
+        "description": "Closes an active release, archives its details and associated requirements, and optionally marks requirements as 'Done'.",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ReleaseIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseCloseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release successfully finalized and archived."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/{project}": {
+      "get": {
+        "summary": "Get all archived releases for a project",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of archived releases for the specified project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ArchivedRelease"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/archives/details/{archiveId}": {
+      "get": {
+        "summary": "Get detailed items for an archived release",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of requirement items that were part of the archived release.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ArchivedReleaseItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           }
         }
       }
@@ -1410,6 +1532,21 @@
           "is_current": {
             "type": "integer",
             "description": "1 if current, 0 if not"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ],
+            "default": "active",
+            "description": "The status of the release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp when the release was closed, if applicable."
           }
         }
       },
@@ -1432,7 +1569,8 @@
             "format": "date"
           },
           "is_current": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -1457,6 +1595,83 @@
           },
           "is_current": {
             "type": "boolean"
+          }
+        }
+      },
+      "ReleaseCloseInput": {
+        "type": "object",
+        "required": [
+          "closeAction"
+        ],
+        "properties": {
+          "closeAction": {
+            "type": "string",
+            "enum": [
+              "archive_only",
+              "archive_and_complete"
+            ],
+            "description": "Action to take upon closing the release. 'archive_only' archives the release and unlinks requirements. 'archive_and_complete' archives the release and marks linked requirements as 'Done'."
+          }
+        }
+      },
+      "ArchivedRelease": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release record."
+          },
+          "original_release_id": {
+            "type": "integer",
+            "description": "ID of the original release that was archived."
+          },
+          "project_id": {
+            "type": "integer",
+            "description": "ID of the project this release belongs to."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the archived release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the release was closed and archived."
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Metrics captured at the time of archiving.",
+            "properties": {
+              "doneCount": {
+                "type": "integer",
+                "description": "Number of requirements marked 'Done' in the release."
+              },
+              "notDoneCount": {
+                "type": "integer",
+                "description": "Number of requirements not marked 'Done' in the release."
+              }
+            }
+          }
+        }
+      },
+      "ArchivedReleaseItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release item record."
+          },
+          "requirement_group_id": {
+            "type": "integer",
+            "description": "The ID of the requirement group."
+          },
+          "requirement_title": {
+            "type": "string",
+            "description": "The title of the requirement at the time of archiving."
+          },
+          "final_status": {
+            "type": "string",
+            "description": "The final status of the requirement at the time of archiving."
           }
         }
       },
@@ -2182,6 +2397,15 @@
         "in": "path",
         "required": true,
         "description": "ID of the defect",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "ArchiveIdPath": {
+        "name": "archiveId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the archived release",
         "schema": {
           "type": "integer"
         }

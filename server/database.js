@@ -95,6 +95,30 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating retrospective_items table", err.message);
             });
 
+            db.run(`CREATE TABLE IF NOT EXISTS archived_releases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                original_release_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                closed_at TEXT NOT NULL,
+                metrics_json TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (original_release_id) REFERENCES releases(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating archived_releases table", err.message);
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS archived_release_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                archive_id INTEGER NOT NULL,
+                requirement_group_id INTEGER NOT NULL,
+                requirement_title TEXT NOT NULL,
+                final_status TEXT NOT NULL,
+                FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating archived_release_items table", err.message);
+            });
+
             db.run(`CREATE TABLE IF NOT EXISTS defects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
@@ -138,6 +162,36 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating app_settings table", err.message);
                 else {
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['weather_location', 'Marousi, Athens']);
+                }
+            });
+
+            // Logic to add columns to releases table if they don't exist
+            db.all("PRAGMA table_info(releases)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching releases table info:", err.message);
+                    return;
+                }
+                
+                const hasStatusColumn = columns.some(col => col.name === 'status');
+                if (!hasStatusColumn) {
+                    db.run("ALTER TABLE releases ADD COLUMN status TEXT DEFAULT 'active'", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding status column to releases:", alterErr.message);
+                        } else {
+                            console.log("Column 'status' added to releases table.");
+                        }
+                    });
+                }
+
+                const hasClosedAtColumn = columns.some(col => col.name === 'closed_at');
+                if (!hasClosedAtColumn) {
+                    db.run("ALTER TABLE releases ADD COLUMN closed_at TEXT NULL", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding closed_at column to releases:", alterErr.message);
+                        } else {
+                            console.log("Column 'closed_at' added to releases table.");
+                        }
+                    });
                 }
             });
 

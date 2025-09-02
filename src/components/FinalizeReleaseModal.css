@@ -1,0 +1,46 @@
+.finalize-options {
+    display: flex;
+    gap: 20px;
+    margin: 25px 0;
+}
+
+.finalize-option {
+    flex: 1;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    background-color: #f9f9f9;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+}
+
+.finalize-option:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.finalize-option-icon {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.finalize-option h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.finalize-option p {
+    font-size: 0.9em;
+    color: #666;
+    flex-grow: 1;
+    margin-bottom: 20px;
+}
+
+.finalize-option button {
+    width: 100%;
+}

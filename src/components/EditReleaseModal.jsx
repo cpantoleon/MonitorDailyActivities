@@ -5,7 +5,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 
-const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, projects, currentProject }) => {
+const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, projects, currentProject, initialReleaseId = null }) => {
   const [selectedModalProject, setSelectedModalProject] = useState('');
   const [selectedReleaseId, setSelectedReleaseId] = useState('');
   const [formData, setFormData] = useState(null);
@@ -14,16 +14,32 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
 
   useEffect(() => {
     if (isOpen) {
-      if (currentProject && projects.includes(currentProject)) {
+      if (initialReleaseId && releases.length > 0) {
+        const releaseToEdit = releases.find(r => r.id === initialReleaseId);
+        if (releaseToEdit) {
+          setSelectedModalProject(releaseToEdit.project);
+          setSelectedReleaseId(releaseToEdit.id);
+          const data = {
+            id: releaseToEdit.id,
+            name: releaseToEdit.name,
+            release_date: new Date(releaseToEdit.release_date + 'T00:00:00'),
+            is_current: !!releaseToEdit.is_current,
+            project: releaseToEdit.project
+          };
+          setFormData(data);
+          setInitialFormData(data);
+        }
+      } else if (currentProject && projects.includes(currentProject)) {
         setSelectedModalProject(currentProject);
       }
     } else {
+      // Reset state on close
       setSelectedModalProject('');
       setSelectedReleaseId('');
       setFormData(null);
       setInitialFormData(null);
     }
-  }, [isOpen, currentProject, projects]);
+  }, [isOpen, currentProject, projects, initialReleaseId, releases]);
   
   const projectOptions = projects.map(p => ({ value: p, label: p }));
 
