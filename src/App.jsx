@@ -311,6 +311,11 @@ const SprintActivitiesPage = ({
               <Pie data={sprintChartData} options={sprintChartOptions} />
             </div>
           )}
+          {releaseChartData && (
+            <div className="chart-container">
+              <Pie data={releaseChartData} options={releaseChartOptions} />
+            </div>
+          )}
           {changeChartData && (
             <div className="chart-container">
               <Bar data={changeChartData} options={changeChartOptions} />
