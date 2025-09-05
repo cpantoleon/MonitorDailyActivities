@@ -3,6 +3,11 @@
   bottom: 25px;
   right: 25px;
   z-index: 1100;
+  transition: right 0.3s ease-in-out;
+}
+
+.chatbot-container.sidebar-open {
+  right: 300px; /* sidebar width (250px) + right spacing (50px) */
 }
 
 .chatbot-toggle-button {

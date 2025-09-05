@@ -12,6 +12,7 @@
   transition: transform 0.3s ease-in-out;
   border-left: 2px solid #8B4513;
   color: #5C4033;
+  overflow-y: auto;
 }
 
 .filter-sidebar.closed {
@@ -55,4 +56,35 @@
   font-size: 1em;
   color: #5C4033;
   cursor: pointer;
+}
+
+.filter-option input[type="date"] {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-left: 5px;
+}
+
+.filter-option label[for^="date-"] {
+  width: 40px;
+}
+
+.clear-filters-button {
+  background-color: #8B4513;
+  color: white;
+  border: none;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin-top: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.clear-filters-button:hover {
+  background-color: #A0522D;
 }

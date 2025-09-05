@@ -71,6 +71,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   // State to hold the editor instance for adding event listeners
   const [editorInstance, setEditorInstance] = useState(null);
 
+  const isToday = (someDate) => {
+    const today = new Date();
+    return someDate.getDate() === today.getDate() &&
+           someDate.getMonth() === today.getMonth() &&
+           someDate.getFullYear() === today.getFullYear();
+  };
+
   const formatDateKey = (date) => {
     if (!(date instanceof Date) || isNaN(date.getTime())) return '';
     const year = date.getFullYear();
@@ -280,6 +287,23 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               max-width: 200px;
               height: auto;
           }
+          .today-button {
+            padding: 8px 12px;
+            border: 1px solid #DEB887;
+            border-radius: 4px;
+            background-color: #F5DEB3;
+            cursor: pointer;
+            font-size: 0.9em;
+            color: #5C4033;
+            font-weight: 500;
+          }
+
+          .today-button:disabled {
+            background-color: #E9ECEF;
+            color: #6C757D;
+            cursor: not-allowed;
+            opacity: 0.7;
+          }
         `}</style>
         <h2>Daily Notes</h2>
         <div className="notes-controls">
@@ -297,15 +321,25 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           </div>
           <div>
             <label htmlFor="note-date">Date:</label>
-            <DatePicker
-              id="note-date"
-              name="noteDate"
-              selected={selectedDate}
-              onChange={(date) => setSelectedDate(date)}
-              dateFormat="MM/dd/yyyy"
-              className="notes-datepicker"
-              renderDayContents={renderDayContents}
-            />
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <DatePicker
+                id="note-date"
+                name="noteDate"
+                selected={selectedDate}
+                onChange={(date) => setSelectedDate(date)}
+                dateFormat="MM/dd/yyyy"
+                className="notes-datepicker"
+                renderDayContents={renderDayContents}
+              />
+              <button 
+                onClick={() => setSelectedDate(new Date())} 
+                disabled={isToday(selectedDate)}
+                className="today-button"
+                style={{ position: 'absolute', right: '-85px', top: '50%', transform: 'translateY(-50%)' }}
+              >
+                Today
+              </button>
+            </div>
           </div>
         </div>
 

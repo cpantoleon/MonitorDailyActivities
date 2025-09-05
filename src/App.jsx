@@ -385,6 +385,9 @@ function App() {
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [availableTypes, setAvailableTypes] = useState([]);
 
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [linkedDefectsFilter, setLinkedDefectsFilter] = useState(null);
   const [selectedReleases, setSelectedReleases] = useState([]);
@@ -400,6 +403,7 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const prevSelectedProject = useRef();
+  const isSearchUpdate = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -597,6 +601,12 @@ function App() {
   }, [selectedProject, allProcessedRequirements]);
 
   useEffect(() => {
+    if (isSearching && !isSearchUpdate.current) {
+      resetSearch();
+    }
+  }, [selectedProject, selectedSprint]);
+
+  useEffect(() => {
     if (allProcessedRequirements.length > 0) {
       const types = [...new Set(allProcessedRequirements.map(req => req.currentStatusDetails?.type).filter(Boolean))].sort();
       setAvailableTypes(types);
@@ -624,9 +634,25 @@ function App() {
         filteredRequirements = filteredRequirements.filter(req => selectedReleases.includes(req.currentStatusDetails.releaseId));
       }
 
+      if (dateFrom) {
+        filteredRequirements = filteredRequirements.filter(req => {
+          const lastUpdated = new Date(req.currentStatusDetails.date);
+          const fromDate = new Date(dateFrom);
+          return lastUpdated >= fromDate;
+        });
+      }
+
+      if (dateTo) {
+        filteredRequirements = filteredRequirements.filter(req => {
+          const lastUpdated = new Date(req.currentStatusDetails.date);
+          const toDate = new Date(dateTo);
+          return lastUpdated <= toDate;
+        });
+      }
+
       setDisplayableRequirements(filteredRequirements);
     } else { setDisplayableRequirements([]); }
-  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching, selectedTypes, linkedDefectsFilter, selectedReleases]);
+  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching, selectedTypes, linkedDefectsFilter, selectedReleases, dateFrom, dateTo]);
 
   useEffect(() => {
     if (!selectedProject || !selectedSprint) {
@@ -745,6 +771,30 @@ function App() {
 
       if (somethingChanged) {
         showMainMessage("Requirement updated successfully!", 'success');
+        if (isSearching) {
+          setDisplayableRequirements(prev => {
+            return prev.map(req => {
+              if (req.id === editingRequirement.id) {
+                const newSprintValue = formData.isBacklog ? 'Backlog' : `Sprint ${formData.sprint}`;
+                return {
+                  ...req,
+                  requirementUserIdentifier: formData.name,
+                  currentStatusDetails: {
+                    ...req.currentStatusDetails,
+                    status: formData.status,
+                    sprint: newSprintValue,
+                    comment: formData.comment,
+                    link: formData.link,
+                    type: formData.type,
+                    tags: formData.tags,
+                    releaseId: formData.release_id || null
+                  }
+                };
+              }
+              return req;
+            });
+          });
+        }
         await fetchData();
       } else {
         showMainMessage("No changes were made.", 'info');
@@ -1153,6 +1203,8 @@ function App() {
     );
     setDisplayableRequirements(results);
 
+    isSearchUpdate.current = true;
+
     if (results.length > 0) {
       const uniqueProjects = [...new Set(results.map(r => r.project))];
       if (uniqueProjects.length === 1) {
@@ -1171,6 +1223,10 @@ function App() {
       setSelectedProject('');
       setSelectedSprint('');
     }
+
+    setTimeout(() => {
+      isSearchUpdate.current = false;
+    }, 0);
   };
 
   const handleClearRequirementSearch = () => {
@@ -1183,6 +1239,22 @@ function App() {
     setSelectedTypes([]);
     setLinkedDefectsFilter(null);
     setSelectedReleases([]);
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const resetSearch = () => {
+    setIsSearching(false);
+    setRequirementQuery('');
+    setSearchSuggestions([]);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedTypes([]);
+    setLinkedDefectsFilter(null);
+    setSelectedReleases([]);
+    setDateFrom('');
+    setDateTo('');
   };
 
   const handleRequirementQueryChange = (query) => {
@@ -1216,6 +1288,8 @@ function App() {
     setRequirementQuery(suggestion.name);
     setSearchSuggestions([]);
 
+    isSearchUpdate.current = true;
+
     const selectedReq = allProcessedRequirements.find(req => req.id === suggestion.id);
 
     if (selectedReq) {
@@ -1226,6 +1300,10 @@ function App() {
     } else {
       handleRequirementSearch(suggestion.name);
     }
+
+    setTimeout(() => {
+      isSearchUpdate.current = false;
+    }, 0);
   };
 
   const handleStatusUpdateRequest = (requirement, newStatus) => {
@@ -1266,6 +1344,24 @@ function App() {
         throw new Error('Failed to update status.');
       }
       showMainMessage('Status updated successfully!', 'success');
+
+      if (isSearching) {
+        setDisplayableRequirements(prev => {
+          return prev.map(req => {
+            if (req.id === requirement.id) {
+              return {
+                ...req,
+                currentStatusDetails: {
+                  ...req.currentStatusDetails,
+                  status: newStatus
+                }
+              };
+            }
+            return req;
+          });
+        });
+      }
+
       await fetchData();
     } catch (error) {
       showMainMessage(`Error: ${error.message}`, 'error');
@@ -1408,11 +1504,17 @@ function App() {
         selectedReleases={selectedReleases}
         onReleaseChange={handleReleaseChange}
         enabledReleases={filterOptions.enabledReleases}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onClearFilters={handleClearFilters}
       />
       <Chatbot 
         selectedProject={selectedProject} 
         onDataChange={handleDataRefresh} 
         firstProjectName={projects.length > 0 ? projects[0] : ''}
+        className={isFilterSidebarOpen ? 'sidebar-open' : ''}
       />
     </div>
   );

@@ -14,7 +14,7 @@ const API_BASE_URL = '/api';
 
 const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
-const ReleaseCard = ({ release, requirements, onNavigate, onFinalize, onEdit }) => {
+const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit }) => {
 
     const getChartData = (reqs) => {
         if (!reqs || reqs.length === 0) return null;
@@ -57,7 +57,10 @@ const ReleaseCard = ({ release, requirements, onNavigate, onFinalize, onEdit }) 
         <div className="release-card">
             <div className="release-card-header">
                 <h3>{release.name}{release.is_current ? <span className="current-tag">Current</span> : ''}</h3>
-                <span className="due-date">Due: {new Date(release.release_date).toLocaleDateString()}</span>
+                <div className="release-card-header-details">
+                    <span className="due-date">Due: {new Date(release.release_date).toLocaleDateString()}</span>
+                    <span className="defect-count">Defects: {defectCount}</span>
+                </div>
             </div>
             <div className="release-card-body">
                 <div className="release-charts">
@@ -281,11 +284,13 @@ const ReleasesPage = ({ projects, selectedProject, onSelectProject, allProcessed
             <div className="releases-container">
                 {activeReleases.map(release => {
                     const requirements = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
+                    const defectCount = requirements.reduce((acc, req) => acc + (req.linkedDefects ? req.linkedDefects.length : 0), 0);
                     return (
                         <ReleaseCard 
                             key={release.id} 
                             release={release} 
                             requirements={requirements} 
+                            defectCount={defectCount}
                             onNavigate={onNavigateToRequirement}
                             onFinalize={handleOpenFinalizeModal}
                             onEdit={handleOpenEditModal}

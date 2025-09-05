@@ -16,6 +16,11 @@ const FilterSidebar = ({
   selectedReleases,
   onReleaseChange,
   enabledReleases,
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+  onClearFilters,
 }) => {
   const sidebarRef = useClickOutside(onClose);
 
@@ -91,6 +96,33 @@ const FilterSidebar = ({
           </div>
         </>
       )}
+
+      <h3>Filter by Last Updated Date</h3>
+      <div className="filter-options">
+        <div className="filter-option">
+          <label htmlFor="date-from">From</label>
+          <input
+            type="date"
+            id="date-from"
+            value={dateFrom}
+            onChange={(e) => onDateFromChange(e.target.value)}
+          />
+        </div>
+        <div className="filter-option">
+          <label htmlFor="date-to">To</label>
+          <input
+            type="date"
+            id="date-to"
+            value={dateTo}
+            onChange={(e) => onDateToChange(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <button onClick={onClearFilters} className="clear-filters-button">
+        Clear Filters
+      </button>
+      <div style={{ height: '40px' }}></div>
     </div>
   );
 };

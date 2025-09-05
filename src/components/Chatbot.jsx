@@ -20,7 +20,7 @@ const TtsDisabledIcon = () => (
     </svg>
 );
 
-const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
+const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className }) => {
     const getInitialState = () => {
         try {
             const storedMessages = sessionStorage.getItem('chatbotMessages');
@@ -163,7 +163,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName }) => {
     };
 
     return (
-        <div className="chatbot-container">
+        <div className={`chatbot-container ${className || ''}`}>
             <div className={`chatbot-window ${isOpen ? 'open' : ''}`}>
                     <div className="chatbot-header">
                         <h3>Project Assistant</h3>
