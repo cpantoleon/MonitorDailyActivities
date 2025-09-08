@@ -21,11 +21,11 @@
 
 .releases-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 25px;
 }
 
-.release-card {
+.release-card, .defect-details-card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     padding: 20px;
@@ -35,10 +35,16 @@
     flex-direction: column;
 }
 
+.defect-details-card {
+    background-color: #fffaf0; 
+    border-color: #f0e68c;
+    grid-column: span 1;
+}
+
 .release-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start; /* Align items to the start */
+    align-items: flex-start; 
     margin-bottom: 15px;
     border-bottom: 1px solid #eee;
     padding-bottom: 10px;
@@ -47,14 +53,14 @@
 .release-card-header h3 {
     margin: 0;
     font-size: 1.4em;
-    flex-grow: 1; /* Allow h3 to take available space */
+    flex-grow: 1; 
 }
 
 .release-card-header-details {
     display: flex;
-    flex-direction: column; /* Stack items vertically */
-    align-items: flex-end; /* Align text to the right */
-    gap: 5px; /* Space between date and defect count */
+    flex-direction: column; 
+    align-items: flex-end; 
+    gap: 5px; 
 }
 
 .current-tag {
@@ -72,10 +78,21 @@
     color: #666;
 }
 
-.defect-count {
+.defect-count-button {
     font-size: 0.9em;
-    color: #dc3545; /* Red color for defects */
+    color: #fff; 
     font-weight: bold;
+    background-color: #dc3545;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: right;
+    transition: background-color 0.2s;
+}
+
+.defect-count-button:hover {
+    background-color: #c82333;
 }
 
 .release-card-body {
@@ -288,7 +305,6 @@
     background-color: #fd7e14;
 }
 
-/* Add other status colors as needed */
 .status-badge.status-blocked {
     background-color: #dc3545;
 }
@@ -306,14 +322,49 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
-}border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-    margin: 50px auto;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.defect-details-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.defect-details-card-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.defect-details-card-body {
+    display: flex;
+    gap: 20px;
+    flex-grow: 1;
+}
+
+.defect-charts {
+    width: 150px;
+    flex-shrink: 0;
+}
+
+.defect-list {
+    flex-grow: 1;
+}
+
+.defect-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
 }

@@ -71,6 +71,21 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   // State to hold the editor instance for adding event listeners
   const [editorInstance, setEditorInstance] = useState(null);
 
+  useEffect(() => {
+    const savedProject = sessionStorage.getItem('notesPageSelectedProject');
+    if (savedProject) {
+        setSelectedProject(savedProject);
+    }
+  }, []);
+
+  useEffect(() => {
+      if (selectedProject) {
+          sessionStorage.setItem('notesPageSelectedProject', selectedProject);
+      } else {
+          sessionStorage.removeItem('notesPageSelectedProject');
+      }
+  }, [selectedProject]);
+
   const isToday = (someDate) => {
     const today = new Date();
     return someDate.getDate() === today.getDate() &&
@@ -142,31 +157,23 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     }
   }, [selectedProject, selectedDate, apiBaseUrl, showMessage]);
   
-  // NEW: useEffect to handle the Ctrl+S keyboard shortcut
   useEffect(() => {
-    if (!editorInstance) return;
-
-    const editableElement = editorInstance.ui.getEditableElement();
-    if (!editableElement) return;
-
     const handleKeyDown = (event) => {
-      // Check for Ctrl+S or Cmd+S
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault(); // Prevent the browser's save dialog
-        
-        // Get the latest data directly from the editor and save
-        const currentData = editorInstance.getData();
-        handleSaveNote(currentData);
+        event.preventDefault();
+        if (selectedProject && editorInstance) {
+          const currentData = editorInstance.getData();
+          handleSaveNote(currentData);
+        }
       }
     };
 
-    editableElement.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
 
-    // Cleanup function to remove the event listener when the component unmounts
     return () => {
-      editableElement.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [editorInstance, handleSaveNote]); // Rerun if the editor or save function changes
+  }, [editorInstance, handleSaveNote, selectedProject]);
 
   const fetchNotesForProject = useCallback(async (project) => {
     if (!project) {

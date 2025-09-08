@@ -23,8 +23,20 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
 
-  
+  useEffect(() => {
+    const savedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
+    if (savedProject) {
+        setSelectedProject(savedProject);
+    }
+  }, []);
 
+  useEffect(() => {
+      if (selectedProject) {
+          sessionStorage.setItem('sprintAnalysisPageSelectedProject', selectedProject);
+      } else {
+          sessionStorage.removeItem('sprintAnalysisPageSelectedProject');
+      }
+  }, [selectedProject]);
 
   const fetchRetrospectiveItems = useCallback(async (project) => {
     if (!project) {
@@ -156,7 +168,6 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
 
   return (
     <div className="main-content-area">
-      <h2>Sprint Retrospective</h2>
       <div className="retrospective-controls">
         <div className="selection-group-container">
           <ProjectSelector

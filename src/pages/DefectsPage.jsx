@@ -64,7 +64,8 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal }) => {
   );
 };
 
-const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, selectedProject, onSelectProject, onSwitchProject }) => {
+const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate }) => {
+  const [selectedProject, setSelectedProject] = useState('');
   const [allDefects, setAllDefects] = useState([]);
   const [activeDefects, setActiveDefects] = useState([]);
   const [closedDefects, setClosedDefects] = useState([]);
@@ -97,6 +98,25 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   const navigate = useNavigate();
   const location = useLocation();
   const hasFetched = useRef(false);
+
+  useEffect(() => {
+    const savedProject = sessionStorage.getItem('defectsPageSelectedProject');
+    if (savedProject) {
+        setSelectedProject(savedProject);
+    }
+  }, []);
+
+  useEffect(() => {
+      if (selectedProject) {
+          sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
+      } else {
+          sessionStorage.removeItem('defectsPageSelectedProject');
+      }
+  }, [selectedProject]);
+
+  const onSelectProject = (project) => {
+      setSelectedProject(project);
+  };
 
   const defectChartTooltipContent = (
     <>
@@ -148,7 +168,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   }, [allDefects, selectedProject]);
 
   useEffect(() => {
-    if (highlightedDefectId && allDefects.length > 0) {
+    if (highlightedDefectId && (activeDefects.length > 0 || closedDefects.length > 0)) {
       const timer = setTimeout(() => {
         const element = document.getElementById(`defect-card-${highlightedDefectId}`);
         if (element) {
@@ -164,7 +184,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
 
       return () => clearTimeout(timer);
     }
-  }, [highlightedDefectId, allDefects]);
+  }, [highlightedDefectId, activeDefects, closedDefects, selectedProject]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -372,11 +392,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
   };
 
   const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
-    if (onSwitchProject) {
-      onSwitchProject(project);
-    }
     navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
-  }, [navigate, onSwitchProject]);
+  }, [navigate]);
 
   const handleOpenImportModal = useCallback(() => setIsImportDefectsModalOpen(true), []);
   const handleCloseImportModal = useCallback(() => { setIsImportDefectsModalOpen(false); setImportConfirmData(null); }, []);
@@ -609,7 +626,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, s
         .defect-charts-wrapper { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 20px; }
         .defect-charts-wrapper .defect-chart-container { flex: 1 1 30%; min-width: 350px; max-width: 500px; height: 320px; padding: 10px; border: 1px solid #DEB887; border-radius: 8px; background-color: #FFF8DC; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
       `}</style>
-      <h2>Defect Tracking</h2>
       <div className="selection-controls">
         <div className="selection-group-container">
             <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={onSelectProject} />

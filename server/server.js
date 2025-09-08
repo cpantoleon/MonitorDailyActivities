@@ -272,9 +272,10 @@ app.get("/api/requirements", (req, res) => {
                  LEFT JOIN releases rel ON act.release_id = rel.id
                  ORDER BY act.requirementGroupId, act.created_at DESC`;
     
-    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status
+    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, p.name as project_name
                       FROM defect_requirement_links l
-                      JOIN defects d ON l.defect_id = d.id`;
+                      JOIN defects d ON l.defect_id = d.id
+                      JOIN projects p ON d.project_id = p.id`;
 
     const changesSql = `SELECT requirement_group_id, COUNT(id) as change_count FROM requirement_changes GROUP BY requirement_group_id`;
 
@@ -288,7 +289,7 @@ app.get("/api/requirements", (req, res) => {
             if (!linksMap.has(link.requirement_group_id)) {
                 linksMap.set(link.requirement_group_id, []);
             }
-            linksMap.get(link.requirement_group_id).push({ id: link.defect_id, title: link.defect_title, status: link.defect_status });
+            linksMap.get(link.requirement_group_id).push({ id: link.defect_id, title: link.defect_title, status: link.defect_status, project: link.project_name });
         });
 
         const changesMap = new Map();

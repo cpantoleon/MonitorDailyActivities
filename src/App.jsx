@@ -380,7 +380,7 @@ function App() {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '' });
-  const [selectedDefectProject, setSelectedDefectProject] = useState('');
+  
   const [highlightedReqId, setHighlightedReqId] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [availableTypes, setAvailableTypes] = useState([]);
@@ -447,7 +447,7 @@ function App() {
 
         return () => clearTimeout(timer);
     }
-  }, [highlightedReqId, displayableRequirements]);
+}, [highlightedReqId, displayableRequirements, selectedProject, selectedSprint]);
 
   const showMainMessage = useCallback((text, type = 'success') => {
     setToastInfo({ message: text, type: type, key: Date.now() });
@@ -570,25 +570,31 @@ function App() {
     }
   
     if (prevSelectedProject.current !== selectedProject) {
+      const params = new URLSearchParams(location.search);
+      const sprintParam = params.get('sprint');
       if (selectedProject) {
         const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
         if (sprints.length > 0) {
-          const sortedSprints = [...sprints].sort((a, b) => {
-            const numA = parseInt(a.match(/\d+/)?.[0], 10);
-            const numB = parseInt(b.match(/\d+/)?.[0], 10);
-  
-            if (!isNaN(numA) && !isNaN(numB)) {
-              return numA - numB;
-            }
-            if (isNaN(numA) && !isNaN(numB)) {
-              return -1;
-            }
-            if (!isNaN(numA) && isNaN(numB)) {
-              return 1;
-            }
-            return a.localeCompare(b);
-          });
-          setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+          if (sprintParam && sprints.includes(sprintParam)) {
+            setSelectedSprint(sprintParam);
+          } else {
+            const sortedSprints = [...sprints].sort((a, b) => {
+              const numA = parseInt(a.match(/\d+/)?.[0], 10);
+              const numB = parseInt(b.match(/\d+/)?.[0], 10);
+    
+              if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+              }
+              if (isNaN(numA) && !isNaN(numB)) {
+                return -1;
+              }
+              if (!isNaN(numA) && isNaN(numB)) {
+                return 1;
+              }
+              return a.localeCompare(b);
+            });
+            setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+          }
         } else {
           setSelectedSprint('');
         }
@@ -598,7 +604,7 @@ function App() {
     }
   
     prevSelectedProject.current = selectedProject;
-  }, [selectedProject, allProcessedRequirements]);
+  }, [selectedProject, allProcessedRequirements, location.search]);
 
   useEffect(() => {
     if (isSearching && !isSearchUpdate.current) {
@@ -1376,15 +1382,19 @@ function App() {
       return;
     }
     const targetPath = `/?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`;
-    
-    if (location.pathname === '/') {
-        setSelectedProject(req.project);
-        setSelectedSprint(req.currentStatusDetails.sprint);
-        setHighlightedReqId(req.id);
-        navigate(targetPath, { replace: true });
-    } else {
-        navigate(targetPath);
+    navigate(targetPath);
+  };
+
+  const handleNavigateToDefect = (defect, isClosed = false) => {
+    if (!defect || !defect.project || !defect.id) {
+      showMainMessage("Could not navigate. Defect data is incomplete.", "error");
+      return;
     }
+    let targetPath = `/defects?project=${encodeURIComponent(defect.project)}&highlight=${defect.id}`;
+    if (isClosed) {
+      targetPath += '&view=closed';
+    }
+    navigate(targetPath);
   };
 
   if (isLoading) { return (<div className="app-container"><AppNavigationBar /><div className="loading-message">Loading data...</div></div>); }
@@ -1430,17 +1440,16 @@ function App() {
             />
           }
         />
-        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} selectedProject={selectedDefectProject} onSelectProject={setSelectedDefectProject} onSwitchProject={setSelectedProject} />} />
+        <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} />} />
         <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
         <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
         <Route path="/releases" element={
           <ReleasesPage
             projects={projects}
-            selectedProject={selectedProject}
-            onSelectProject={setSelectedProject}
             allProcessedRequirements={allProcessedRequirements}
             showMainMessage={showMainMessage}
             onNavigateToRequirement={handleNavigateToRequirement}
+            onNavigateToDefect={handleNavigateToDefect}
             onEditRelease={handleEditRelease}
             onDeleteRelease={(release) => handleDeleteRequest('release', release)}
             fetchData={fetchData}

@@ -14,7 +14,85 @@ const API_BASE_URL = '/api';
 
 const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
-const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit }) => {
+const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
+    const getDefectChartData = () => {
+        if (!defects || defects.length === 0) return null;
+
+        let done = 0;
+        let notDone = 0;
+        let closed = 0;
+
+        defects.forEach(defect => {
+            if (defect.status === 'Done') {
+                done++;
+            } else if (defect.status === 'Closed') {
+                closed++;
+            } else {
+                notDone++;
+            }
+        });
+
+        if (done === 0 && notDone === 0 && closed === 0) return null;
+
+        return {
+            labels: ['Done', 'Not Done', 'Closed'],
+            datasets: [{
+                data: [done, notDone, closed],
+                backgroundColor: ['#4CAF50', '#F44336', '#808080'],
+                borderColor: ['#ffffff', '#ffffff', '#ffffff'],
+                borderWidth: 1,
+            }],
+        };
+    };
+
+    const chartData = getDefectChartData();
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            title: { display: true, text: `Defect Status (${defects.length} items)`, font: { size: 14 } },
+            tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / (c.dataset.data.reduce((a, b) => a + b, 0) || 1)) * 100).toFixed(1)}%)` } }
+        },
+    };
+
+    const chartAriaLabel = chartData
+        ? `Pie chart showing defect status for release ${release.name}. ${chartData.datasets[0].data[0]} defects are done, ${chartData.datasets[0].data[1]} are not done, and ${chartData.datasets[0].data[2]} are closed.`
+        : 'No defect data to display in a chart.';
+
+    return (
+        <div className="defect-details-card">
+            <div className="defect-details-card-header">
+                <h3>Defects for {release.name}</h3>
+                <button onClick={onClose} className="close-button">X</button>
+            </div>
+            <div className="defect-details-card-body">
+                <div className="defect-charts">
+                    {chartData ? (
+                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                    ) : (
+                        <div className="empty-chart-placeholder">No defects for this release</div>
+                    )}
+                </div>
+                <div className="defect-list">
+                    <h4>Defects ({defects.length})</h4>
+                    <ul>
+                        {defects.length > 0 ? defects.map(defect => (
+                            <li key={defect.id}>
+                                <button onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
+                                    {defect.title}
+                                </button>
+                            </li>
+                        )) : <li>No defects in this release.</li>}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick }) => {
 
     const getChartData = (reqs) => {
         if (!reqs || reqs.length === 0) return null;
@@ -53,19 +131,25 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
         },
     };
 
+    const chartAriaLabel = chartData
+        ? `Pie chart showing requirement progress for release ${release.name}. ${chartData.datasets[0].data[0]} items are done and ${chartData.datasets[0].data[1]} items are not done.`
+        : 'No requirement data to display in a chart.';
+
     return (
         <div className="release-card">
             <div className="release-card-header">
                 <h3>{release.name}{release.is_current ? <span className="current-tag">Current</span> : ''}</h3>
                 <div className="release-card-header-details">
                     <span className="due-date">Due: {new Date(release.release_date).toLocaleDateString()}</span>
-                    <span className="defect-count">Defects: {defectCount}</span>
+                    <button onClick={() => onDefectClick(release.id)} className="defect-count-button">
+                        Defects: {defectCount}
+                    </button>
                 </div>
             </div>
             <div className="release-card-body">
                 <div className="release-charts">
                     {chartData ? (
-                        <Pie data={chartData} options={chartOptions} />
+                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
                     ) : (
                         <div className="empty-chart-placeholder">No requirements assigned</div>
                     )}
@@ -134,6 +218,8 @@ const ArchivedReleaseDetails = ({ archive, onBack }) => {
         },
     };
 
+    const chartAriaLabel = `Pie chart showing final metrics for archived release ${archive.name}. ${archive.metrics.doneCount} items were done and ${archive.metrics.notDoneCount} were not done.`;
+
     return (
         <div className="archived-details-view">
             <div className="details-header">
@@ -149,7 +235,7 @@ const ArchivedReleaseDetails = ({ archive, onBack }) => {
                     <div className="release-snapshot-metrics">
                         <h4>Final Metrics</h4>
                         <div className="chart-container">
-                            <Pie data={chartData} options={chartOptions} />
+                            <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
                         </div>
                     </div>
                     <div className="release-requirements frozen-list-container">
@@ -171,21 +257,39 @@ const ArchivedReleaseDetails = ({ archive, onBack }) => {
     );
 };
 
-const ReleasesPage = ({ projects, selectedProject, onSelectProject, allProcessedRequirements, showMainMessage, onNavigateToRequirement, onEditRelease, onDeleteRelease, fetchData }) => {
+const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onNavigateToRequirement, onNavigateToDefect, onEditRelease, onDeleteRelease, fetchData }) => {
+    const [selectedProject, setSelectedProject] = useState('');
     const [view, setView] = useState('active');
     const [activeReleases, setActiveReleases] = useState([]);
     const [archivedReleases, setArchivedReleases] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedArchive, setSelectedArchive] = useState(null);
-
     const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
     const [releaseToFinalize, setReleaseToFinalize] = useState(null);
-    
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [releaseToEdit, setReleaseToEdit] = useState(null);
-
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [openedDefectReleaseId, setOpenedDefectReleaseId] = useState(null);
 
+    useEffect(() => {
+        const savedProject = sessionStorage.getItem('releasePageSelectedProject');
+        if (savedProject) {
+            setSelectedProject(savedProject);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (selectedProject) {
+            sessionStorage.setItem('releasePageSelectedProject', selectedProject);
+        } else {
+            sessionStorage.removeItem('releasePageSelectedProject');
+        }
+    }, [selectedProject]);
+
+    const onSelectProject = (project) => {
+        setSelectedProject(project);
+    };
+    
     const fetchActiveReleases = useCallback(async () => {
         if (!selectedProject) return;
         setIsLoading(true);
@@ -276,16 +380,22 @@ const ReleasesPage = ({ projects, selectedProject, onSelectProject, allProcessed
         setIsEditModalOpen(false);
     };
 
+    const handleDefectClick = (releaseId) => {
+        setOpenedDefectReleaseId(prevId => prevId === releaseId ? null : releaseId);
+    };
+
     const renderActiveView = () => {
         if (isLoading) return <LoadingSpinner />;
         if (activeReleases.length === 0) return <div className="empty-column-message">No active releases found for this project.</div>;
 
         return (
             <div className="releases-container">
-                {activeReleases.map(release => {
+                {activeReleases.flatMap(release => {
                     const requirements = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
-                    const defectCount = requirements.reduce((acc, req) => acc + (req.linkedDefects ? req.linkedDefects.length : 0), 0);
-                    return (
+                    const defects = requirements.flatMap(r => r.linkedDefects || []);
+                    const defectCount = defects.length;
+
+                    const releaseCard = (
                         <ReleaseCard 
                             key={release.id} 
                             release={release} 
@@ -294,8 +404,24 @@ const ReleasesPage = ({ projects, selectedProject, onSelectProject, allProcessed
                             onNavigate={onNavigateToRequirement}
                             onFinalize={handleOpenFinalizeModal}
                             onEdit={handleOpenEditModal}
+                            onDefectClick={handleDefectClick}
                         />
                     );
+
+                    if (openedDefectReleaseId === release.id) {
+                        return [
+                            releaseCard,
+                            <DefectDetailsCard
+                                key={`defect-details-${release.id}`}
+                                release={release}
+                                defects={defects}
+                                onClose={() => setOpenedDefectReleaseId(null)}
+                                onNavigate={onNavigateToDefect}
+                            />
+                        ];
+                    }
+
+                    return [releaseCard];
                 })}
             </div>
         );
@@ -360,8 +486,8 @@ const ReleasesPage = ({ projects, selectedProject, onSelectProject, allProcessed
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
-                    onDelete={handleDeleteRequest} // Opens confirmation
-                    releases={[releaseToEdit]} // Pass only the specific release
+                    onDelete={handleDeleteRequest}
+                    releases={[releaseToEdit]}
                     projects={projects}
                     currentProject={selectedProject}
                     isEditing={true}

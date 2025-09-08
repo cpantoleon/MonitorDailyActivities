@@ -140,19 +140,20 @@ Once synced, you can start asking questions! For a full list of example commands
 -   View a full, detailed history of changes for each defect.
 -   Visualize defect distribution by area and "return to developer" counts with dynamic charts.
 
-#### 3. Sprint Analysis
+#### 3. Releases
+-   View active and archived releases for a selected project.
+-   For active releases, it shows a pie chart of the progress (done vs not done requirements).
+-   It lists the requirements associated with each release.
+-   A dedicated "Defects" button allows quick access to view defects linked to the selected release.
+-   Users can finalize a release, which archives it.
+-   Users can edit a release.
+-   For archived releases, it shows the final metrics and the list of requirements at the time of archival.
+
+#### 4. Sprint Analysis
 -   Log sprint retrospective items (What Went Well, What Went Wrong, What Can We Improve).
 -   **Drag and drop** retrospective items between columns to re-categorize them.
 -   Organize and view feedback on a per-project basis.
 -   Add, edit, and delete retrospective items.
-
-#### 4. Releases
--   View active and archived releases for a selected project.
--   For active releases, it shows a pie chart of the progress (done vs not done requirements).
--   It lists the requirements associated with each release.
--   Users can finalize a release, which archives it.
--   Users can edit a release.
--   For archived releases, it shows the final metrics and the list of requirements at the time of archival.
 
 #### 5. Notes
 -   Create and save daily notes for each project using a rich text editor with `Ctrl+S` support.
