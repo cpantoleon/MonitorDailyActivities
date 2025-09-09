@@ -12,6 +12,35 @@ ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
+const ReleaseCountdown = ({ activeReleases }) => {
+    const currentRelease = activeReleases.find(r => r.is_current);
+
+    if (!currentRelease) {
+        return null;
+    }
+
+    const calculateDaysLeft = () => {
+        const releaseDate = new Date(currentRelease.release_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); 
+        releaseDate.setHours(0, 0, 0, 0);
+
+        const differenceInTime = releaseDate.getTime() - today.getTime();
+        const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
+        return differenceInDays;
+    };
+
+    const daysLeft = calculateDaysLeft();
+
+    if (daysLeft < 0) {
+        return <span className="countdown-timer overdue">Current release overdue by {-daysLeft} days</span>;
+    } else if (daysLeft === 0) {
+        return <span className="countdown-timer">Current release is due today</span>;
+    } else {
+        return <span className="countdown-timer">{daysLeft} days until current release</span>;
+    }
+};
+
 const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
 const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
@@ -465,6 +494,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
                 {selectedProject && (
                     <div className="view-toggle-buttons">
+                        <ReleaseCountdown activeReleases={activeReleases} />
                         <button onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
                         <button onClick={() => setView('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
                     </div>

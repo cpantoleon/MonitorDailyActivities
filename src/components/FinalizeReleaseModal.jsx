@@ -14,7 +14,7 @@ const FinalizeReleaseModal = ({ isOpen, onClose, onConfirm, releaseName }) => {
                     <div className="finalize-option">
                         <div className="finalize-option-icon">&#128451;</div>
                         <h4>Archive Only</h4>
-                        <p>Creates a permanent, read-only record. Requirements remain on the board, unlinked from this release, to be managed independently.</p>
+                        <p>Creates a permanent, read-only record. Requirements remain on the board and are still linked to this release.</p>
                         <button 
                             onClick={() => onConfirm('archive_only')} 
                             className="modal-button-confirm"

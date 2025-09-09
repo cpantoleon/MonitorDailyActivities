@@ -1172,15 +1172,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
                             }
 
                             if (closeAction === 'archive_only') {
-                                const updateActivitiesSql = "UPDATE activities SET release_id = NULL WHERE release_id = ?";
-                                db.run(updateActivitiesSql, [releaseId], (err) => {
-                                    if (err) {
-                                        db.run("ROLLBACK");
-                                        if (!res.headersSent) res.status(500).json({ error: "Failed to unlink requirements." });
-                                        return;
-                                    }
-                                    commitTransaction();
-                                });
+                                commitTransaction();
                             } else if (closeAction === 'archive_and_complete') {
                                 const now = new Date().toISOString();
                                 const statusDate = now.split('T')[0];
