@@ -204,9 +204,27 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
     );
 };
 
-const ArchivedReleaseDetails = ({ archive, onBack }) => {
+const ArchivedDefectList = ({ defects, onNavigate }) => {
+    return (
+        <div className="defect-list" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px', flexGrow: 1 }}>
+            <h4>Defects ({defects.length})</h4>
+            <ul className="requirement-list">
+                {defects.length > 0 ? defects.map(defect => (
+                    <li key={defect.id}>
+                        <button onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
+                            {defect.title}
+                        </button>
+                    </li>
+                )) : <li>No defects in this release.</li>}
+            </ul>
+        </div>
+    );
+};
+
+const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements }) => {
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [defects, setDefects] = useState([]);
 
     useEffect(() => {
         setIsLoading(true);
@@ -221,6 +239,26 @@ const ArchivedReleaseDetails = ({ archive, onBack }) => {
                 setIsLoading(false);
             });
     }, [archive.id]);
+
+    useEffect(() => {
+        if (items.length > 0 && allProcessedRequirements.length > 0) {
+            const releaseDefects = items.flatMap(item => {
+                const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+                return requirement ? (requirement.linkedDefects || []) : [];
+            });
+            const uniqueDefects = Array.from(new Map(releaseDefects.map(defect => [defect.id, defect])).values());
+            setDefects(uniqueDefects);
+        }
+    }, [items, allProcessedRequirements]);
+
+    const handleRequirementClick = (item) => {
+        const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+        if (requirement) {
+            onNavigateToRequirement(requirement);
+        } else {
+            console.error("Could not find requirement details for navigation.");
+        }
+    };
 
     const chartData = {
         labels: ['Done', 'Not Done'],
@@ -253,40 +291,44 @@ const ArchivedReleaseDetails = ({ archive, onBack }) => {
         <div className="archived-details-view">
             <div className="details-header">
                 <button onClick={onBack} className="back-button">&#8592; Back to Archives</button>
-                <h2>Archived Release: {archive.name}</h2>
+                <h2>Archived Release Details</h2>
             </div>
-            <div className="release-card detailed-view">
+            <div className="release-card">
                 <div className="release-card-header">
-                    <h3>Final Snapshot</h3>
-                    <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleString()}</span>
+                    <h3>{archive.name}</h3>
+                    <div className="release-card-header-details">
+                        <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleString()}</span>
+                    </div>
                 </div>
                 <div className="release-card-body">
-                    <div className="release-snapshot-metrics">
-                        <h4>Final Metrics</h4>
-                        <div className="chart-container">
-                            <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                    <div className="release-charts">
+                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                    </div>
+                    <div className="release-requirements">
+                        <h4>Frozen Requirements ({items.length})</h4>
+                        <div className="requirements-list-wrapper">
+                            {isLoading ? <LoadingSpinner /> : (
+                                <ul className="requirement-list frozen">
+                                    {items.length > 0 ? items.map(item => (
+                                        <li key={item.id}>
+                                            <button onClick={() => handleRequirementClick(item)} className="link-button">
+                                                {item.requirement_title}
+                                            </button>
+                                            <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
+                                        </li>
+                                    )) : <li>No requirements were in this release.</li>}
+                                </ul>
+                            )}
                         </div>
                     </div>
-                    <div className="release-requirements frozen-list-container">
-                        <h4>Frozen Requirements ({items.length})</h4>
-                        {isLoading ? <LoadingSpinner /> : (
-                            <ul className="requirement-list frozen">
-                                {items.length > 0 ? items.map(item => (
-                                    <li key={item.id}>
-                                        <span>{item.requirement_title}</span> 
-                                        <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
-                                    </li>
-                                )) : <li>No requirements were in this release.</li>}
-                            </ul>
-                        )}
-                    </div>
+                    <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
                 </div>
             </div>
         </div>
     );
 };
 
-const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onNavigateToRequirement, onNavigateToDefect, onEditRelease, onDeleteRelease, fetchData }) => {
+const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onNavigateToRequirement, onNavigateToDefect, onEditRelease, onDeleteRelease, onDeleteArchivedRelease, fetchData }) => {
     const [selectedProject, setSelectedProject] = useState('');
     const [view, setView] = useState('active');
     const [activeReleases, setActiveReleases] = useState([]);
@@ -458,7 +500,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
     const renderArchivedView = () => {
         if (selectedArchive) {
-            return <ArchivedReleaseDetails archive={selectedArchive} onBack={() => setSelectedArchive(null)} />;
+            return <ArchivedReleaseDetails archive={selectedArchive} onBack={() => setSelectedArchive(null)} onNavigateToRequirement={onNavigateToRequirement} onNavigateToDefect={onNavigateToDefect} allProcessedRequirements={allProcessedRequirements} />;
         }
 
         if (isLoading) return <LoadingSpinner />;
@@ -481,6 +523,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                         </div>
                         <div className="release-card-actions">
                             <button onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
+                            <button onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
                         </div>
                     </div>
                 ))}

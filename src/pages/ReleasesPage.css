@@ -219,6 +219,20 @@
 }
 .button-view-details:hover { background-color: #138496; }
 
+.button-delete {
+    padding: 8px 16px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: #dc3545;
+    color: white;
+}
+.button-delete:hover { background-color: #c82333; }
+
 .archived-details-view {
     padding: 20px;
     background-color: #f8f9fa;
@@ -238,11 +252,18 @@
 }
 
 .back-button {
-    background: none;
-    border: 1px solid #ccc;
-    padding: 8px 12px;
+    background-color: #0056b3;
+    color: white;
+    border: none;
+    padding: 10px 16px;
     border-radius: 5px;
     cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.back-button:hover {
+    background-color: #004494;
 }
 
 .detailed-view .release-card-body {
@@ -263,8 +284,19 @@
     margin-top: 10px;
 }
 
-.frozen-list-container {
-    flex: 2;
+.requirements-list-wrapper {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.requirements-list-wrapper .loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
 }
 
 .frozen-list-container h4 {

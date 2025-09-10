@@ -1077,6 +1077,11 @@ function App() {
             successMessage = `Release '${currentItem.name}' deleted successfully.`;
             errorMessage = `Failed to delete release ${currentItem.name}`;
             break;
+        case 'archived-release':
+            url = `${API_BASE_URL}/archives/${currentItem.id}`;
+            successMessage = `Archived release '${currentItem.name}' deleted successfully.`;
+            errorMessage = `Failed to delete archived release ${currentItem.name}`;
+            break;
         default:
             return;
     }
@@ -1102,6 +1107,8 @@ function App() {
                 );
                 setDisplayableRequirements(newSearchResults);
             }
+        } else if (currentType === 'release' || currentType === 'archived-release') {
+            await fetchData();
         }
 
     } catch (error) {
@@ -1121,6 +1128,8 @@ function App() {
             return `Are you sure you want to delete the project "${itemToDelete.name}"? This will also delete ALL associated requirements, releases, notes, defects, and retrospective items permanently. This action cannot be undone.`;
         case 'release':
             return `Are you sure you want to delete the release "${itemToDelete.name}"? This will not delete the requirements, but will unlink them from this release. This action cannot be undone.`;
+        case 'archived-release':
+            return `Are you sure you want to permanently delete the archived release "${itemToDelete.name}"? This action cannot be undone.`;
         default:
             return 'Are you sure?';
     }
@@ -1452,6 +1461,7 @@ function App() {
             onNavigateToDefect={handleNavigateToDefect}
             onEditRelease={handleEditRelease}
             onDeleteRelease={(release) => handleDeleteRequest('release', release)}
+            onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)}
             fetchData={fetchData}
           />
         } />

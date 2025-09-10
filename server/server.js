@@ -1270,6 +1270,43 @@ app.get("/api/archives/details/:archiveId", (req, res) => {
     });
 });
 
+app.delete("/api/archives/:id", (req, res) => {
+    const archiveId = req.params.id;
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+
+        const deleteItemsSql = "DELETE FROM archived_release_items WHERE archive_id = ?";
+        db.run(deleteItemsSql, [archiveId], function(err) {
+            if (err) {
+                db.run("ROLLBACK");
+                return res.status(400).json({ error: err.message });
+            }
+
+            const deleteArchiveSql = "DELETE FROM archived_releases WHERE id = ?";
+            db.run(deleteArchiveSql, [archiveId], function(err) {
+                if (err) {
+                    db.run("ROLLBACK");
+                    return res.status(400).json({ error: err.message });
+                }
+
+                if (this.changes === 0) {
+                    db.run("ROLLBACK");
+                    return res.status(404).json({ error: `Archived release with ID ${archiveId} not found.` });
+                }
+
+                db.run("COMMIT", (commitErr) => {
+                    if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
+                    scheduleQdrantSync();
+                    res.json({
+                        message: `Archived release ${archiveId} and its associated data deleted.`,
+                        changes: this.changes
+                    });
+                });
+            });
+        });
+    });
+});
+
 
 app.get("/api/defects/all", (req, res) => {
     const defectsSql = `
