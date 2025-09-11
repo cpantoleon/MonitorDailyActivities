@@ -126,12 +126,14 @@ Once synced, you can start asking questions! For a full list of example commands
 -   **Charts**: Visualize the status of the current sprint, the active release, and the frequency of scope changes with dynamic charts.
 -   **Bulk Import**: Import multiple requirements at once from a JIRA-exported Excel file, with guidance provided via an in-app tooltip.
 -   **Context-aware search** with autosuggestions to quickly find requirements across all projects or within a selected project/sprint.
+-   **Filter Sidebar**: Refine the view with a powerful sidebar to filter requirements by type, linked defects (yes/no), associated release, and last updated date range.
 -   View the complete, chronologically-ordered history of a requirement's status changes and logged scope changes.
 -   See defects that are linked to a specific requirement for full traceability.
 
 #### 2. Defects
 -   Track defects on a separate Kanban board (Assigned to Developer, Assigned to Tester, Done).
 -   **Drag and drop** active defects between columns to update their status.
+-   **Move to Closed**: A dedicated button on each defect card allows you to move it to the "Closed" view, keeping the active board clean. A confirmation is required if the defect is not yet "Done".
 -   Toggle between viewing active and closed defects.
 -   Create, update, and delete defects with details like area, description, and external links.
 -   **Bulk Import**: Import multiple defects at once from a JIRA-exported Excel file, with format guidance available in the import window.
@@ -142,12 +144,13 @@ Once synced, you can start asking questions! For a full list of example commands
 
 #### 3. Releases
 -   View active and archived releases for a selected project.
--   For active releases, it shows a pie chart of the progress (done vs not done requirements).
--   It lists the requirements associated with each release.
--   A dedicated "Defects" button allows quick access to view defects linked to the selected release.
--   Users can finalize a release, which archives it.
--   Users can edit a release.
--   For archived releases, it shows the final metrics and the list of requirements at the time of archival.
+-   For active releases, a pie chart shows the progress (done vs. not done requirements).
+-   The card lists the requirements associated with each release and allows filtering them by sprint.
+-   A dedicated "Defects" button allows quick access to view all defects linked to the release's requirements.
+-   **Export to Excel**: Generate a comprehensive Excel report for the release, with separate sheets detailing requirements, linked defects (including their 'Return to Dev' count), and a full requirement-to-defect breakdown.
+-   **Finalize a Release**: Archive a release with two options: "Archive Only" (creates a permanent record) or "Archive & Complete Items" (archives the release and marks all associated requirements as 'Done').
+-   **Edit & Delete**: Modify release details or remove a release completely.
+For archived releases, view the final metrics and the frozen list of requirements at the time of archival.
 
 #### 4. Sprint Analysis
 -   Log sprint retrospective items (What Went Well, What Went Wrong, What Can We Improve).

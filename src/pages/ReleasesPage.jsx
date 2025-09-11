@@ -1,16 +1,145 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import ProjectSelector from '../components/ProjectSelector';
 import FinalizeReleaseModal from '../components/FinalizeReleaseModal';
 import EditReleaseModal from '../components/EditReleaseModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js';
+import Tooltip from '../components/Tooltip'; // <-- IMPORTED TOOLTIP
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import '../App.css';
 import './ReleasesPage.css';
 
-ChartJS.register(ArcElement, Tooltip, Legend, Title);
+ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
+
+const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
+    const handleCheckboxChange = (sprint) => {
+        if (sprint === 'All') {
+            onChange(['All']);
+            return;
+        }
+
+        const newSelection = selectedSprints.includes('All')
+            ? [sprint]
+            : selectedSprints.includes(sprint)
+                ? selectedSprints.filter(s => s !== sprint)
+                : [...selectedSprints, sprint];
+
+        if (newSelection.length === 0 || newSelection.length === availableSprints.length - 1) {
+            onChange(['All']);
+        } else {
+            onChange(newSelection);
+        }
+    };
+
+    if (availableSprints.length <= 2) {
+        return null;
+    }
+
+    return (
+        <div className="sprint-filter-options-container">
+            {availableSprints.map(sprint => (
+                <label key={sprint} className="sprint-filter-label">
+                    <input
+                        type="checkbox"
+                        checked={selectedSprints.includes(sprint)}
+                        onChange={() => handleCheckboxChange(sprint)}
+                    />
+                    {sprint}
+                </label>
+            ))}
+        </div>
+    );
+};
+
+
+const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportRelease }) => {
+    const [selectedSprints, setSelectedSprints] = useState(['All']);
+    const [isDefectsCardOpen, setIsDefectsCardOpen] = useState(false);
+    const [isFilterVisible, setIsFilterVisible] = useState(false);
+
+    const releaseRequirements = useMemo(() => 
+        allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id),
+        [allProcessedRequirements, release.id]
+    );
+
+    const availableSprints = useMemo(() => {
+        const sprints = new Set(releaseRequirements.map(r => r.currentStatusDetails.sprint).filter(Boolean));
+        return ['All', ...Array.from(sprints).sort()];
+    }, [releaseRequirements]);
+
+    const filteredRequirements = useMemo(() => {
+        if (selectedSprints.includes('All')) {
+            return releaseRequirements;
+        }
+        return releaseRequirements.filter(r => selectedSprints.includes(r.currentStatusDetails.sprint));
+    }, [releaseRequirements, selectedSprints]);
+
+    const filteredDefects = useMemo(() => 
+        filteredRequirements.flatMap(r => r.linkedDefects || []),
+        [filteredRequirements]
+    );
+
+    const uniqueFilteredDefects = useMemo(() => 
+        Array.from(new Map(filteredDefects.map(d => [d.id, d])).values()),
+        [filteredDefects]
+    );
+
+    const defectCount = uniqueFilteredDefects.length;
+
+    const handleSprintChange = (newSelection) => {
+        setSelectedSprints(newSelection);
+    };
+
+    const handleDefectClick = () => {
+        setIsDefectsCardOpen(prev => !prev);
+    };
+    
+    const sprintFilterElement = isFilterVisible ? (
+        <SprintFilter
+            availableSprints={availableSprints}
+            selectedSprints={selectedSprints}
+            onChange={handleSprintChange}
+        />
+    ) : null;
+
+    const releaseCard = (
+        <ReleaseCard 
+            key={release.id} 
+            release={release} 
+            requirements={filteredRequirements} 
+            defectCount={defectCount}
+            onNavigate={onNavigateToRequirement}
+            onFinalize={() => onFinalize(release)}
+            onEdit={() => onEdit(release)}
+            onDefectClick={handleDefectClick}
+            onExport={() => handleExportRelease(release, filteredRequirements, uniqueFilteredDefects)}
+            sprintFilter={sprintFilterElement}
+            onToggleFilter={() => setIsFilterVisible(prev => !prev)}
+            showFilterToggle={availableSprints.length > 2}
+        />
+    );
+    
+    if (isDefectsCardOpen) {
+        return (
+            <>
+                {releaseCard}
+                <DefectDetailsCard
+                    key={`defect-details-${release.id}`}
+                    release={release}
+                    defects={uniqueFilteredDefects}
+                    onClose={() => setIsDefectsCardOpen(false)}
+                    onNavigate={onNavigateToDefect}
+                />
+            </>
+        );
+    }
+
+    return releaseCard;
+};
+
 
 const ReleaseCountdown = ({ activeReleases }) => {
     const currentRelease = activeReleases.find(r => r.is_current);
@@ -94,7 +223,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
         <div className="defect-details-card">
             <div className="defect-details-card-header">
                 <h3>Defects for {release.name}</h3>
-                <button onClick={onClose} className="close-button">X</button>
+                <button type="button" onClick={onClose} className="close-button">X</button>
             </div>
             <div className="defect-details-card-body">
                 <div className="defect-charts">
@@ -109,7 +238,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
                     <ul>
                         {defects.length > 0 ? defects.map(defect => (
                             <li key={defect.id}>
-                                <button onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
+                                <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
                                     {defect.title}
                                 </button>
                             </li>
@@ -121,7 +250,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
     );
 };
 
-const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick }) => {
+const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExport, sprintFilter, onToggleFilter, showFilterToggle }) => {
 
     const getChartData = (reqs) => {
         if (!reqs || reqs.length === 0) return null;
@@ -170,11 +299,12 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                 <h3>{release.name}{release.is_current ? <span className="current-tag">Current</span> : ''}</h3>
                 <div className="release-card-header-details">
                     <span className="due-date">Due: {new Date(release.release_date).toLocaleDateString()}</span>
-                    <button onClick={() => onDefectClick(release.id)} className="defect-count-button">
+                    <button type="button" onClick={onDefectClick} className="defect-count-button">
                         Defects: {defectCount}
                     </button>
                 </div>
             </div>
+            
             <div className="release-card-body">
                 <div className="release-charts">
                     {chartData ? (
@@ -188,7 +318,7 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                     <ul className="requirement-list">
                         {requirements.length > 0 ? requirements.map(req => (
                             <li key={req.id}>
-                                <button onClick={() => onNavigate(req)} className="link-button">
+                                <button type="button" onClick={() => onNavigate(req)} className="link-button">
                                     {req.requirementUserIdentifier}
                                 </button>
                             </li>
@@ -196,9 +326,22 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                     </ul>
                 </div>
             </div>
-            <div className="release-card-actions">
-                <button onClick={() => onEdit(release)} className="button-edit">&#9998; Edit</button>
-                <button onClick={() => onFinalize(release)} className="button-finalize">&#10004; Finalize</button>
+            
+            <div className="release-card-footer">
+                {sprintFilter && (
+                    <div className="sprint-filter-controls">
+                        {sprintFilter}
+                    </div>
+                )}
+                
+                <div className="release-card-actions">
+                    {showFilterToggle && (
+                        <button type="button" onClick={onToggleFilter} className="button-filter">Filter Sprints</button>
+                    )}
+                    <button type="button" onClick={onExport} className="button-export">&#128229; Export</button>
+                    <button type="button" onClick={onEdit} className="button-edit">&#9998; Edit</button>
+                    <button type="button" onClick={onFinalize} className="button-finalize">&#10004; Finalize</button>
+                </div>
             </div>
         </div>
     );
@@ -211,7 +354,7 @@ const ArchivedDefectList = ({ defects, onNavigate }) => {
             <ul className="requirement-list">
                 {defects.length > 0 ? defects.map(defect => (
                     <li key={defect.id}>
-                        <button onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
+                        <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
                             {defect.title}
                         </button>
                     </li>
@@ -290,7 +433,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     return (
         <div className="archived-details-view">
             <div className="details-header">
-                <button onClick={onBack} className="back-button">&#8592; Back to Archives</button>
+                <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
                 <h2>Archived Release Details</h2>
             </div>
             <div className="release-card">
@@ -311,7 +454,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                 <ul className="requirement-list frozen">
                                     {items.length > 0 ? items.map(item => (
                                         <li key={item.id}>
-                                            <button onClick={() => handleRequirementClick(item)} className="link-button">
+                                            <button type="button" onClick={() => handleRequirementClick(item)} className="link-button">
                                                 {item.requirement_title}
                                             </button>
                                             <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
@@ -340,7 +483,20 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [releaseToEdit, setReleaseToEdit] = useState(null);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [openedDefectReleaseId, setOpenedDefectReleaseId] = useState(null);
+
+    // ======================= NEW TOOLTIP CONTENT =======================
+    const releasesPageTooltipContent = (
+        <>
+            <strong>Releases Page Guide</strong>
+            <p>This page shows all active and archived releases for the selected project.</p>
+            <ul>
+                <li><strong>Active Releases:</strong> View real-time progress of ongoing releases. You can filter by sprint, export details, edit, or finalize them.</li>
+                <li><strong>Archived Releases:</strong> View a permanent snapshot of finalized releases.</li>
+                <li><strong>Defects Count:</strong> This number represents unique defects linked to the requirements currently displayed for the release.</li>
+            </ul>
+        </>
+    );
+    // ====================================================================
 
     useEffect(() => {
         const savedProject = sessionStorage.getItem('releasePageSelectedProject');
@@ -391,19 +547,14 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     }, [selectedProject, showMainMessage]);
 
-    const refreshData = useCallback(() => {
-        if (view === 'active') {
-            fetchActiveReleases();
-        } else {
-            fetchArchivedReleases();
-        }
-    }, [view, fetchActiveReleases, fetchArchivedReleases]);
-
     useEffect(() => {
         if (selectedProject) {
-            refreshData();
+            fetchActiveReleases();
+            if (view === 'archived') {
+                fetchArchivedReleases();
+            }
         }
-    }, [view, selectedProject, refreshData]);
+    }, [view, selectedProject, fetchActiveReleases, fetchArchivedReleases]);
 
     const handleOpenFinalizeModal = (release) => {
         setReleaseToFinalize(release);
@@ -422,7 +573,11 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
             showMainMessage(result.message, 'success');
             fetchData();
-            refreshData();
+            if (view === 'active') {
+                fetchActiveReleases();
+            } else {
+                fetchArchivedReleases();
+            }
         } catch (error) {
             showMainMessage(error.message, 'error');
         } finally {
@@ -451,8 +606,204 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         setIsEditModalOpen(false);
     };
 
-    const handleDefectClick = (releaseId) => {
-        setOpenedDefectReleaseId(prevId => prevId === releaseId ? null : releaseId);
+    const handleExportRelease = async (release, requirements, defects) => {
+        const returnCountsMap = new Map();
+
+        try {
+            const project = release.project;
+            if (project) {
+                const [activeRes, closedRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=active`),
+                    fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=closed`)
+                ]);
+
+                if (activeRes.ok) {
+                    const activeData = await activeRes.json();
+                    (activeData.data || []).forEach(item => returnCountsMap.set(item.id, item.return_count));
+                }
+                if (closedRes.ok) {
+                    const closedData = await closedRes.json();
+                    (closedData.data || []).forEach(item => returnCountsMap.set(item.id, item.return_count));
+                }
+            }
+        } catch (error) {
+            console.error("Could not fetch defect return counts for export:", error);
+            showMainMessage("Could not fetch return-to-dev counts for the export, they will be omitted.", "warning");
+        }
+
+        const MAX_WIDTH = 70;
+        const borderStyle = { style: "thin", color: { auto: 1 } };
+        const border = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+
+        const headerStyle = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "E9E9E9" } },
+            border: border,
+            alignment: { vertical: 'center', horizontal: 'center' }
+        };
+        
+        const cellStyle = {
+            border: border,
+            alignment: { wrapText: true, vertical: 'top' }
+        };
+
+        const linkStyle = {
+            font: { color: { rgb: "0000FF" }, underline: true },
+            border: border,
+            alignment: { wrapText: true, vertical: 'top' }
+        };
+
+        const fitToColumn = (arrayOfArrays) => {
+            if (!arrayOfArrays || arrayOfArrays.length === 0) return [];
+            const colWidths = [];
+            arrayOfArrays.forEach(row => {
+                row.forEach((cell, i) => {
+                    const cellValue = cell ? cell.toString() : '';
+                    const lines = cellValue.split('\n');
+                    const maxLength = Math.max(...lines.map(line => line.length));
+                    if (!colWidths[i] || colWidths[i].wch < maxLength) {
+                        colWidths[i] = { wch: maxLength };
+                    }
+                });
+            });
+            colWidths.forEach(col => { col.wch = Math.min(col.wch + 2, MAX_WIDTH); });
+            return colWidths;
+        };
+
+        const processSheet = (data, headers) => {
+            const dataAsArray = [headers, ...data.map(row => headers.map(header => row[header]))];
+            
+            const ws = XLSX.utils.aoa_to_sheet(dataAsArray);
+            ws['!cols'] = fitToColumn(dataAsArray);
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                    let cell = ws[cell_ref];
+                    if (!cell) continue;
+
+                    if (R === 0) {
+                        cell.s = headerStyle;
+                    } else {
+                        const headerName = headers[C];
+                        if ((headerName === 'Requirement Link' || headerName === 'Defect Link') && cell.v) {
+                            cell.l = { Target: cell.v, Tooltip: `Click to open link` };
+                            cell.s = linkStyle;
+                        } else {
+                            cell.s = cellStyle;
+                        }
+                    }
+                }
+            }
+            return ws;
+        };
+
+        const reqHeaders = ['Release Name', 'Requirement Name', 'Requirement Link', 'Sprint', 'Linked Defects', 'Status'];
+        const requirementsData = requirements.map(req => ({
+            'Release Name': release.name,
+            'Requirement Name': req.requirementUserIdentifier,
+            'Requirement Link': req.currentStatusDetails.link || '',
+            'Sprint': req.currentStatusDetails.sprint || '',
+            'Linked Defects': (req.linkedDefects || []).map(d => d.title).join('\n'),
+            'Status': req.currentStatusDetails.status
+        }));
+
+        const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
+        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Sprints', 'Status', 'Return to Dev Count'];
+        const defectsData = uniqueDefects.map(defect => {
+            const linkedRequirements = allProcessedRequirements
+                .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
+            const linkedRequirementsNames = linkedRequirements.map(req => req.requirementUserIdentifier);
+            const linkedSprints = new Set(linkedRequirements.map(req => req.currentStatusDetails.sprint).filter(Boolean));
+            return {
+                'Defect Name': defect.title,
+                'Defect Link': defect.link || '',
+                'Linked Requirements': linkedRequirementsNames.join('\n'),
+                'Sprints': Array.from(linkedSprints).sort().join(', '),
+                'Status': defect.status,
+                'Return to Dev Count': returnCountsMap.get(defect.id) || 0
+            };
+        });
+
+        const reqDefectHeaders = ['Requirement Name', 'Defect Name', 'Sprint', 'Return to Dev Count'];
+        const reqDefectData = [];
+        requirements.forEach(req => {
+            if (req.linkedDefects && req.linkedDefects.length > 0) {
+                req.linkedDefects.forEach(defect => {
+                    reqDefectData.push({
+                        'Requirement Name': req.requirementUserIdentifier,
+                        'Requirement Link': req.currentStatusDetails.link,
+                        'Defect Name': defect.title,
+                        'Defect Link': defect.link,
+                        'Sprint': req.currentStatusDetails.sprint || '',
+                        'Return to Dev Count': returnCountsMap.get(defect.id) || 0
+                    });
+                });
+            }
+        });
+
+        const wb = XLSX.utils.book_new();
+
+        if (requirementsData.length > 0) {
+            const wsReqs = processSheet(requirementsData, reqHeaders);
+            XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
+        }
+        
+        if (reqDefectData.length > 0) {
+            const reqDefectDataAsArray = [
+                reqDefectHeaders,
+                ...reqDefectData.map(row => [
+                    row['Requirement Name'],
+                    row['Defect Name'],
+                    row['Sprint'],
+                    row['Return to Dev Count']
+                ])
+            ];
+
+            const wsReqDefects = XLSX.utils.aoa_to_sheet(reqDefectDataAsArray);
+            wsReqDefects['!cols'] = fitToColumn(reqDefectDataAsArray);
+
+            const range = XLSX.utils.decode_range(wsReqDefects['!ref']);
+            for (let R = 1; R <= range.e.r; ++R) { 
+                const rowData = reqDefectData[R - 1];
+
+                for (let C = 0; C <= range.e.c; C++) {
+                    const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
+                    if (wsReqDefects[cellRef]) wsReqDefects[cellRef].s = cellStyle;
+                }
+
+                if (rowData['Requirement Link']) {
+                    const reqNameCellRef = XLSX.utils.encode_cell({ c: 0, r: R });
+                    if (wsReqDefects[reqNameCellRef]) {
+                        wsReqDefects[reqNameCellRef].l = { Target: rowData['Requirement Link'], Tooltip: 'Click to open requirement' };
+                        wsReqDefects[reqNameCellRef].s = linkStyle;
+                    }
+                }
+
+                if (rowData['Defect Link']) {
+                    const defNameCellRef = XLSX.utils.encode_cell({ c: 1, r: R });
+                    if (wsReqDefects[defNameCellRef]) {
+                        wsReqDefects[defNameCellRef].l = { Target: rowData['Defect Link'], Tooltip: 'Click to open defect' };
+                        wsReqDefects[defNameCellRef].s = linkStyle;
+                    }
+                }
+            }
+
+            for (let C = 0; C < reqDefectHeaders.length; C++) {
+                const cellRef = XLSX.utils.encode_cell({c: C, r: 0});
+                if (wsReqDefects[cellRef]) wsReqDefects[cellRef].s = headerStyle;
+            }
+
+            XLSX.utils.book_append_sheet(wb, wsReqDefects, 'Requirements with Defects');
+        }
+
+        if (defectsData.length > 0) {
+            const wsDefects = processSheet(defectsData, defectHeaders);
+            XLSX.utils.book_append_sheet(wb, wsDefects, 'Defects');
+        }
+
+        XLSX.writeFile(wb, `${release.name}_Details.xlsx`);
     };
 
     const renderActiveView = () => {
@@ -461,39 +812,18 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
         return (
             <div className="releases-container">
-                {activeReleases.flatMap(release => {
-                    const requirements = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
-                    const defects = requirements.flatMap(r => r.linkedDefects || []);
-                    const defectCount = defects.length;
-
-                    const releaseCard = (
-                        <ReleaseCard 
-                            key={release.id} 
-                            release={release} 
-                            requirements={requirements} 
-                            defectCount={defectCount}
-                            onNavigate={onNavigateToRequirement}
-                            onFinalize={handleOpenFinalizeModal}
-                            onEdit={handleOpenEditModal}
-                            onDefectClick={handleDefectClick}
-                        />
-                    );
-
-                    if (openedDefectReleaseId === release.id) {
-                        return [
-                            releaseCard,
-                            <DefectDetailsCard
-                                key={`defect-details-${release.id}`}
-                                release={release}
-                                defects={defects}
-                                onClose={() => setOpenedDefectReleaseId(null)}
-                                onNavigate={onNavigateToDefect}
-                            />
-                        ];
-                    }
-
-                    return [releaseCard];
-                })}
+                {activeReleases.map(release => (
+                    <ActiveReleaseCardWrapper
+                        key={release.id}
+                        release={release}
+                        allProcessedRequirements={allProcessedRequirements}
+                        onNavigateToRequirement={onNavigateToRequirement}
+                        onNavigateToDefect={onNavigateToDefect}
+                        onFinalize={handleOpenFinalizeModal}
+                        onEdit={handleOpenEditModal}
+                        handleExportRelease={handleExportRelease}
+                    />
+                ))}
             </div>
         );
     };
@@ -522,8 +852,8 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                             </div>
                         </div>
                         <div className="release-card-actions">
-                            <button onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
-                            <button onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
+                            <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
+                            <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
                         </div>
                     </div>
                 ))}
@@ -537,9 +867,11 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
                 {selectedProject && (
                     <div className="view-toggle-buttons">
+                        {/* ======================= TOOLTIP ADDED HERE ======================= */}
+                        <Tooltip content={releasesPageTooltipContent} position="bottom" />
                         <ReleaseCountdown activeReleases={activeReleases} />
-                        <button onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
-                        <button onClick={() => setView('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
+                        <button type="button" onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
+                        <button type="button" onClick={() => setView('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
                     </div>
                 )}
             </div>

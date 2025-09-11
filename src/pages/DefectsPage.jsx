@@ -114,9 +114,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       }
   }, [selectedProject]);
 
-  const onSelectProject = (project) => {
+  const onSelectProject = useCallback((project) => {
       setSelectedProject(project);
-  };
+      setIsSearching(false);
+      setDefectQuery('');
+      setSearchResults([]);
+      setSearchSuggestions([]);
+  }, []);
 
   const defectChartTooltipContent = (
     <>
@@ -331,6 +335,20 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const handleOpenModal = (defect = null) => { setEditingDefect(defect); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setEditingDefect(null); };
 
+  const refreshDefectsState = useCallback(async () => {
+    const freshDefects = await fetchAllDefects();
+    if (isSearching) {
+        const lowerCaseQuery = defectQuery.toLowerCase();
+        const sourceData = freshDefects.filter(defect => 
+            (showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed') &&
+            (selectedProject ? defect.project === selectedProject : true)
+        );
+        const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
+        setSearchResults(newSearchResults);
+    }
+    if (onDefectUpdate) onDefectUpdate();
+  }, [fetchAllDefects, isSearching, defectQuery, showClosedView, selectedProject, onDefectUpdate]);
+
   const handleSubmitDefect = async (formData) => {
     const projectForSubmit = formData.project || selectedProject;
     if (!projectForSubmit) { showMessage("Please select a project.", "error"); return; }
@@ -344,8 +362,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'create'} defect`);
       showMessage(`Defect ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
-      await fetchAllDefects();
-      if (onDefectUpdate) onDefectUpdate();
+      await refreshDefectsState();
       handleCloseModal();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
@@ -363,14 +380,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         throw new Error(result.error || 'Failed to delete defect');
       }
       showMessage('Defect deleted successfully!', 'success');
-      const freshDefects = await fetchAllDefects();
-      if (isSearching) {
-        const lowerCaseQuery = defectQuery.toLowerCase();
-        const sourceData = freshDefects.filter(defect => showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed');
-        const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
-        setSearchResults(newSearchResults);
-      }
-      if (onDefectUpdate) onDefectUpdate();
+      await refreshDefectsState();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
     } finally {
@@ -408,15 +418,14 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Failed to import defects.');
         showMessage(result.message, 'success');
-        await fetchAllDefects();
-        if (onDefectUpdate) onDefectUpdate();
+        await refreshDefectsState();
         onSelectProject(project);
     } catch (error) {
         showMessage(`Import Error: ${error.message}`, 'error');
     } finally {
         handleCloseImportModal();
     }
-  }, [fetchAllDefects, showMessage, handleCloseImportModal, onDefectUpdate, onSelectProject]);
+  }, [refreshDefectsState, showMessage, handleCloseImportModal, onSelectProject]);
 
   const handleValidateDefectImport = useCallback(async (file, project) => {
     const formData = new FormData();
@@ -473,9 +482,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setSearchResults(results);
     if (results.length > 0) {
       const uniqueProjects = [...new Set(results.map(d => d.project))];
-      onSelectProject(uniqueProjects.length === 1 ? uniqueProjects[0] : '');
+      setSelectedProject(uniqueProjects.length === 1 ? uniqueProjects[0] : '');
     } else {
-      onSelectProject('');
+      setSelectedProject('');
     }
   };
 
@@ -484,7 +493,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setDefectQuery('');
     setSearchResults([]);
     setSearchSuggestions([]);
-    onSelectProject('');
+    setSelectedProject('');
   };
 
   const handleDefectQueryChange = (query) => {
@@ -509,7 +518,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     const selectedDefect = allDefects.find(d => d.id === suggestion.id);
     if (selectedDefect) {
       setSearchResults([selectedDefect]);
-      onSelectProject(selectedDefect.project);
+      setSelectedProject(selectedDefect.project);
       setIsSearching(true);
     } else {
       handleDefectSearch(suggestion.name);
@@ -538,8 +547,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       });
       if (!response.ok) throw new Error('Failed to update defect status.');
       showMessage('Defect status updated successfully!', 'success');
-      await fetchAllDefects();
-      if (onDefectUpdate) onDefectUpdate();
+      await refreshDefectsState();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
     } finally {
@@ -568,8 +576,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       });
       if (!response.ok) throw new Error('Failed to move defect to closed.');
       showMessage('Defect moved to closed successfully!', 'success');
-      await fetchAllDefects();
-      if (onDefectUpdate) onDefectUpdate();
+      await refreshDefectsState();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
     }
@@ -599,7 +606,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   const pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
   const doneNotDonePieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
-  const returnToDevChartOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 20 } }, plugins: { legend: { display: false }, title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { title: function(context) { const dataIndex = context[0].dataIndex; const fullLabel = context[0].dataset.fullLabels[dataIndex]; return fullLabel; }, label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.x !== null) { label += context.parsed.x; } return label; } } } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } };
+  const returnToDevChartOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 20 } }, plugins: { legend: { display: false }, title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { title: function(context) { const dataIndex = context[0].dataIndex; const fullLabel = context[0].dataset.fullLabels[dataIndex]; return fullLabel; }, label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.x !== null) { label += context.parsed.x; } return label; } } } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } }, y: {ticks: {autoSkip: false}} } };
 
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {

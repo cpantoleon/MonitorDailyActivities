@@ -508,7 +508,7 @@
         }
       }
     },
-    "/archives/{archiveId}": {
+    "/archives/{id}": {
       "delete": {
         "summary": "Delete an archived release",
         "tags": [
@@ -516,7 +516,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ArchiveIdPath"
+            "$ref": "#/components/parameters/ItemIdPath"
           }
         ],
         "responses": {
@@ -1259,7 +1259,25 @@
         ],
         "responses": {
           "200": {
-            "description": "A list of defects with their return counts."
+            "description": "A list of defects with their return counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DefectReturnCount"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
