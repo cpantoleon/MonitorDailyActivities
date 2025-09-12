@@ -4,7 +4,8 @@ import ProjectSelector from '../components/ProjectSelector';
 import FinalizeReleaseModal from '../components/FinalizeReleaseModal';
 import EditReleaseModal from '../components/EditReleaseModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import Tooltip from '../components/Tooltip'; // <-- IMPORTED TOOLTIP
+import Modal from '../components/ReleaseModal';
+import Tooltip from '../components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import '../App.css';
@@ -13,6 +14,53 @@ import './ReleasesPage.css';
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
+
+const getSatChartConfig = (sat_report) => {
+    if (!sat_report) return { data: null, legendItems: [] };
+
+    const allLabels = ['Passed', 'Failed', 'Blocked', 'Pending', 'Executing', 'Aborted'];
+    const allColors = ['#28a745', '#dc3545', '#ffc107', '#6c757d', '#17a2b8', '#fd7e14'];
+
+    const data = [];
+    const labels = [];
+    const backgroundColor = [];
+    const legendItems = [];
+
+    allLabels.forEach((label, index) => {
+        const key = label.toLowerCase();
+        const value = sat_report[key];
+        if (value > 0) {
+            data.push(value);
+            labels.push(label);
+            backgroundColor.push(allColors[index]);
+            legendItems.push({ text: label, color: allColors[index] });
+        }
+    });
+
+    if (data.length === 0) return { data: null, legendItems: [] };
+
+    return {
+        data: {
+            labels,
+            datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+        },
+        legendItems
+    };
+};
+
+const ChartLegend = ({ items }) => {
+    if (!items || items.length === 0) return null;
+    return (
+        <ul className="chart-legend">
+            {items.map(item => (
+                <li key={item.text} className="legend-item">
+                    <span className="legend-color-box" style={{ backgroundColor: item.color }}></span>
+                    {item.text}
+                </li>
+            ))}
+        </ul>
+    );
+};
 
 const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
     const handleCheckboxChange = (sprint) => {
@@ -349,7 +397,7 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
 
 const ArchivedDefectList = ({ defects, onNavigate }) => {
     return (
-        <div className="defect-list" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px', flexGrow: 1 }}>
+        <div className="defect-list" style={{ borderLeft: '1px solid #E3C9A6', paddingLeft: '20px', flexGrow: 1 }}>
             <h4>Defects ({defects.length})</h4>
             <ul className="requirement-list">
                 {defects.length > 0 ? defects.map(defect => (
@@ -364,7 +412,7 @@ const ArchivedDefectList = ({ defects, onNavigate }) => {
     );
 };
 
-const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements }) => {
+const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements, onAddSatReport }) => {
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [defects, setDefects] = useState([]);
@@ -403,32 +451,26 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         }
     };
 
-    const chartData = {
+    const ourMetricsChartData = {
         labels: ['Done', 'Not Done'],
         datasets: [{
             data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
-            backgroundColor: ['#4CAF50', '#F44336'],
-            borderColor: '#fff',
+            backgroundColor: ['#28a745', '#dc3545'],
+            borderColor: '#FFFAF0',
             borderWidth: 2,
         }],
     };
+
+    const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
     
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { 
-                position: 'bottom',
-                labels: {
-                    boxWidth: 12,
-                    padding: 20,
-                }
-            },
+            legend: { display: false },
             title: { display: false },
         },
     };
-
-    const chartAriaLabel = `Pie chart showing final metrics for archived release ${archive.name}. ${archive.metrics.doneCount} items were done and ${archive.metrics.notDoneCount} were not done.`;
 
     return (
         <div className="archived-details-view">
@@ -444,9 +486,25 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     </div>
                 </div>
                 <div className="release-card-body">
-                    <div className="release-charts">
-                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                    <div className="archived-details-charts-container">
+                        <div className="archived-details-chart-wrapper">
+                            <h4>Our Final Metrics</h4>
+                            <div className="archived-details-chart">
+                                <Pie data={ourMetricsChartData} options={chartOptions} />
+                            </div>
+                            <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
+                        </div>
+                        {satChartData && (
+                            <div className="archived-details-chart-wrapper">
+                                <h4>SAT Report</h4>
+                                <div className="archived-details-chart">
+                                    <Pie data={satChartData} options={chartOptions} />
+                                </div>
+                                <ChartLegend items={satLegendItems} />
+                            </div>
+                        )}
                     </div>
+
                     <div className="release-requirements">
                         <h4>Frozen Requirements ({items.length})</h4>
                         <div className="requirements-list-wrapper">
@@ -464,8 +522,170 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                             )}
                         </div>
                     </div>
+
                     <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
                 </div>
+                <div className="release-card-footer">
+                    <div className="release-card-actions">
+                        <button type="button" onClick={() => onAddSatReport(archive)} className="button-edit">
+                            {archive.sat_report ? 'Update SAT Results' : 'Add SAT Results'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }) => {
+    const initialData = {
+        passed: archive?.sat_report?.passed || 0,
+        failed: archive?.sat_report?.failed || 0,
+        blocked: archive?.sat_report?.blocked || 0,
+        pending: archive?.sat_report?.pending || 0,
+        executing: archive?.sat_report?.executing || 0,
+        aborted: archive?.sat_report?.aborted || 0,
+    };
+    const [satData, setSatData] = useState(initialData);
+
+    useEffect(() => {
+        setSatData(initialData);
+    }, [archive]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setSatData(prev => ({ ...prev, [name]: value === '' ? 0 : parseInt(value, 10) }));
+    };
+
+    const handleReset = () => {
+        setSatData({ passed: 0, failed: 0, blocked: 0, pending: 0, executing: 0, aborted: 0 });
+    };
+
+    const total = useMemo(() => Object.values(satData).reduce((sum, val) => sum + (val || 0), 0), [satData]);
+    const isTotalValid = useMemo(() => total === 100 || total === 0, [total]);
+
+    const handleSave = async () => {
+        if (total !== 100 && total !== 0) {
+            showMainMessage('Total must be exactly 100% or 0% to clear the report.', 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/sat-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(satData),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
+            showMainMessage(result.message, 'success');
+            onSave();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const fields = ['passed', 'failed', 'blocked', 'pending', 'executing', 'aborted'];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`SAT Results for ${archive?.name}`}>
+            <div className="sat-modal-grid">
+                {fields.map(field => (
+                    <div className="form-group" key={field}>
+                        <label htmlFor={field}>{field.charAt(0).toUpperCase() + field.slice(1)} (%)</label>
+                        <input
+                            type="number"
+                            id={field}
+                            name={field}
+                            value={satData[field]}
+                            onChange={handleChange}
+                            onFocus={e => e.target.select()}
+                            min="0"
+                            max="100"
+                        />
+                    </div>
+                ))}
+            </div>
+            <div className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
+                Total: {total}%
+                {!isTotalValid && <div style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
+            </div>
+            <div className="modal-actions">
+                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+                <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
+                <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
+            </div>
+        </Modal>
+    );
+};
+
+const ComparisonView = ({ archives, onBack }) => {
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            title: { display: false },
+        },
+    };
+
+    return (
+        <div className="comparison-view">
+            <div className="comparison-header">
+                <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
+                <h2>Compare Archived Releases</h2>
+            </div>
+            <div className="comparison-container">
+                {archives.map(archive => {
+                    const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+                    const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
+                    return (
+                        <div key={archive.id} className="comparison-column">
+                            <h3>{archive.name}</h3>
+                            <div className="comparison-metrics">
+                                <div className="metric-item">
+                                    <span className="metric-label">Closed Date:</span>
+                                    <span className="metric-value">{new Date(archive.closed_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="metric-item">
+                                    <span className="metric-label">Total Requirements:</span>
+                                    <span className="metric-value">{totalRequirements}</span>
+                                </div>
+                            </div>
+                            <div className="comparison-charts">
+                                <div className="comparison-chart-wrapper">
+                                    <h4>Our Final Metrics</h4>
+                                    <div className="chart-container">
+                                        <Pie data={{
+                                            labels: ['Done', 'Not Done'],
+                                            datasets: [{
+                                                data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
+                                                backgroundColor: ['#28a745', '#dc3545'],
+                                                borderColor: '#FFFAF0',
+                                                borderWidth: 2,
+                                            }],
+                                        }} options={chartOptions} />
+                                    </div>
+                                    <div className="legend-wrapper">
+                                        <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
+                                    </div>
+                                </div>
+                                <div className="comparison-chart-wrapper">
+                                    <h4>SAT Report</h4>
+                                    <div className="chart-container">
+                                        {satChartData ? (
+                                            <Pie data={satChartData} options={chartOptions} />
+                                        ) : (
+                                            <div className="empty-chart-placeholder">No SAT Report</div>
+                                        )}
+                                    </div>
+                                    <div className="legend-wrapper">
+                                        <ChartLegend items={satLegendItems} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -483,20 +703,22 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [releaseToEdit, setReleaseToEdit] = useState(null);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isSatModalOpen, setIsSatModalOpen] = useState(false);
+    const [archiveForSat, setArchiveForSat] = useState(null);
+    const [comparisonList, setComparisonList] = useState([]);
+    const [isComparing, setIsComparing] = useState(false);
 
-    // ======================= NEW TOOLTIP CONTENT =======================
     const releasesPageTooltipContent = (
         <>
             <strong>Releases Page Guide</strong>
             <p>This page shows all active and archived releases for the selected project.</p>
             <ul>
                 <li><strong>Active Releases:</strong> View real-time progress of ongoing releases. You can filter by sprint, export details, edit, or finalize them.</li>
-                <li><strong>Archived Releases:</strong> View a permanent snapshot of finalized releases.</li>
+                <li><strong>Archived Releases:</strong> View a permanent snapshot of finalized releases. Select multiple to compare them side-by-side.</li>
                 <li><strong>Defects Count:</strong> This number represents unique defects linked to the requirements currently displayed for the release.</li>
             </ul>
         </>
     );
-    // ====================================================================
 
     useEffect(() => {
         const savedProject = sessionStorage.getItem('releasePageSelectedProject');
@@ -515,6 +737,8 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
     const onSelectProject = (project) => {
         setSelectedProject(project);
+        setComparisonList([]);
+        setIsComparing(false);
     };
     
     const fetchActiveReleases = useCallback(async () => {
@@ -539,9 +763,13 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const response = await fetch(`${API_BASE_URL}/archives/${selectedProject}`);
             if (!response.ok) throw new Error('Failed to fetch archived releases.');
             const result = await response.json();
-            setArchivedReleases(result.data || []);
+            const data = result.data || [];
+            setArchivedReleases(data);
+            return data;
         } catch (error) {
             showMainMessage(error.message, 'error');
+            setArchivedReleases([]);
+            return [];
         } finally {
             setIsLoading(false);
         }
@@ -549,8 +777,9 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
     useEffect(() => {
         if (selectedProject) {
-            fetchActiveReleases();
-            if (view === 'archived') {
+            if (view === 'active') {
+                fetchActiveReleases();
+            } else {
                 fetchArchivedReleases();
             }
         }
@@ -573,11 +802,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
             showMainMessage(result.message, 'success');
             fetchData();
-            if (view === 'active') {
-                fetchActiveReleases();
-            } else {
-                fetchArchivedReleases();
-            }
+            fetchActiveReleases();
         } catch (error) {
             showMainMessage(error.message, 'error');
         } finally {
@@ -604,6 +829,28 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         onDeleteRelease(releaseToEdit);
         setIsDeleteConfirmOpen(false);
         setIsEditModalOpen(false);
+    };
+
+    const handleOpenSatModal = (archive) => {
+        setArchiveForSat(archive);
+        setIsSatModalOpen(true);
+    };
+
+    const handleSaveSatReport = async () => {
+        setIsSatModalOpen(false);
+        const updatedReleases = await fetchArchivedReleases();
+        if (selectedArchive) {
+            const updatedArchive = updatedReleases.find(ar => ar.id === selectedArchive.id);
+            setSelectedArchive(updatedArchive || null);
+        }
+    };
+    
+    const handleToggleComparison = (archiveId) => {
+        setComparisonList(prev =>
+            prev.includes(archiveId)
+                ? prev.filter(id => id !== archiveId)
+                : [...prev, archiveId]
+        );
     };
 
     const handleExportRelease = async (release, requirements, defects) => {
@@ -699,11 +946,12 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             return ws;
         };
 
-        const reqHeaders = ['Release Name', 'Requirement Name', 'Requirement Link', 'Sprint', 'Linked Defects', 'Status'];
+        const reqHeaders = ['Release Name', 'Requirement Name', 'Requirement Link', 'Type', 'Sprint', 'Linked Defects', 'Status'];
         const requirementsData = requirements.map(req => ({
             'Release Name': release.name,
             'Requirement Name': req.requirementUserIdentifier,
             'Requirement Link': req.currentStatusDetails.link || '',
+            'Type': req.currentStatusDetails.type || '',
             'Sprint': req.currentStatusDetails.sprint || '',
             'Linked Defects': (req.linkedDefects || []).map(d => d.title).join('\n'),
             'Status': req.currentStatusDetails.status
@@ -726,13 +974,14 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             };
         });
 
-        const reqDefectHeaders = ['Requirement Name', 'Defect Name', 'Sprint', 'Return to Dev Count'];
+        const reqDefectHeaders = ['Requirement Name', 'Type', 'Defect Name', 'Sprint', 'Return to Dev Count'];
         const reqDefectData = [];
         requirements.forEach(req => {
             if (req.linkedDefects && req.linkedDefects.length > 0) {
                 req.linkedDefects.forEach(defect => {
                     reqDefectData.push({
                         'Requirement Name': req.requirementUserIdentifier,
+                        'Type': req.currentStatusDetails.type || '',
                         'Requirement Link': req.currentStatusDetails.link,
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
@@ -755,6 +1004,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 reqDefectHeaders,
                 ...reqDefectData.map(row => [
                     row['Requirement Name'],
+                    row['Type'],
                     row['Defect Name'],
                     row['Sprint'],
                     row['Return to Dev Count']
@@ -829,35 +1079,61 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     };
 
     const renderArchivedView = () => {
+        const archivesToCompare = archivedReleases.filter(ar => comparisonList.includes(ar.id));
+
+        if (isComparing) {
+            return <ComparisonView archives={archivesToCompare} onBack={() => setIsComparing(false)} />;
+        }
+        
         if (selectedArchive) {
-            return <ArchivedReleaseDetails archive={selectedArchive} onBack={() => setSelectedArchive(null)} onNavigateToRequirement={onNavigateToRequirement} onNavigateToDefect={onNavigateToDefect} allProcessedRequirements={allProcessedRequirements} />;
+            return <ArchivedReleaseDetails 
+                archive={selectedArchive} 
+                onBack={() => setSelectedArchive(null)} 
+                onNavigateToRequirement={onNavigateToRequirement} 
+                onNavigateToDefect={onNavigateToDefect} 
+                allProcessedRequirements={allProcessedRequirements}
+                onAddSatReport={handleOpenSatModal}
+            />;
         }
 
         if (isLoading) return <LoadingSpinner />;
         if (archivedReleases.length === 0) return <div className="empty-column-message">No archived releases found for this project.</div>;
 
         return (
-            <div className="releases-container archived">
-                {archivedReleases.map(archive => (
-                    <div key={archive.id} className="release-card archived-card">
-                        <div className="release-card-header">
-                            <h3>{archive.name}</h3>
-                            <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleDateString()}</span>
-                        </div>
-                        <div className="archived-card-body">
-                            <h4>Final Metrics</h4>
-                            <div className="archived-metrics">
-                                <span className="metric-item done">&#10004; Done: {archive.metrics.doneCount}</span>
-                                <span className="metric-item not-done">&#10008; Not Done: {archive.metrics.notDoneCount}</span>
+            <>
+                <div className="archive-controls">
+                    <button type="button" onClick={() => setIsComparing(true)} disabled={comparisonList.length < 2}>
+                        Compare Selected ({comparisonList.length})
+                    </button>
+                </div>
+                <div className="releases-container archived">
+                    {archivedReleases.map(archive => (
+                        <div key={archive.id} className="release-card archived-card">
+                            <div className="release-card-header archived-card-header">
+                                <input 
+                                    type="checkbox" 
+                                    checked={comparisonList.includes(archive.id)} 
+                                    onChange={() => handleToggleComparison(archive.id)}
+                                    aria-label={`Select ${archive.name} for comparison`}
+                                />
+                                <h3>{archive.name}</h3>
+                                <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleDateString()}</span>
+                            </div>
+                            <div className="archived-card-body">
+                                <h4>Final Metrics</h4>
+                                <div className="archived-metrics">
+                                    <span className="metric-item done">&#10004; Done: {archive.metrics.doneCount}</span>
+                                    <span className="metric-item not-done">&#10008; Not Done: {archive.metrics.notDoneCount}</span>
+                                </div>
+                            </div>
+                            <div className="release-card-actions">
+                                <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
+                                <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
                             </div>
                         </div>
-                        <div className="release-card-actions">
-                            <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
-                            <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            </>
         );
     };
 
@@ -867,7 +1143,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
                 {selectedProject && (
                     <div className="view-toggle-buttons">
-                        {/* ======================= TOOLTIP ADDED HERE ======================= */}
                         <Tooltip content={releasesPageTooltipContent} position="bottom" />
                         <ReleaseCountdown activeReleases={activeReleases} />
                         <button type="button" onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
@@ -892,13 +1167,20 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
                     onDelete={handleDeleteRequest}
-                    releases={[releaseToEdit]}
+                    releases={allReleases}
                     projects={projects}
                     currentProject={selectedProject}
-                    isEditing={true}
                     initialReleaseId={releaseToEdit.id}
                 />
             )}
+
+            <AddSatReportModal
+                isOpen={isSatModalOpen}
+                onClose={() => setIsSatModalOpen(false)}
+                onSave={handleSaveSatReport}
+                archive={archiveForSat}
+                showMainMessage={showMainMessage}
+            />
 
             <ConfirmationModal 
                 isOpen={isDeleteConfirmOpen}

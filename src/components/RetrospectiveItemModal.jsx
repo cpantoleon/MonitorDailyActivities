@@ -9,6 +9,7 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
   const getInitialState = () => ({
     column_type: (columnTypes.length > 0 ? columnTypes[0].value : ''),
     description: '',
+    details: '',
     item_date: new Date(),
   });
 
@@ -32,6 +33,7 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
         initialState = {
           column_type: item.column_type || (columnTypes.length > 0 ? columnTypes[0].value : ''),
           description: item.description || '',
+          details: item.details || '',
           item_date: parsedDate,
         };
       } else {
@@ -70,13 +72,13 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.column_type || !formData.description.trim() || !formData.item_date) {
-      alert("Column, description, and date are required.");
+    if (!formData.column_type || !formData.description.trim() || !formData.details.trim() || !formData.item_date) {
+      alert("Column, description, details, and date are required.");
       return;
     }
     const date = formData.item_date;
     const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    onSubmit({ ...formData, description: formData.description.trim(), item_date: formattedDate });
+    onSubmit({ ...formData, description: formData.description.trim(), details: formData.details.trim(), item_date: formattedDate });
   };
 
   if (!isOpen) return null;
@@ -100,6 +102,10 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
             <div className="form-group">
               <label htmlFor="retro-description">Description:</label>
               <textarea id="retro-description" name="description" value={formData.description} onChange={handleChange} rows="4" placeholder="What happened? What did you observe?" required />
+            </div>
+            <div className="form-group">
+              <label htmlFor="retro-details">Details:</label>
+              <textarea id="retro-details" name="details" value={formData.details} onChange={handleChange} rows="4" placeholder="Provide more details." required />
             </div>
             <div className="form-group">
               <label htmlFor="retro-item-date">Date:</label>

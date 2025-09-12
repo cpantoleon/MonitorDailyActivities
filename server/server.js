@@ -858,18 +858,21 @@ app.get("/api/retrospective/:project", async (req, res) => {
 });
 
 app.post("/api/retrospective", async (req, res) => {
-    let { project, column_type, description, item_date } = req.body;
-    if (!project || !column_type || !description || !item_date) {
+    let { project, column_type, description, details, item_date } = req.body;
+    if (!project || !column_type || !description || !details || !item_date) {
         return res.status(400).json({ error: "Missing required fields" });
     }
     try {
         const projectId = await getProjectId(project.trim());
-        column_type = column_type.trim(); description = description.trim(); item_date = item_date.trim();
-        const sql = `INSERT INTO retrospective_items (project_id, column_type, description, item_date) VALUES (?,?,?,?)`;
-        db.run(sql, [projectId, column_type, description, item_date], function (err) {
+        column_type = column_type.trim(); 
+        description = description.trim(); 
+        details = details.trim(); 
+        item_date = item_date.trim();
+        const sql = `INSERT INTO retrospective_items (project_id, column_type, description, details, item_date) VALUES (?,?,?,?,?)`;
+        db.run(sql, [projectId, column_type, description, details, item_date], function (err) {
             if (err) return res.status(400).json({ "error": err.message });
             scheduleQdrantSync();
-            res.json({ message: "success", data: { id: this.lastID, project, column_type, description, item_date } });
+            res.json({ message: "success", data: { id: this.lastID, project, column_type, description, details, item_date } });
         });
     } catch (error) {
         return res.status(400).json({ error: error.message });
@@ -878,13 +881,14 @@ app.post("/api/retrospective", async (req, res) => {
 
 app.put("/api/retrospective/:id", (req, res) => {
     const itemId = req.params.id;
-    let { column_type, description, item_date } = req.body;
-    if (!column_type && !description && !item_date) {
+    let { column_type, description, details, item_date } = req.body;
+    if (!column_type && !description && !details && !item_date) {
         return res.status(400).json({ error: "No fields provided to update." });
     }
     let setClauses = []; let params = [];
     if (column_type) { setClauses.push("column_type = ?"); params.push(column_type.trim()); }
     if (description) { setClauses.push("description = ?"); params.push(description.trim()); }
+    if (details) { setClauses.push("details = ?"); params.push(details.trim()); }
     if (item_date) { setClauses.push("item_date = ?"); params.push(item_date.trim()); }
     setClauses.push("updated_at = CURRENT_TIMESTAMP");
     params.push(itemId);
@@ -1096,7 +1100,7 @@ app.delete("/api/releases/:id", (req, res) => {
 
 app.post("/api/releases/:id/close", async (req, res) => {
     const releaseId = req.params.id;
-    const { closeAction } = req.body; // 'archive_only' or 'archive_and_complete'
+    const { closeAction } = req.body; 
 
     if (!['archive_only', 'archive_and_complete'].includes(closeAction)) {
         return res.status(400).json({ error: "Invalid closeAction specified." });
@@ -1148,7 +1152,6 @@ app.post("/api/releases/:id/close", async (req, res) => {
                             db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status], (err) => {
                                 if (err) {
                                     db.run("ROLLBACK");
-                                    // This response might not be sent if another error occurs first.
                                     if (!res.headersSent) {
                                         res.status(500).json({ error: "Failed to archive requirement item." });
                                     }
@@ -1232,22 +1235,40 @@ app.get("/api/archives/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
         const sql = `
-            SELECT id, original_release_id, name, closed_at, metrics_json 
-            FROM archived_releases 
-            WHERE project_id = ? 
-            ORDER BY closed_at DESC
+            SELECT
+                ar.id, ar.original_release_id, ar.name, ar.closed_at, ar.metrics_json,
+                sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed, sr.pending
+            FROM archived_releases ar
+            LEFT JOIN sat_reports sr ON ar.id = sr.archive_id
+            WHERE ar.project_id = ?
+            ORDER BY ar.closed_at DESC
         `;
         db.all(sql, [projectId], (err, rows) => {
             if (err) return res.status(400).json({ "error": err.message });
             const archives = rows.map(row => {
+                let sat_report = null;
+                if (row.blocked !== null) {
+                    sat_report = {
+                        blocked: row.blocked,
+                        failed: row.failed,
+                        executing: row.executing,
+                        aborted: row.aborted,
+                        passed: row.passed,
+                        pending: row.pending
+                    };
+                }
                 try {
                     return {
-                        ...row,
-                        metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {}
+                        id: row.id,
+                        original_release_id: row.original_release_id,
+                        name: row.name,
+                        closed_at: row.closed_at,
+                        metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {},
+                        sat_report: sat_report
                     };
                 } catch (e) {
                     console.error("Failed to parse metrics_json for archive:", row.id, e);
-                    return { ...row, metrics: {} };
+                    return { ...row, metrics: {}, sat_report: sat_report };
                 }
             });
             res.json({ message: "success", data: archives });
@@ -1267,6 +1288,55 @@ app.get("/api/archives/details/:archiveId", (req, res) => {
     db.all(itemsSql, [archiveId], (err, items) => {
         if (err) return res.status(400).json({ "error": err.message });
         res.json({ message: "success", data: items });
+    });
+});
+
+app.post("/api/archives/:archiveId/sat-report", (req, res) => {
+    const archiveId = req.params.archiveId;
+    const { blocked, failed, executing, aborted, passed, pending } = req.body;
+
+    const values = [blocked, failed, executing, aborted, passed, pending];
+    const numericValues = values.map(v => v === '' || v === null ? 0 : parseInt(v, 10));
+
+    if (numericValues.some(isNaN)) {
+        return res.status(400).json({ error: "All fields must be numbers." });
+    }
+
+    const total = numericValues.reduce((sum, v) => sum + v, 0);
+
+    if (total === 0) {
+        const deleteSql = `DELETE FROM sat_reports WHERE archive_id = ?`;
+        db.run(deleteSql, [archiveId], function(err) {
+            if (err) {
+                return res.status(500).json({ error: "Database error clearing SAT report: " + err.message });
+            }
+            return res.status(200).json({ message: "SAT report cleared successfully." });
+        });
+        return;
+    }
+
+    if (total !== 100) {
+        return res.status(400).json({ error: `The sum of all fields must be 100%. Current sum is ${total}%.` });
+    }
+
+    const sql = `
+        INSERT INTO sat_reports (archive_id, blocked, failed, executing, aborted, passed, pending)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(archive_id) DO UPDATE SET
+            blocked = excluded.blocked,
+            failed = excluded.failed,
+            executing = excluded.executing,
+            aborted = excluded.aborted,
+            passed = excluded.passed,
+            pending = excluded.pending,
+            created_at = CURRENT_TIMESTAMP;
+    `;
+
+    db.run(sql, [archiveId, ...numericValues], function(err) {
+        if (err) {
+            return res.status(500).json({ error: "Database error saving SAT report: " + err.message });
+        }
+        res.status(201).json({ message: "SAT report saved successfully." });
     });
 });
 

@@ -1,0 +1,127 @@
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(44, 26, 2, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #FFFAF0;
+    padding: 25px 35px;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.35);
+    border: 1px solid #D2B48C;
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #E3C9A6;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+    color: #5C4033;
+}
+
+.modal-close-button {
+    background: none;
+    border: none;
+    font-size: 2em;
+    cursor: pointer;
+    color: #A0522D;
+    line-height: 1;
+}
+
+.modal-close-button:hover {
+    color: #5C4033;
+}
+
+.modal-body {
+    overflow-y: auto;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #E3C9A6;
+}
+
+.modal-actions button {
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.modal-button-save {
+    background-color: #8B4513;
+    color: white;
+    border: 1px solid #8B4513;
+}
+.modal-button-save:hover:not(:disabled) {
+    background-color: #5C4033;
+    border-color: #5C4033;
+}
+.modal-button-save:disabled {
+    background-color: #ab987a;
+    border-color: #ab987a;
+    cursor: not-allowed;
+}
+
+.modal-button-cancel {
+    background-color: #F5DEB3;
+    color: #8B4513;
+    border: 1px solid #DEB887;
+}
+.modal-button-cancel:hover {
+    background-color: #E3C9A6;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: #704214;
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #DEB887;
+    border-radius: 4px;
+    font-size: 0.95em;
+    background-color: white;
+    color: #5C4033;
+    box-sizing: border-box;
+}

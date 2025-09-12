@@ -87,6 +87,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 project_id INTEGER NOT NULL,
                 column_type TEXT NOT NULL CHECK(column_type IN ('well', 'wrong', 'improve')),
                 description TEXT NOT NULL,
+                details TEXT NOT NULL,
                 item_date TEXT NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -117,6 +118,21 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
             )`, (err) => {
                 if (err) console.error("Error creating archived_release_items table", err.message);
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS sat_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                archive_id INTEGER NOT NULL UNIQUE,
+                blocked INTEGER DEFAULT 0,
+                failed INTEGER DEFAULT 0,
+                executing INTEGER DEFAULT 0,
+                aborted INTEGER DEFAULT 0,
+                passed INTEGER DEFAULT 0,
+                pending INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating sat_reports table", err.message);
             });
 
             db.run(`CREATE TABLE IF NOT EXISTS defects (
@@ -155,6 +171,24 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating defect_requirement_links table", err.message);
             });
 
+            db.all("PRAGMA table_info(retrospective_items)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching retrospective_items table info:", err.message);
+                    return;
+                }
+                
+                const hasDetailsColumn = columns.some(col => col.name === 'details');
+                if (!hasDetailsColumn) {
+                    db.run("ALTER TABLE retrospective_items ADD COLUMN details TEXT NOT NULL DEFAULT ''", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding details column to retrospective_items:", alterErr.message);
+                        } else {
+                            console.log("Column 'details' added to retrospective_items table.");
+                        }
+                    });
+                }
+            });
+
             db.run(`CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -165,7 +199,6 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 }
             });
 
-            // Logic to add columns to releases table if they don't exist
             db.all("PRAGMA table_info(releases)", (err, columns) => {
                 if (err) {
                     console.error("Error fetching releases table info:", err.message);

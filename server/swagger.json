@@ -508,6 +508,44 @@
         }
       }
     },
+    "/archives/{archiveId}/sat-report": {
+      "post": {
+        "summary": "Add or update a SAT report for an archive",
+        "tags": [
+          "Archives"
+        ],
+        "description": "Adds or updates the SAT (System Acceptance Testing) report for a specific archived release. The total of all percentage fields must equal 100 to save, or 0 to clear the report.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatReportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SAT report cleared successfully."
+          },
+          "201": {
+            "description": "SAT report saved or updated successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/archives/{id}": {
       "delete": {
         "summary": "Delete an archived release",
@@ -1528,285 +1566,6 @@
   },
   "components": {
     "schemas": {
-      "Project": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ProjectInput": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "The name of the project."
-          }
-        }
-      },
-      "Release": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "project": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "release_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "is_current": {
-            "type": "integer",
-            "description": "1 if current, 0 if not"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "closed"
-            ],
-            "default": "active",
-            "description": "The status of the release."
-          },
-          "closed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "Timestamp when the release was closed, if applicable."
-          }
-        }
-      },
-      "ReleaseInput": {
-        "type": "object",
-        "required": [
-          "project",
-          "name",
-          "release_date"
-        ],
-        "properties": {
-          "project": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "release_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "is_current": {
-            "type": "boolean",
-            "default": false
-          }
-        }
-      },
-      "ReleaseUpdateInput": {
-        "type": "object",
-        "required": [
-          "project",
-          "name",
-          "release_date"
-        ],
-        "properties": {
-          "project": {
-            "type": "string",
-            "description": "Project must be sent for is_current logic"
-          },
-          "name": {
-            "type": "string"
-          },
-          "release_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "is_current": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ReleaseCloseInput": {
-        "type": "object",
-        "required": [
-          "closeAction"
-        ],
-        "properties": {
-          "closeAction": {
-            "type": "string",
-            "enum": [
-              "archive_only",
-              "archive_and_complete"
-            ],
-            "description": "Action to take upon closing the release. 'archive_only' archives the release and unlinks requirements. 'archive_and_complete' archives the release and marks linked requirements as 'Done'."
-          }
-        }
-      },
-      "ArchivedRelease": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "description": "ID of the archived release record."
-          },
-          "original_release_id": {
-            "type": "integer",
-            "description": "ID of the original release that was archived."
-          },
-          "project_id": {
-            "type": "integer",
-            "description": "ID of the project this release belongs to."
-          },
-          "name": {
-            "type": "string",
-            "description": "Name of the archived release."
-          },
-          "closed_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Timestamp when the release was closed and archived."
-          },
-          "metrics": {
-            "type": "object",
-            "description": "Metrics captured at the time of archiving.",
-            "properties": {
-              "doneCount": {
-                "type": "integer",
-                "description": "Number of requirements marked 'Done' in the release."
-              },
-              "notDoneCount": {
-                "type": "integer",
-                "description": "Number of requirements not marked 'Done' in the release."
-              }
-            }
-          }
-        }
-      },
-      "ArchivedReleaseItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "description": "ID of the archived release item record."
-          },
-          "requirement_group_id": {
-            "type": "integer",
-            "description": "The ID of the requirement group."
-          },
-          "requirement_title": {
-            "type": "string",
-            "description": "The title of the requirement at the time of archiving."
-          },
-          "final_status": {
-            "type": "string",
-            "description": "The final status of the requirement at the time of archiving."
-          }
-        }
-      },
-      "RequirementGroup": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "description": "Requirement Group ID"
-          },
-          "project": {
-            "type": "string"
-          },
-          "requirementUserIdentifier": {
-            "type": "string",
-            "description": "User-facing name/ID"
-          },
-          "history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ActivityLog"
-            }
-          },
-          "currentStatusDetails": {
-            "$ref": "#/components/schemas/ActivityLog"
-          },
-          "linkedDefects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LinkedDefect"
-            }
-          },
-          "changeCount": {
-            "type": "integer",
-            "description": "The number of logged scope changes for this requirement."
-          }
-        }
-      },
-      "ActivityLog": {
-        "type": "object",
-        "properties": {
-          "activityId": {
-            "type": "integer"
-          },
-          "status": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "sprint": {
-            "type": "string",
-            "nullable": true
-          },
-          "link": {
-            "type": "string",
-            "format": "url",
-            "nullable": true
-          },
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "tags": {
-            "type": "string",
-            "nullable": true
-          },
-          "isCurrent": {
-            "type": "boolean"
-          },
-          "releaseId": {
-            "type": "integer",
-            "nullable": true
-          },
-          "releaseName": {
-            "type": "string",
-            "nullable": true
-          },
-          "releaseDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          }
-        }
-      },
       "ActivityInput": {
         "type": "object",
         "required": [
@@ -1860,6 +1619,58 @@
           },
           "existingRequirementGroupId": {
             "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "ActivityLog": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "sprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "releaseId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "releaseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "releaseDate": {
+            "type": "string",
+            "format": "date",
             "nullable": true
           }
         }
@@ -1948,14 +1759,500 @@
         },
         "minProperties": 1
       },
-      "RequirementRenameInput": {
+      "ArchivedRelease": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release record."
+          },
+          "original_release_id": {
+            "type": "integer",
+            "description": "ID of the original release that was archived."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the archived release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the release was closed and archived."
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Metrics captured at the time of archiving.",
+            "properties": {
+              "doneCount": {
+                "type": "integer",
+                "description": "Number of requirements marked 'Done' in the release."
+              },
+              "notDoneCount": {
+                "type": "integer",
+                "description": "Number of requirements not marked 'Done' in the release."
+              }
+            }
+          },
+          "sat_report": {
+            "$ref": "#/components/schemas/SatReport",
+            "nullable": true,
+            "description": "The SAT (System Acceptance Testing) report associated with this archive, if available."
+          }
+        }
+      },
+      "ArchivedReleaseItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release item record."
+          },
+          "requirement_group_id": {
+            "type": "integer",
+            "description": "The ID of the requirement group."
+          },
+          "requirement_title": {
+            "type": "string",
+            "description": "The title of the requirement at the time of archiving."
+          },
+          "final_status": {
+            "type": "string",
+            "description": "The final status of the requirement at the time of archiving."
+          }
+        }
+      },
+      "ChatbotQueryInput": {
         "type": "object",
         "required": [
-          "newRequirementName"
+          "message"
         ],
         "properties": {
-          "newRequirementName": {
+          "message": {
+            "type": "string",
+            "description": "The natural language question for the chatbot.",
+            "example": "What is the status of requirement 'REQ-123'?"
+          },
+          "projectContext": {
+            "type": "string",
+            "description": "Optional project name to provide context for the query.",
+            "example": "crm-project"
+          }
+        }
+      },
+      "ChatbotResponse": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "The chatbot's answer to the query."
+          },
+          "data_changed": {
+            "type": "boolean",
+            "description": "Indicates if the query resulted in a database modification.",
+            "example": true
+          },
+          "new_item": {
+            "type": "object",
+            "description": "Details of the newly created item, if any.",
+            "properties": {
+              "project": {
+                "type": "string"
+              },
+              "sprint": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ChatbotSyncResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Sync successful!"
+          },
+          "synced": {
+            "type": "integer",
+            "description": "The number of documents successfully synchronized.",
+            "example": 152
+          }
+        }
+      },
+      "Defect": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project": {
             "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done",
+              "Closed"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "linkedRequirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkedRequirement"
+            }
+          }
+        }
+      },
+      "DefectHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "defect_id": {
+            "type": "integer"
+          },
+          "changes_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DefectInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "title",
+          "area",
+          "status",
+          "created_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedRequirementGroupIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "DefectReturnCount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "return_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "DefectUpdateInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done",
+              "Closed"
+            ],
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedRequirementGroupIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "minProperties": 1
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "LinkedDefect": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "LinkedRequirement": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sprint": {
+            "type": "string"
+          }
+        }
+      },
+      "NoteInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "noteDate"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "noteDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "noteText": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the project."
+          }
+        }
+      },
+      "Release": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "integer",
+            "description": "1 if current, 0 if not"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ],
+            "default": "active",
+            "description": "The status of the release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp when the release was closed, if applicable."
+          }
+        }
+      },
+      "ReleaseCloseInput": {
+        "type": "object",
+        "required": [
+          "closeAction"
+        ],
+        "properties": {
+          "closeAction": {
+            "type": "string",
+            "enum": [
+              "archive_only",
+              "archive_and_complete"
+            ],
+            "description": "Action to take upon closing the release. 'archive_only' archives the release and unlinks requirements. 'archive_and_complete' archives the release and marks linked requirements as 'Done'."
+          }
+        }
+      },
+      "ReleaseInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "name",
+          "release_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ReleaseUpdateInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "name",
+          "release_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Project must be sent for is_current logic"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "boolean"
           }
         }
       },
@@ -1984,23 +2281,52 @@
           }
         }
       },
-      "NoteInput": {
+      "RequirementGroup": {
         "type": "object",
-        "required": [
-          "project",
-          "noteDate"
-        ],
         "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Requirement Group ID"
+          },
           "project": {
             "type": "string"
           },
-          "noteDate": {
+          "requirementUserIdentifier": {
             "type": "string",
-            "format": "date"
+            "description": "User-facing name/ID"
           },
-          "noteText": {
-            "type": "string",
-            "nullable": true
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityLog"
+            }
+          },
+          "currentStatusDetails": {
+            "$ref": "#/components/schemas/ActivityLog"
+          },
+          "linkedDefects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkedDefect"
+            }
+          },
+          "changeCount": {
+            "type": "integer",
+            "description": "The number of logged scope changes for this requirement."
+          }
+        }
+      },
+      "RequirementRenameInput": {
+        "type": "object",
+        "required": [
+          "newRequirementName"
+        ],
+        "properties": {
+          "newRequirementName": {
+            "type": "string"
           }
         }
       },
@@ -2091,304 +2417,66 @@
         },
         "minProperties": 1
       },
-      "Defect": {
+      "SatReport": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "project": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "area": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "Assigned to Developer",
-              "Assigned to Tester",
-              "Done",
-              "Closed"
-            ]
-          },
-          "link": {
-            "type": "string",
-            "format": "url",
-            "nullable": true
-          },
-          "created_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "linkedRequirements": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LinkedRequirement"
-            }
-          }
-        }
-      },
-      "DefectInput": {
-        "type": "object",
-        "required": [
-          "project",
-          "title",
-          "area",
-          "status",
-          "created_date"
-        ],
-        "properties": {
-          "project": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "area": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "Assigned to Developer",
-              "Assigned to Tester",
-              "Done"
-            ]
-          },
-          "link": {
-            "type": "string",
-            "format": "url",
-            "nullable": true
-          },
-          "created_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "linkedRequirementGroupIds": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            }
-          }
-        }
-      },
-      "DefectUpdateInput": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "area": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "Assigned to Developer",
-              "Assigned to Tester",
-              "Done",
-              "Closed"
-            ],
-            "nullable": true
-          },
-          "link": {
-            "type": "string",
-            "format": "url",
-            "nullable": true
-          },
-          "created_date": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "linkedRequirementGroupIds": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            }
-          }
-        },
-        "minProperties": 1
-      },
-      "DefectHistoryEntry": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "defect_id": {
-            "type": "integer"
-          },
-          "changes_summary": {
-            "type": "string",
-            "nullable": true
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "changed_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "DefectReturnCount": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "title": {
-            "type": "string"
-          },
-          "return_count": {
-            "type": "integer"
-          }
-        }
-      },
-      "LinkedDefect": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "title": {
-            "type": "string"
-          }
-        }
-      },
-      "LinkedRequirement": {
-        "type": "object",
-        "properties": {
-          "groupId": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "sprint": {
-            "type": "string"
-          }
-        }
-      },
-      "ChatbotQueryInput": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "The natural language question for the chatbot.",
-            "example": "What is the status of requirement 'REQ-123'?"
-          },
-          "projectContext": {
-            "type": "string",
-            "description": "Optional project name to provide context for the query.",
-            "example": "crm-project"
-          }
-        }
-      },
-      "ChatbotResponse": {
-        "type": "object",
-        "properties": {
-          "reply": {
-            "type": "string",
-            "description": "The chatbot's answer to the query."
-          },
-          "data_changed": {
-            "type": "boolean",
-            "description": "Indicates if the query resulted in a database modification.",
-            "example": true
-          },
-          "new_item": {
-            "type": "object",
-            "description": "Details of the newly created item, if any.",
-            "properties": {
-              "project": {
-                "type": "string"
-              },
-              "sprint": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "ChatbotSyncResponse": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "example": "Sync successful!"
-          },
-          "synced": {
+          "passed": {
             "type": "integer",
-            "description": "The number of documents successfully synchronized.",
-            "example": 152
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "default": 0
+          },
+          "pending": {
+            "type": "integer",
+            "default": 0
+          },
+          "executing": {
+            "type": "integer",
+            "default": 0
+          },
+          "aborted": {
+            "type": "integer",
+            "default": 0
           }
         }
       },
-      "Error": {
+      "SatReportInput": {
         "type": "object",
-        "required": [
-          "error"
-        ],
         "properties": {
-          "error": {
-            "type": "string"
+          "passed": {
+            "type": "integer",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "default": 0
+          },
+          "pending": {
+            "type": "integer",
+            "default": 0
+          },
+          "executing": {
+            "type": "integer",
+            "default": 0
+          },
+          "aborted": {
+            "type": "integer",
+            "default": 0
           }
         }
       }
     },
     "parameters": {
-      "ProjectNamePath": {
-        "name": "name",
-        "in": "path",
-        "required": true,
-        "description": "Name of the project",
-        "schema": {
-          "type": "string"
-        }
-      },
       "ActivityIdPath": {
         "name": "activityId",
         "in": "path",
@@ -2398,38 +2486,11 @@
           "type": "integer"
         }
       },
-      "RequirementGroupIdPath": {
-        "name": "requirementGroupId",
+      "ArchiveIdPath": {
+        "name": "archiveId",
         "in": "path",
         "required": true,
-        "description": "ID of the requirement group",
-        "schema": {
-          "type": "integer"
-        }
-      },
-      "ProjectPath": {
-        "name": "project",
-        "in": "path",
-        "required": true,
-        "description": "Name of the project",
-        "schema": {
-          "type": "string"
-        }
-      },
-      "ItemIdPath": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "description": "ID of the item",
-        "schema": {
-          "type": "integer"
-        }
-      },
-      "ReleaseIdPath": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "description": "ID of the release",
+        "description": "ID of the archived release",
         "schema": {
           "type": "integer"
         }
@@ -2443,11 +2504,47 @@
           "type": "integer"
         }
       },
-      "ArchiveIdPath": {
-        "name": "archiveId",
+      "ItemIdPath": {
+        "name": "id",
         "in": "path",
         "required": true,
-        "description": "ID of the archived release",
+        "description": "ID of the item",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "ProjectNamePath": {
+        "name": "name",
+        "in": "path",
+        "required": true,
+        "description": "Name of the project",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ProjectPath": {
+        "name": "project",
+        "in": "path",
+        "required": true,
+        "description": "Name of the project",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ReleaseIdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "ID of the release",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RequirementGroupIdPath": {
+        "name": "requirementGroupId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the requirement group",
         "schema": {
           "type": "integer"
         }
@@ -2456,36 +2553,6 @@
     "responses": {
       "BadRequest": {
         "description": "Bad Request",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "NotFound": {
-        "description": "Resource not found",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "ServerError": {
-        "description": "Internal Server Error",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/Error"
-            }
-          }
-        }
-      },
-      "Conflict": {
-        "description": "Conflict (e.g., resource already exists)",
         "content": {
           "application/json": {
             "schema": {
@@ -2510,6 +2577,36 @@
                   "example": "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
                 }
               }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict (e.g., resource already exists)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Internal Server Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
             }
           }
         }
