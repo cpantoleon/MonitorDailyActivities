@@ -103,6 +103,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 name TEXT NOT NULL,
                 closed_at TEXT NOT NULL,
                 metrics_json TEXT,
+                close_action TEXT,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
                 FOREIGN KEY (original_release_id) REFERENCES releases(id) ON DELETE CASCADE
             )`, (err) => {
@@ -223,6 +224,24 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                             console.error("Error adding closed_at column to releases:", alterErr.message);
                         } else {
                             console.log("Column 'closed_at' added to releases table.");
+                        }
+                    });
+                }
+            });
+
+            db.all("PRAGMA table_info(archived_releases)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching archived_releases table info:", err.message);
+                    return;
+                }
+                
+                const hasCloseActionColumn = columns.some(col => col.name === 'close_action');
+                if (!hasCloseActionColumn) {
+                    db.run("ALTER TABLE archived_releases ADD COLUMN close_action TEXT", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding close_action column to archived_releases:", alterErr.message);
+                        } else {
+                            console.log("Column 'close_action' added to archived_releases table.");
                         }
                     });
                 }

@@ -38,44 +38,41 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+let syncTimeout = null;
 let isSyncing = false;
-let syncIsPending = false;
 
 const scheduleQdrantSync = () => {
     if (!isChatbotEnabled) return;
 
-    if (isSyncing) {
-        console.log("Sync is already in progress. Queuing another sync.");
-        syncIsPending = true;
-        return;
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
     }
 
-    isSyncing = true;
+    console.log("Change detected. Scheduling Qdrant sync in 30 seconds...");
+    syncTimeout = setTimeout(async () => {
+        if (isSyncing) {
+            console.log("Sync is already in progress. Will skip this scheduled sync.");
+            return;
+        }
 
-    const runSync = async () => {
-        console.log("Starting Qdrant sync...");
-        const dummyRes = { 
-            status: () => ({ 
-                json: (data) => console.log("Background sync completed.", data) 
-            }) 
+        isSyncing = true;
+        console.log("Starting debounced Qdrant sync...");
+        const dummyRes = {
+            status: () => ({
+                json: (data) => console.log("Background sync completed.", data)
+            })
         };
         try {
             await syncWithQdrant(db)({}, dummyRes);
         } catch (error) {
             console.error("Background Qdrant sync failed:", error.message);
         } finally {
-            if (syncIsPending) {
-                syncIsPending = false;
-                console.log("Pending sync found. Running again immediately.");
-                runSync();
-            } else {
-                isSyncing = false;
-            }
+            isSyncing = false;
+            console.log("Sync process finished.");
         }
-    };
-
-    runSync();
+    }, 30000);
 };
+
 
 const swaggerDocument = JSON.parse(fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8'));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -1129,10 +1126,10 @@ app.post("/api/releases/:id/close", async (req, res) => {
                 db.run("BEGIN TRANSACTION");
 
                 const archiveSql = `
-                    INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 `;
-                db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson], function(err) {
+                db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function(err) {
                     if (err) {
                         db.run("ROLLBACK");
                         return res.status(500).json({ error: "Failed to create archive record." });
@@ -1236,7 +1233,7 @@ app.get("/api/archives/:project", async (req, res) => {
         const projectId = await getProjectId(req.params.project);
         const sql = `
             SELECT
-                ar.id, ar.original_release_id, ar.name, ar.closed_at, ar.metrics_json,
+                ar.id, ar.original_release_id, ar.name, ar.closed_at, ar.metrics_json, ar.close_action,
                 sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed, sr.pending
             FROM archived_releases ar
             LEFT JOIN sat_reports sr ON ar.id = sr.archive_id
@@ -1264,7 +1261,8 @@ app.get("/api/archives/:project", async (req, res) => {
                         name: row.name,
                         closed_at: row.closed_at,
                         metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {},
-                        sat_report: sat_report
+                        sat_report: sat_report,
+                        close_action: row.close_action
                     };
                 } catch (e) {
                     console.error("Failed to parse metrics_json for archive:", row.id, e);
@@ -1288,6 +1286,89 @@ app.get("/api/archives/details/:archiveId", (req, res) => {
     db.all(itemsSql, [archiveId], (err, items) => {
         if (err) return res.status(400).json({ "error": err.message });
         res.json({ message: "success", data: items });
+    });
+});
+
+app.post("/api/archives/:id/complete", async (req, res) => {
+    const archiveId = req.params.id;
+
+    db.get("SELECT * FROM archived_releases WHERE id = ?", [archiveId], (err, archive) => {
+        if (err) return res.status(500).json({ error: "DB error fetching archive info." });
+        if (!archive) return res.status(404).json({ error: "Archived release not found." });
+        if (archive.close_action !== 'archive_only') {
+            return res.status(400).json({ error: "This release was not 'archive only'." });
+        }
+
+        db.get("SELECT * FROM releases WHERE id = ?", [archive.original_release_id], (err, release) => {
+            if (err) return res.status(500).json({ error: "DB error fetching original release info." });
+            // Original release might be deleted, so we proceed with caution
+            const projectName = release ? release.name : archive.name;
+            const projectId = release ? release.project_id : archive.project_id;
+
+            const archiveItemsSql = `SELECT * FROM archived_release_items WHERE archive_id = ?`;
+            db.all(archiveItemsSql, [archiveId], (err, items) => {
+                if (err) return res.status(500).json({ error: "DB error fetching archived items." });
+
+                db.serialize(() => {
+                    db.run("BEGIN TRANSACTION");
+
+                    const now = new Date().toISOString();
+                    const statusDate = now.split('T')[0];
+                    const newSprintName = `Archived_from_${projectName.replace(/\s/g, '_')}`;
+                    
+                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
+                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
+                    const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+
+                    let activitiesProcessed = 0;
+                    if (items.length === 0) {
+                        finalizeCompletion();
+                    } else {
+                        items.forEach(item => {
+                            db.run(updateOldSql, [item.requirement_group_id], function(err) {
+                                if (err) {
+                                    db.run("ROLLBACK");
+                                    if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
+                                    return;
+                                }
+                                const comment = `Item completed as part of completing archived release '${projectName}'`;
+                                db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, now, now], function(err) {
+                                    if (err) {
+                                        db.run("ROLLBACK");
+                                        if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                        return;
+                                    }
+                                    activitiesProcessed++;
+                                    if (activitiesProcessed === items.length) {
+                                        finalizeCompletion();
+                                    }
+                                });
+                            });
+                        });
+                    }
+
+                    function finalizeCompletion() {
+                        const updateArchiveSql = "UPDATE archived_releases SET close_action = 'archive_and_complete' WHERE id = ?";
+                        db.run(updateArchiveSql, [archiveId], (err) => {
+                            if (err) {
+                                db.run("ROLLBACK");
+                                if (!res.headersSent) res.status(500).json({ error: "Failed to update archive record." });
+                                return;
+                            }
+                            
+                            db.run("COMMIT", (err) => {
+                                if (err) {
+                                    if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
+                                    return;
+                                }
+                                scheduleQdrantSync();
+                                if (!res.headersSent) res.json({ message: `Archived release '${projectName}' has been successfully completed.` });
+                            });
+                        });
+                    }
+                });
+            });
+        });
     });
 });
 

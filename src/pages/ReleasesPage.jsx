@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import ProjectSelector from '../components/ProjectSelector';
 import FinalizeReleaseModal from '../components/FinalizeReleaseModal';
 import EditReleaseModal from '../components/EditReleaseModal';
@@ -103,10 +105,14 @@ const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
 };
 
 
-const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportRelease }) => {
+const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportReleaseToExcel, onExportToPdf }) => {
     const [selectedSprints, setSelectedSprints] = useState(['All']);
     const [isDefectsCardOpen, setIsDefectsCardOpen] = useState(false);
     const [isFilterVisible, setIsFilterVisible] = useState(false);
+    const [isPdfExporting, setIsPdfExporting] = useState(false);
+
+    const reqChartRef = useRef(null);
+    const defectChartRef = useRef(null);
 
     const releaseRequirements = useMemo(() => 
         allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id),
@@ -137,13 +143,51 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
 
     const defectCount = uniqueFilteredDefects.length;
 
-    const handleSprintChange = (newSelection) => {
-        setSelectedSprints(newSelection);
+    const reqChartData = useMemo(() => {
+        if (!filteredRequirements || filteredRequirements.length === 0) return null;
+        let done = 0;
+        let notDone = 0;
+        filteredRequirements.forEach(req => {
+            if (req.currentStatusDetails.status === 'Done') done++;
+            else notDone++;
+        });
+        if (done === 0 && notDone === 0) return null;
+        return {
+            labels: ['Done', 'Not Done'],
+            datasets: [{ data: [done, notDone], backgroundColor: ['#4CAF50', '#F44336'], borderColor: ['#ffffff'], borderWidth: 1 }],
+        };
+    }, [filteredRequirements]);
+
+    const defectChartData = useMemo(() => {
+        if (!uniqueFilteredDefects || uniqueFilteredDefects.length === 0) return null;
+        let done = 0, notDone = 0, closed = 0;
+        uniqueFilteredDefects.forEach(defect => {
+            if (defect.status === 'Done') done++;
+            else if (defect.status === 'Closed') closed++;
+            else notDone++;
+        });
+        if (done === 0 && notDone === 0 && closed === 0) return null;
+        return {
+            labels: ['Done', 'Not Done', 'Closed'],
+            datasets: [{ data: [done, notDone, closed], backgroundColor: ['#4CAF50', '#F44336', '#808080'], borderColor: ['#ffffff'], borderWidth: 1 }],
+        };
+    }, [uniqueFilteredDefects]);
+
+    const handlePdfExport = async () => {
+        if (!reqChartRef.current) {
+            console.error("Requirements chart reference is not available for PDF export.");
+            return;
+        }
+        setIsPdfExporting(true);
+        await onExportToPdf(release, filteredRequirements, uniqueFilteredDefects, {
+            reqChart: reqChartRef.current,
+            defectChart: defectChartRef.current,
+        });
+        setIsPdfExporting(false);
     };
 
-    const handleDefectClick = () => {
-        setIsDefectsCardOpen(prev => !prev);
-    };
+    const handleSprintChange = (newSelection) => setSelectedSprints(newSelection);
+    const handleDefectClick = () => setIsDefectsCardOpen(prev => !prev);
     
     const sprintFilterElement = isFilterVisible ? (
         <SprintFilter
@@ -163,29 +207,37 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             onFinalize={() => onFinalize(release)}
             onEdit={() => onEdit(release)}
             onDefectClick={handleDefectClick}
-            onExport={() => handleExportRelease(release, filteredRequirements, uniqueFilteredDefects)}
+            onExportExcel={() => handleExportReleaseToExcel(release, filteredRequirements, uniqueFilteredDefects)}
+            onExportPdf={handlePdfExport}
+            isPdfExporting={isPdfExporting}
             sprintFilter={sprintFilterElement}
             onToggleFilter={() => setIsFilterVisible(prev => !prev)}
             showFilterToggle={availableSprints.length > 2}
+            chartData={reqChartData}
+            chartRef={reqChartRef}
         />
     );
     
-    if (isDefectsCardOpen) {
-        return (
-            <>
-                {releaseCard}
-                <DefectDetailsCard
-                    key={`defect-details-${release.id}`}
-                    release={release}
-                    defects={uniqueFilteredDefects}
-                    onClose={() => setIsDefectsCardOpen(false)}
-                    onNavigate={onNavigateToDefect}
-                />
-            </>
-        );
-    }
+    const defectDetailsCard = isDefectsCardOpen ? (
+        <DefectDetailsCard
+            key={`defect-details-${release.id}`}
+            release={release}
+            defects={uniqueFilteredDefects}
+            onClose={() => setIsDefectsCardOpen(false)}
+            onNavigate={onNavigateToDefect}
+            chartData={defectChartData}
+        />
+    ) : null;
 
-    return releaseCard;
+    return (
+        <>
+            {releaseCard}
+            {defectDetailsCard}
+            <div style={{ position: 'absolute', left: '-9999px', width: '300px', height: '300px' }}>
+                {defectChartData && <Pie ref={defectChartRef} data={defectChartData} options={{ animation: false, plugins: { legend: { display: false } } }} />}
+            </div>
+        </>
+    );
 };
 
 
@@ -220,39 +272,7 @@ const ReleaseCountdown = ({ activeReleases }) => {
 
 const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
-const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
-    const getDefectChartData = () => {
-        if (!defects || defects.length === 0) return null;
-
-        let done = 0;
-        let notDone = 0;
-        let closed = 0;
-
-        defects.forEach(defect => {
-            if (defect.status === 'Done') {
-                done++;
-            } else if (defect.status === 'Closed') {
-                closed++;
-            } else {
-                notDone++;
-            }
-        });
-
-        if (done === 0 && notDone === 0 && closed === 0) return null;
-
-        return {
-            labels: ['Done', 'Not Done', 'Closed'],
-            datasets: [{
-                data: [done, notDone, closed],
-                backgroundColor: ['#4CAF50', '#F44336', '#808080'],
-                borderColor: ['#ffffff', '#ffffff', '#ffffff'],
-                borderWidth: 1,
-            }],
-        };
-    };
-
-    const chartData = getDefectChartData();
-
+const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData }) => {
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -298,34 +318,19 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate }) => {
     );
 };
 
-const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExport, sprintFilter, onToggleFilter, showFilterToggle }) => {
+const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef }) => {
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+    const exportContainerRef = useRef(null);
 
-    const getChartData = (reqs) => {
-        if (!reqs || reqs.length === 0) return null;
-        let done = 0;
-        let notDone = 0;
-        reqs.forEach(req => {
-            if (req.currentStatusDetails.status === 'Done') {
-                done++;
-            } else {
-                notDone++;
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (exportContainerRef.current && !exportContainerRef.current.contains(event.target)) {
+                setIsExportMenuOpen(false);
             }
-        });
-
-        if (done === 0 && notDone === 0) return null;
-
-        return {
-            labels: ['Done', 'Not Done'],
-            datasets: [{
-                data: [done, notDone],
-                backgroundColor: ['#4CAF50', '#F44336'],
-                borderColor: ['#ffffff', '#ffffff'],
-                borderWidth: 1,
-            }],
         };
-    };
-
-    const chartData = getChartData(requirements);
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const chartOptions = {
         responsive: true,
@@ -356,7 +361,7 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
             <div className="release-card-body">
                 <div className="release-charts">
                     {chartData ? (
-                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                        <Pie ref={chartRef} data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
                     ) : (
                         <div className="empty-chart-placeholder">No requirements assigned</div>
                     )}
@@ -386,9 +391,21 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                     {showFilterToggle && (
                         <button type="button" onClick={onToggleFilter} className="button-filter">Filter Sprints</button>
                     )}
-                    <button type="button" onClick={onExport} className="button-export">&#128229; Export</button>
-                    <button type="button" onClick={onEdit} className="button-edit">&#9998; Edit</button>
-                    <button type="button" onClick={onFinalize} className="button-finalize">&#10004; Finalize</button>
+                    <div className="export-button-container" ref={exportContainerRef}>
+                        <button type="button" onClick={() => setIsExportMenuOpen(prev => !prev)} className="button-export">
+                            Export
+                        </button>
+                        {isExportMenuOpen && (
+                            <div className="export-dropdown-menu">
+                                <button type="button" onClick={() => { onExportExcel(); setIsExportMenuOpen(false); }}>as Excel</button>
+                                <button type="button" onClick={() => { onExportPdf(); setIsExportMenuOpen(false); }} disabled={isPdfExporting}>
+                                    {isPdfExporting ? 'Exporting...' : 'as PDF'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <button type="button" onClick={onEdit} className="button-edit">Edit</button>
+                    <button type="button" onClick={onFinalize} className="button-finalize">Finalize</button>
                 </div>
             </div>
         </div>
@@ -412,10 +429,15 @@ const ArchivedDefectList = ({ defects, onNavigate }) => {
     );
 };
 
-const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements, onAddSatReport }) => {
+const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements, onAddSatReport, onCompleteRelease, onExportToExcel, onExportToPdf }) => {
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [defects, setDefects] = useState([]);
+    const [isPdfExporting, setIsPdfExporting] = useState(false);
+    const [isExcelExporting, setIsExcelExporting] = useState(false);
+
+    const metricsChartRef = useRef(null);
+    const satChartRef = useRef(null);
 
     useEffect(() => {
         setIsLoading(true);
@@ -451,6 +473,21 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         }
     };
 
+    const handlePdfExport = async () => {
+        setIsPdfExporting(true);
+        await onExportToPdf(archive, items, defects, {
+            metricsChart: metricsChartRef.current,
+            satChart: satChartRef.current
+        });
+        setIsPdfExporting(false);
+    };
+
+    const handleExcelExport = async () => {
+        setIsExcelExporting(true);
+        await onExportToExcel(archive, items, defects);
+        setIsExcelExporting(false);
+    };
+
     const ourMetricsChartData = {
         labels: ['Done', 'Not Done'],
         datasets: [{
@@ -470,12 +507,19 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
             legend: { display: false },
             title: { display: false },
         },
+        animation: false
     };
 
     return (
         <div className="archived-details-view">
+            {isPdfExporting && (
+                <div className="pdf-export-overlay">
+                    <div className="loading-spinner"></div>
+                    <p>Generating PDF, please wait...</p>
+                </div>
+            )}
             <div className="details-header">
-                <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
+                <button type="button" onClick={onBack} className="back-button">Back to Archives</button>
                 <h2>Archived Release Details</h2>
             </div>
             <div className="release-card">
@@ -490,7 +534,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         <div className="archived-details-chart-wrapper">
                             <h4>Our Final Metrics</h4>
                             <div className="archived-details-chart">
-                                <Pie data={ourMetricsChartData} options={chartOptions} />
+                                <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
                             </div>
                             <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
                         </div>
@@ -498,7 +542,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                             <div className="archived-details-chart-wrapper">
                                 <h4>SAT Report</h4>
                                 <div className="archived-details-chart">
-                                    <Pie data={satChartData} options={chartOptions} />
+                                    <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
                                 </div>
                                 <ChartLegend items={satLegendItems} />
                             </div>
@@ -527,6 +571,15 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 </div>
                 <div className="release-card-footer">
                     <div className="release-card-actions">
+                        {archive.close_action === 'archive_only' && (
+                            <button type="button" onClick={() => onCompleteRelease(archive)} className="button-complete">Complete Release</button>
+                        )}
+                        <button type="button" onClick={handleExcelExport} className="button-export" disabled={isExcelExporting}>
+                            {isExcelExporting ? 'Exporting...' : 'Export to Excel'}
+                        </button>
+                        <button type="button" onClick={handlePdfExport} className="button-export" disabled={isPdfExporting}>
+                            {isPdfExporting ? 'Exporting...' : 'Export to PDF'}
+                        </button>
                         <button type="button" onClick={() => onAddSatReport(archive)} className="button-edit">
                             {archive.sat_report ? 'Update SAT Results' : 'Add SAT Results'}
                         </button>
@@ -618,24 +671,225 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
     );
 };
 
-const ComparisonView = ({ archives, onBack }) => {
-    const chartOptions = {
+const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMessage }) => {
+    const [detailedArchives, setDetailedArchives] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isPdfExporting, setIsPdfExporting] = useState(false);
+    
+    const chartRefs = useRef({});
+
+    useEffect(() => {
+        if (archives.length === 0) {
+            setIsLoading(false);
+            return;
+        }
+
+        const fetchAllDetails = async () => {
+            try {
+                const promises = archives.map(archive =>
+                    fetch(`${API_BASE_URL}/archives/details/${archive.id}`).then(res => res.json())
+                );
+                const results = await Promise.all(promises);
+                const enrichedArchives = archives.map((archive, index) => {
+                    const details = results[index].data || [];
+                    const requirementsWithDefects = details.map(item => {
+                        const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+                        return {
+                            ...item,
+                            linkedDefects: requirement ? requirement.linkedDefects : [],
+                            link: requirement ? requirement.currentStatusDetails.link : ''
+                        };
+                    });
+                    return { ...archive, requirements: requirementsWithDefects };
+                });
+                setDetailedArchives(enrichedArchives);
+            } catch (error)
+            {
+                showMainMessage('Failed to load detailed data for comparison.', 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchAllDetails();
+    }, [archives, allProcessedRequirements, showMainMessage]);
+
+    const handleExportToPdf = async () => {
+        setIsPdfExporting(true);
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        let yPos = 15;
+        const pageHeight = pdf.internal.pageSize.height;
+        const leftMargin = 15;
+        
+        try {
+            for (const archive of detailedArchives) {
+                if (yPos > pageHeight - 120) {
+                    pdf.addPage();
+                    yPos = 15;
+                }
+
+                pdf.setFontSize(16);
+                pdf.text(archive.name, leftMargin, yPos);
+                yPos += 8;
+
+                pdf.setFontSize(10);
+                pdf.text(`Closed: ${new Date(archive.closed_at).toLocaleDateString()}`, leftMargin, yPos);
+                yPos += 5;
+                pdf.text(`Total Requirements: ${archive.metrics.doneCount + archive.metrics.notDoneCount}`, leftMargin, yPos);
+                yPos += 15;
+
+                const chartStartY = yPos;
+                const chartWidth = 45;
+                const chartHeight = 45;
+
+                const metricsChart = chartRefs.current[`metrics-${archive.id}`];
+                const satChart = chartRefs.current[`sat-${archive.id}`];
+                
+                let finalMetricsLegendY = chartStartY + chartHeight + 5;
+                let finalSatLegendY = chartStartY + chartHeight + 5;
+
+                const metricsChartX = leftMargin + 15;
+                pdf.setFontSize(12);
+                pdf.text('Our Final Metrics', metricsChartX, yPos);
+                yPos += 5;
+                if (metricsChart) {
+                    metricsChart.resize(300, 300);
+                    const metricsImg = metricsChart.toBase64Image();
+                    metricsChart.resize();
+
+                    pdf.addImage(metricsImg, 'PNG', metricsChartX, yPos, chartWidth, chartHeight);
+
+                    const metricsLegend = [{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}];
+                    let legendY = yPos + chartHeight + 5;
+                    pdf.setFontSize(9);
+                    metricsLegend.forEach(item => {
+                        pdf.setFillColor(item.color);
+                        pdf.rect(metricsChartX, legendY, 3, 3, 'F');
+                        pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
+                        legendY += 5;
+                    });
+                    finalMetricsLegendY = legendY;
+                }
+                
+                const satChartX = leftMargin + chartWidth + 45;
+                yPos = chartStartY;
+                pdf.setFontSize(12);
+                pdf.text('SAT Report', satChartX, yPos);
+                yPos += 5;
+                const { legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+                if (satChart && satLegendItems.length > 0) {
+                    satChart.resize(300, 300);
+                    const satImg = satChart.toBase64Image();
+                    satChart.resize();
+
+                    pdf.addImage(satImg, 'PNG', satChartX, yPos, chartWidth, chartHeight);
+
+                    let legendY = yPos + chartHeight + 5;
+                    pdf.setFontSize(9);
+                    satLegendItems.forEach(item => {
+                        pdf.setFillColor(item.color);
+                        pdf.rect(satChartX, legendY, 3, 3, 'F');
+                        pdf.text(item.text, satChartX + 5, legendY + 2.5);
+                        legendY += 5;
+                    });
+                    finalSatLegendY = legendY;
+                } else {
+                    pdf.setDrawColor(220, 220, 220);
+                    pdf.setFillColor(250, 250, 250);
+                    pdf.rect(satChartX, yPos, chartWidth, chartHeight, 'FD');
+                    pdf.setTextColor(150, 150, 150);
+                    pdf.text('No SAT Report', satChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
+                    pdf.setTextColor(0, 0, 0);
+                }
+                
+                yPos = Math.max(finalMetricsLegendY, finalSatLegendY) + 10;
+
+                if (archive.requirements && archive.requirements.length > 0) {
+                    if (yPos > pageHeight - 60) {
+                        pdf.addPage();
+                        yPos = 15;
+                    }
+
+                    pdf.setFontSize(12);
+                    pdf.text('Requirements', leftMargin, yPos);
+                    yPos += 8;
+
+                    const tableBody = archive.requirements.flatMap(req => {
+                        const mainRow = [
+                            { content: req.requirement_title, data: { url: req.link } },
+                            (req.linkedDefects && req.linkedDefects.length > 0)
+                                ? { content: req.linkedDefects[0].title, data: { url: req.linkedDefects[0].link } }
+                                : 'None'
+                        ];
+                        const additionalDefectRows = (req.linkedDefects || []).slice(1).map(defect => [
+                            '',
+                            { content: defect.title, data: { url: defect.link } }
+                        ]);
+                        return [mainRow, ...additionalDefectRows];
+                    });
+
+                    autoTable(pdf, {
+                        startY: yPos,
+                        head: [['Requirement', 'Linked Defect']],
+                        body: tableBody,
+                        theme: 'grid',
+                        headStyles: { fillColor: [76, 56, 48] },
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 'auto' } },
+                        didParseCell: function (data) {
+                            if (data.cell.raw?.data?.url) {
+                                data.cell.styles.textColor = [0, 0, 255];
+                            }
+                        },
+                        didDrawCell: function (data) {
+                            if (data.cell.raw?.data?.url && data.section === 'body') {
+                                pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                            }
+                        }
+                    });
+                    yPos = pdf.lastAutoTable.finalY + 15;
+                }
+            }
+            pdf.save('release-comparison.pdf');
+            showMainMessage('PDF exported successfully!', 'success');
+        } catch (error) {
+            console.error("PDF Export Error:", error);
+            showMainMessage('Failed to export PDF. See console for details.', 'error');
+        } finally {
+            setIsPdfExporting(false);
+        }
+    };
+
+    const onScreenChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         plugins: {
             legend: { display: false },
             title: { display: false },
         },
     };
 
+    if (isLoading) return <LoadingSpinner />;
+
     return (
         <div className="comparison-view">
+            {isPdfExporting && (
+                <div className="pdf-export-overlay">
+                    <div className="loading-spinner"></div>
+                    <p>Generating PDF, please wait...</p>
+                </div>
+            )}
+
             <div className="comparison-header">
                 <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
                 <h2>Compare Archived Releases</h2>
+                <button type="button" onClick={handleExportToPdf} className="button-export" disabled={isPdfExporting}>
+                    {isPdfExporting ? 'Exporting...' : 'Export to PDF'}
+                </button>
             </div>
             <div className="comparison-container">
-                {archives.map(archive => {
+                {detailedArchives.map(archive => {
                     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
                     const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
                     return (
@@ -655,15 +909,19 @@ const ComparisonView = ({ archives, onBack }) => {
                                 <div className="comparison-chart-wrapper">
                                     <h4>Our Final Metrics</h4>
                                     <div className="chart-container">
-                                        <Pie data={{
-                                            labels: ['Done', 'Not Done'],
-                                            datasets: [{
-                                                data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
-                                                backgroundColor: ['#28a745', '#dc3545'],
-                                                borderColor: '#FFFAF0',
-                                                borderWidth: 2,
-                                            }],
-                                        }} options={chartOptions} />
+                                        <Pie
+                                            ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
+                                            data={{
+                                                labels: ['Done', 'Not Done'],
+                                                datasets: [{
+                                                    data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
+                                                    backgroundColor: ['#28a745', '#dc3545'],
+                                                    borderColor: '#FFFAF0',
+                                                    borderWidth: 2,
+                                                }],
+                                            }}
+                                            options={onScreenChartOptions}
+                                        />
                                     </div>
                                     <div className="legend-wrapper">
                                         <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
@@ -673,7 +931,11 @@ const ComparisonView = ({ archives, onBack }) => {
                                     <h4>SAT Report</h4>
                                     <div className="chart-container">
                                         {satChartData ? (
-                                            <Pie data={satChartData} options={chartOptions} />
+                                            <Pie
+                                                ref={el => (chartRefs.current[`sat-${archive.id}`] = el)}
+                                                data={satChartData}
+                                                options={onScreenChartOptions}
+                                            />
                                         ) : (
                                             <div className="empty-chart-placeholder">No SAT Report</div>
                                         )}
@@ -707,6 +969,23 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [archiveForSat, setArchiveForSat] = useState(null);
     const [comparisonList, setComparisonList] = useState([]);
     const [isComparing, setIsComparing] = useState(false);
+
+    const handleCompleteRelease = async (archive) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to complete release.');
+            showMainMessage(result.message, 'success');
+            fetchData();
+            fetchArchivedReleases();
+            setSelectedArchive(null);
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
 
     const releasesPageTooltipContent = (
         <>
@@ -853,7 +1132,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         );
     };
 
-    const handleExportRelease = async (release, requirements, defects) => {
+    const handleExportReleaseToExcel = async (release, requirements, defects) => {
         const returnCountsMap = new Map();
 
         try {
@@ -1056,6 +1335,367 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         XLSX.writeFile(wb, `${release.name}_Details.xlsx`);
     };
 
+    const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs) => {
+        // NOTE: We no longer use the chartRefs, but keep the signature for consistency if needed elsewhere.
+        const { reqChart, defectChart } = chartRefs;
+
+        // We will now use the data directly to build a new, off-screen chart for the PDF.
+        const reqChartData = reqChart?.data;
+        const defectChartData = defectChart?.data;
+    
+        if (!reqChartData) {
+            showMainMessage('Could not generate PDF. Requirements chart data is not available.', 'error');
+            return;
+        }
+    
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        let yPos = 15;
+        const leftMargin = 15;
+    
+        const generateChartImage = (data) => {
+            if (!data) return null;
+            
+            // 1. Create a temporary, off-screen canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 800; // Force a 1:1 aspect ratio
+            const ctx = canvas.getContext('2d');
+    
+            // 2. Create a new chart instance on our temporary canvas
+            const tempChart = new ChartJS(ctx, {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: false, // Must be false for off-screen rendering
+                    animation: { duration: 0 }, // No animation
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false },
+                    },
+                },
+            });
+    
+            // 3. Get the high-quality image and destroy the temporary chart to prevent memory leaks
+            const imageData = tempChart.toBase64Image('image/png', 1.0);
+            tempChart.destroy();
+    
+            return imageData;
+        };
+    
+        const drawLegend = (pdfDoc, x, y, items) => {
+            const itemHeight = 5;
+            const boxSize = 3;
+            pdfDoc.setFontSize(9);
+            items.forEach((item, index) => {
+                const currentY = y + (index * itemHeight);
+                pdfDoc.setFillColor(item.color);
+                pdfDoc.rect(x, currentY, boxSize, boxSize, 'F');
+                pdfDoc.text(item.text, x + boxSize + 2, currentY + boxSize - 0.5);
+            });
+            return y + (items.length * itemHeight);
+        };
+    
+        try {
+            pdf.setFontSize(18);
+            pdf.text(release.name, leftMargin, yPos);
+            yPos += 8;
+            pdf.setFontSize(12);
+            pdf.text(`Due: ${new Date(release.release_date).toLocaleDateString()}`, leftMargin, yPos);
+            yPos += 5;
+            pdf.text(`Total Requirements: ${requirements.length}`, leftMargin, yPos);
+            yPos += 15;
+    
+            const chartStartY = yPos;
+            const chartWidth = 60;
+            const chartHeight = 60;
+    
+            const reqChartX = leftMargin + 10;
+            pdf.setFontSize(14);
+            pdf.text('Requirements Progress', reqChartX, yPos);
+            yPos += 5;
+    
+            const reqImg = generateChartImage(reqChartData);
+            if (reqImg) {
+                pdf.addImage(reqImg, 'PNG', reqChartX, yPos, chartWidth, chartHeight);
+            }
+            let reqLegendY = yPos + chartHeight + 5;
+    
+            let reqDone = 0;
+            requirements.forEach(r => { if (r.currentStatusDetails.status === 'Done') reqDone++; });
+            const reqNotDone = requirements.length - reqDone;
+            const reqLegendItems = [
+                { text: `Done (${reqDone})`, color: '#4CAF50' },
+                { text: `Not Done (${reqNotDone})`, color: '#F44336' }
+            ];
+            const finalReqY = drawLegend(pdf, reqChartX + 15, reqLegendY, reqLegendItems);
+    
+            yPos = chartStartY;
+            const defectChartX = leftMargin + chartWidth + 30;
+            pdf.setFontSize(14);
+            pdf.text('Defect Status', defectChartX, yPos);
+            yPos += 5;
+    
+            let finalDefectY = yPos + chartHeight + 5;
+    
+            if (defects.length > 0 && defectChartData) {
+                const defectImg = generateChartImage(defectChartData);
+                if (defectImg) {
+                    pdf.addImage(defectImg, 'PNG', defectChartX, yPos, chartWidth, chartHeight);
+                }
+                let defectLegendY = yPos + chartHeight + 5;
+    
+                let defDone = 0, defNotDone = 0, defClosed = 0;
+                defects.forEach(d => {
+                    if (d.status === 'Done') defDone++;
+                    else if (d.status === 'Closed') defClosed++;
+                    else defNotDone++;
+                });
+                const defectLegendItems = [
+                    { text: `Done (${defDone})`, color: '#4CAF50' },
+                    { text: `Not Done (${defNotDone})`, color: '#F44336' },
+                    { text: `Closed (${defClosed})`, color: '#808080' }
+                ].filter(item => parseInt(item.text.match(/\((\d+)\)/)[1], 10) > 0);
+                
+                finalDefectY = drawLegend(pdf, defectChartX + 15, defectLegendY, defectLegendItems);
+            } else {
+                pdf.setDrawColor(220, 220, 220);
+                pdf.setFillColor(250, 250, 250);
+                pdf.rect(defectChartX, yPos, chartWidth, chartHeight, 'FD');
+                pdf.setTextColor(150, 150, 150);
+                pdf.text('No Defects', defectChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
+                pdf.setTextColor(0, 0, 0);
+            }
+            
+            yPos = Math.max(finalReqY, finalDefectY) + 10;
+    
+            if (requirements.length > 0) {
+                if (yPos > 260) { pdf.addPage(); yPos = 15; }
+                pdf.setFontSize(14);
+                pdf.text('Requirements', leftMargin, yPos);
+                yPos += 8;
+                autoTable(pdf, {
+                    startY: yPos,
+                    head: [['Requirement', 'Sprint', 'Status']],
+                    body: requirements.map(r => [
+                        r.requirementUserIdentifier,
+                        r.currentStatusDetails.sprint || 'N/A',
+                        r.currentStatusDetails.status
+                    ]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 56, 48] },
+                    columnStyles: { 1: { cellWidth: 25 } },
+                });
+                yPos = pdf.lastAutoTable.finalY + 10;
+            }
+    
+            if (defects.length > 0) {
+                if (yPos > 260) { pdf.addPage(); yPos = 15; }
+                pdf.setFontSize(14);
+                pdf.text('Defects', leftMargin, yPos);
+                yPos += 8;
+                autoTable(pdf, {
+                    startY: yPos,
+                    head: [['Defect', 'Status']],
+                    body: defects.map(d => [d.title, d.status]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 56, 48] },
+                });
+            }
+    
+            pdf.save(`${release.name}_Details.pdf`);
+            showMainMessage('PDF exported successfully!', 'success');
+        } catch (error) {
+            console.error("Active Release PDF Export Error:", error);
+            showMainMessage('Failed to export PDF. See console for details.', 'error');
+        }
+    };
+
+    const handleExportArchivedReleaseToExcel = async (archive, items, defects) => {
+        const MAX_WIDTH = 70;
+        const borderStyle = { style: "thin", color: { auto: 1 } };
+        const border = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+        const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E9E9E9" } }, border: border, alignment: { vertical: 'center', horizontal: 'center' } };
+        const cellStyle = { border: border, alignment: { wrapText: true, vertical: 'top' } };
+        const linkStyle = { font: { color: { rgb: "0000FF" }, underline: true }, border: border, alignment: { wrapText: true, vertical: 'top' } };
+
+        const fitToColumn = (arrayOfArrays) => {
+            if (!arrayOfArrays || arrayOfArrays.length === 0) return [];
+            const colWidths = [];
+            arrayOfArrays.forEach(row => {
+                row.forEach((cell, i) => {
+                    const cellValue = cell ? cell.toString() : '';
+                    const lines = cellValue.split('\n');
+                    const maxLength = Math.max(...lines.map(line => line.length));
+                    if (!colWidths[i] || colWidths[i].wch < maxLength) {
+                        colWidths[i] = { wch: maxLength };
+                    }
+                });
+            });
+            colWidths.forEach(col => { col.wch = Math.min(col.wch + 2, MAX_WIDTH); });
+            return colWidths;
+        };
+
+        const processSheet = (data, headers) => {
+            const dataAsArray = [headers, ...data.map(row => headers.map(header => row[header]))];
+            const ws = XLSX.utils.aoa_to_sheet(dataAsArray);
+            ws['!cols'] = fitToColumn(dataAsArray);
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                    let cell = ws[cell_ref];
+                    if (!cell) continue;
+
+                    if (R === 0) {
+                        cell.s = headerStyle;
+                    } else {
+                        const headerName = headers[C];
+                        if (headerName === 'Defect Link' && cell.v) {
+                            cell.l = { Target: cell.v, Tooltip: `Click to open link` };
+                            cell.s = linkStyle;
+                        } else {
+                            cell.s = cellStyle;
+                        }
+                    }
+                }
+            }
+            return ws;
+        };
+
+        const wb = XLSX.utils.book_new();
+
+        const reqHeaders = ['Release Name', 'Requirement Name', 'Final Status'];
+        const requirementsData = items.map(item => ({
+            'Release Name': archive.name,
+            'Requirement Name': item.requirement_title,
+            'Final Status': item.final_status
+        }));
+        if (requirementsData.length > 0) {
+            const wsReqs = processSheet(requirementsData, reqHeaders);
+            XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
+        }
+
+        const defectHeaders = ['Defect Name', 'Defect Link', 'Status'];
+        const defectsData = defects.map(defect => ({
+            'Defect Name': defect.title,
+            'Defect Link': defect.link || '',
+            'Status': defect.status,
+        }));
+        if (defectsData.length > 0) {
+            const wsDefects = processSheet(defectsData, defectHeaders);
+            XLSX.utils.book_append_sheet(wb, wsDefects, 'Defects');
+        }
+        
+        XLSX.writeFile(wb, `${archive.name}_Archive_Details.xlsx`);
+    };
+
+    const handleExportArchivedReleaseToPdf = async (archive, items, defects, chartRefs) => {
+        if (!chartRefs || !chartRefs.metricsChart) {
+            showMainMessage('Could not generate PDF. Chart data is not available.', 'error');
+            return;
+        }
+
+        try {
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let yPos = 15;
+            const leftMargin = 15;
+
+            pdf.setFontSize(18);
+            pdf.text(archive.name, leftMargin, yPos);
+            yPos += 8;
+            pdf.setFontSize(12);
+            pdf.text(`Closed: ${new Date(archive.closed_at).toLocaleString()}`, leftMargin, yPos);
+            yPos += 5;
+            pdf.text(`Total Requirements: ${archive.metrics.doneCount + archive.metrics.notDoneCount}`, leftMargin, yPos);
+            yPos += 15;
+
+            const chartStartY = yPos;
+            const chartWidth = 60;
+            const chartHeight = 60;
+            const metricsChart = chartRefs.metricsChart;
+            const satChart = chartRefs.satChart;
+
+            const metricsChartX = leftMargin + 10;
+            pdf.setFontSize(12);
+            pdf.text('Our Final Metrics', metricsChartX, yPos);
+            yPos += 5;
+            metricsChart.resize(300, 300);
+            const metricsImg = metricsChart.toBase64Image();
+            metricsChart.resize();
+            pdf.addImage(metricsImg, 'PNG', metricsChartX, yPos, chartWidth, chartHeight);
+            const metricsLegend = [{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}];
+            let legendY = yPos + chartHeight + 5;
+            pdf.setFontSize(9);
+            metricsLegend.forEach(item => {
+                pdf.setFillColor(item.color);
+                pdf.rect(metricsChartX, legendY, 3, 3, 'F');
+                pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
+                legendY += 5;
+            });
+            let finalMetricsLegendY = legendY;
+
+            const satChartX = leftMargin + chartWidth + 30;
+            yPos = chartStartY;
+            pdf.setFontSize(12);
+            pdf.text('SAT Report', satChartX, yPos);
+            yPos += 5;
+            const { legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+            let finalSatLegendY = chartStartY + chartHeight + 5;
+            if (satChart && satLegendItems.length > 0) {
+                satChart.resize(300, 300);
+                const satImg = satChart.toBase64Image();
+                satChart.resize();
+                pdf.addImage(satImg, 'PNG', satChartX, yPos, chartWidth, chartHeight);
+                let satLegendY = yPos + chartHeight + 5;
+                pdf.setFontSize(9);
+                satLegendItems.forEach(item => {
+                    pdf.setFillColor(item.color);
+                    pdf.rect(satChartX, satLegendY, 3, 3, 'F');
+                    pdf.text(item.text, satChartX + 5, satLegendY + 2.5);
+                    satLegendY += 5;
+                });
+                finalSatLegendY = satLegendY;
+            } else {
+                pdf.setDrawColor(220, 220, 220);
+                pdf.setFillColor(250, 250, 250);
+                pdf.rect(satChartX, yPos, chartWidth, chartHeight, 'FD');
+                pdf.setTextColor(150, 150, 150);
+                pdf.text('No SAT Report', satChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
+                pdf.setTextColor(0, 0, 0);
+            }
+
+            yPos = Math.max(finalMetricsLegendY, finalSatLegendY) + 10;
+
+            if (items.length > 0) {
+                autoTable(pdf, {
+                    startY: yPos,
+                    head: [['Requirement', 'Final Status']],
+                    body: items.map(item => [item.requirement_title, item.final_status]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 56, 48] },
+                });
+                yPos = pdf.lastAutoTable.finalY + 10;
+            }
+
+            if (defects.length > 0) {
+                autoTable(pdf, {
+                    startY: yPos,
+                    head: [['Defect', 'Status']],
+                    body: defects.map(d => [d.title, d.status]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 56, 48] },
+                });
+            }
+
+            pdf.save(`${archive.name}_Archive_Details.pdf`);
+            showMainMessage('PDF exported successfully!', 'success');
+        } catch (error) {
+            console.error("PDF Export Error:", error);
+            showMainMessage('Failed to export PDF. See console for details.', 'error');
+        }
+    };
+
     const renderActiveView = () => {
         if (isLoading) return <LoadingSpinner />;
         if (activeReleases.length === 0) return <div className="empty-column-message">No active releases found for this project.</div>;
@@ -1071,7 +1711,8 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                         onNavigateToDefect={onNavigateToDefect}
                         onFinalize={handleOpenFinalizeModal}
                         onEdit={handleOpenEditModal}
-                        handleExportRelease={handleExportRelease}
+                        handleExportReleaseToExcel={handleExportReleaseToExcel}
+                        onExportToPdf={handleExportActiveReleaseToPdf}
                     />
                 ))}
             </div>
@@ -1082,7 +1723,12 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         const archivesToCompare = archivedReleases.filter(ar => comparisonList.includes(ar.id));
 
         if (isComparing) {
-            return <ComparisonView archives={archivesToCompare} onBack={() => setIsComparing(false)} />;
+            return <ComparisonView 
+                        archives={archivesToCompare} 
+                        onBack={() => setIsComparing(false)} 
+                        allProcessedRequirements={allProcessedRequirements}
+                        showMainMessage={showMainMessage} 
+                    />;
         }
         
         if (selectedArchive) {
@@ -1093,6 +1739,9 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 onNavigateToDefect={onNavigateToDefect} 
                 allProcessedRequirements={allProcessedRequirements}
                 onAddSatReport={handleOpenSatModal}
+                onCompleteRelease={handleCompleteRelease}
+                onExportToExcel={handleExportArchivedReleaseToExcel}
+                onExportToPdf={handleExportArchivedReleaseToPdf}
             />;
         }
 
@@ -1122,13 +1771,13 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                             <div className="archived-card-body">
                                 <h4>Final Metrics</h4>
                                 <div className="archived-metrics">
-                                    <span className="metric-item done">&#10004; Done: {archive.metrics.doneCount}</span>
-                                    <span className="metric-item not-done">&#10008; Not Done: {archive.metrics.notDoneCount}</span>
+                                    <span className="metric-item done">Done: {archive.metrics.doneCount}</span>
+                                    <span className="metric-item not-done">Not Done: {archive.metrics.notDoneCount}</span>
                                 </div>
                             </div>
                             <div className="release-card-actions">
                                 <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
-                                <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">&#128465; Delete</button>
+                                <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">Delete</button>
                             </div>
                         </div>
                     ))}
@@ -1167,7 +1816,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
                     onDelete={handleDeleteRequest}
-                    releases={allReleases}
+                    releases={activeReleases}
                     projects={projects}
                     currentProject={selectedProject}
                     initialReleaseId={releaseToEdit.id}

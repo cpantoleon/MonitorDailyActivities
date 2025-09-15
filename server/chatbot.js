@@ -15,7 +15,6 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
-// This is the original, reliable function for simple, intent-specific queries.
 function extractProjectFromMessage(message, intent) {
     let regex;
     switch (intent) {
@@ -56,12 +55,10 @@ function extractProjectFromMessage(message, intent) {
 }
 
 function extractConversationalProject(message) {
-    // This regex looks for a project name but stops before it hits another keyword.
     const pattern = /(?:(?:for|in|on|to)\s+project|project|for|in|on|to)\s+(?:the\s+)?(['"]?)([\w\s-]+?)\1(?=\s|,\s|\.\s|\?\s|sprint|title|titled|called|requirement|defect|$)/i;
     
     let match = message.match(pattern);
 
-    // If the first pattern fails, try a simpler one for when the project name starts the sentence.
     if (!match) {
         const startPattern = /^(['"]?)([\w\s-]+?)\1\s+(?:requirement|defect)/i;
         match = message.match(startPattern);
@@ -158,9 +155,29 @@ function initializeClients() {
   });
 
   embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
-  generativeModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite", safetySettings });
+  generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", safetySettings });
 
   console.log("Chatbot clients initialized successfully.");
+}
+
+async function embedBatchWithRetry(textsToEmbed, maxRetries = 5) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const embeddingResult = await embeddingModel.batchEmbedContents({
+                requests: textsToEmbed.map(text => ({ model: "models/embedding-001", content: { parts: [{ text }] } })),
+            });
+            return embeddingResult;
+        } catch (error) {
+            if (error.status === 429 && attempt < maxRetries - 1) {
+                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                console.warn(`Rate limit hit. Retrying in ${Math.round(delay / 1000)}s... (Attempt ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                throw error;
+            }
+        }
+    }
+    throw new Error("Failed to embed batch after multiple retries.");
 }
 
 const syncWithQdrant = (db) => async (req, res) => {
@@ -280,9 +297,9 @@ const syncWithQdrant = (db) => async (req, res) => {
         for (let i = 0; i < documents.length; i += BATCH_SIZE) {
             const batchDocuments = documents.slice(i, i + BATCH_SIZE);
             const textsToEmbed = batchDocuments.map(d => d.text);
-            const embeddingResult = await embeddingModel.batchEmbedContents({
-                requests: textsToEmbed.map(text => ({ model: "models/embedding-001", content: { parts: [{ text }] } })),
-            });
+            
+            const embeddingResult = await embedBatchWithRetry(textsToEmbed);
+
             const embeddings = embeddingResult.embeddings.map(e => e.values);
             await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
                 wait: true,
@@ -688,10 +705,8 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             }
 
             case "create_item": {
-                // NEW HYBRID PARAMETER LOGIC
                 let { item_type, title, sprint, project_name } = parameters || {};
 
-                // AI-first, Regex-backup
                 item_type = item_type || (message.match(/\b(requirement|defect)\b/i) || [])[1]?.toLowerCase();
                 title = title || extractTitleFromMessage(message);
                 project_name = project_name || extractConversationalProject(message);

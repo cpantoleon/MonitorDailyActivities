@@ -1431,7 +1431,7 @@ body {
 .chart-container {
   flex: 1 1 30%;
   min-width: 350px;
-  max-width: 500px;
+  max-width: 650px;
   height: 350px;
   padding: 15px;
   border: 1px solid #DEB887;

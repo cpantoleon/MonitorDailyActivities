@@ -206,6 +206,47 @@
 }
 .button-export:hover { background-color: #138496; }
 
+.export-button-container {
+    position: relative;
+    display: inline-block;
+}
+
+.export-dropdown-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background-color: #FFFAF0;
+    border: 1px solid #D2B48C;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 10;
+    min-width: 120px;
+    margin-bottom: 5px;
+    overflow: hidden;
+}
+
+.export-dropdown-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 15px;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #5C4033;
+    font-size: 0.9em;
+}
+
+.export-dropdown-menu button:hover {
+    background-color: #FAF0E6;
+}
+
+.export-dropdown-menu button:disabled {
+    color: #999;
+    cursor: not-allowed;
+    background-color: #f5f5f5;
+}
+
 .archived-card {
     background-color: #FAF0E6;
 }
@@ -262,6 +303,7 @@
 .button-delete:hover { background-color: #c82333; }
 
 .archived-details-view {
+    position: relative;
     padding: 20px;
     background-color: #FAF0E6;
     border-radius: 8px;
@@ -413,7 +455,7 @@
 .comparison-chart-wrapper { text-align: center; }
 .comparison-chart-wrapper:last-child { margin-top: auto; }
 .comparison-chart-wrapper h4 { margin-bottom: 10px; color: #704214; }
-.comparison-chart-wrapper .chart-container { height: 180px; display: flex; align-items: center; justify-content: center; }
+.comparison-chart-wrapper .chart-container { height: 180px; display: flex; align-items: center; justify-content: center; position: relative; }
 .comparison-chart-wrapper .empty-chart-placeholder { border: 1px dashed #E3C9A6; border-radius: 4px; background-color: #FAF0E6; width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; }
 
 .chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 15px; margin-top: 15px; list-style: none; padding: 0; }
@@ -476,4 +518,47 @@
 .modal-button-reset:hover {
     background-color: #6c757d;
     color: white;
+}
+
+.pdf-export-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 250, 240, 0.8);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+}
+
+.button-complete {
+    padding: 8px 16px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: #28a745;
+    color: white;
+}
+
+.button-complete:hover {
+    background-color: #218838;
+}
+
+.pdf-export-overlay p {
+    margin-top: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #5C4033;
+}
+
+.comparison-view {
+    position: relative;
 }
