@@ -136,6 +136,18 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating sat_reports table", err.message);
             });
 
+            db.run(`CREATE TABLE IF NOT EXISTS sat_bugs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                archive_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                link TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating sat_bugs table", err.message);
+            });
+
             db.run(`CREATE TABLE IF NOT EXISTS defects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,

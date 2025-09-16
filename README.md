@@ -144,14 +144,18 @@ Once synced, you can start asking questions! For a full list of example commands
 
 #### 3. Releases
 -   View active and archived releases for a selected project.
--   For active releases, a pie chart shows the progress (done vs. not done requirements).
--   The card lists the requirements associated with each release and allows filtering them by sprint.
--   A dedicated "Defects" button allows quick access to view all defects linked to the release's requirements.
--   **Export to Excel**: Generate a comprehensive Excel report for the release, with separate sheets detailing requirements, linked defects (including their 'Return to Dev' count), and a full requirement-to-defect breakdown.
--   **Finalize a Release**: Archive a release with two options: "Archive Only" (creates a permanent record) or "Archive & Complete Items" (archives the release and marks all associated requirements as 'Done').
--   **Edit & Delete**: Modify release details or remove a release completely. For archived releases, view the final metrics and the frozen list of requirements at the time of archival.
--   **Add/Update SAT Reports**: For archived releases, add or update a SAT (System Acceptance Testing) report. Enter the percentage of tests that Passed, Failed, Blocked, Pending, Executing, or Aborted. The data is visualized as a dedicated pie chart.
--   **Compare Archives**: Select multiple archived releases to view a side-by-side comparison of their final metrics and SAT reports.
+-   **Active Releases**:
+    -   Track real-time progress with a live pie chart showing done vs. not-done requirements.
+    -   View and filter the list of associated requirements by sprint.
+    -   Quickly access all defects linked to the release's requirements.
+    -   Export a comprehensive report to Excel or PDF.
+    -   Finalize a release with two options: "Archive Only" (creates a permanent record) or "Archive & Complete Items" (archives the release and marks all associated requirements as 'Done').
+-   **Archived Releases**:
+    -   Review a permanent snapshot with final metrics and the frozen list of requirements.
+    -   **Add/Update SAT Reports**: Log a SAT (System Acceptance Testing) report by entering the percentage of tests that Passed, Failed, Blocked, etc. The data is visualized in a dedicated pie chart.
+    -   **Log SAT Bugs**: Once a SAT report is added, you can log, edit, and delete specific bugs found during testing. Each bug includes a title and a direct URL link for easy access.
+    -   **Compare Archives**: Select multiple archived releases to view a side-by-side comparison of their final metrics and SAT reports.
+    -   **Export Archives**: Generate detailed Excel or PDF reports for an archive, which now include a dedicated section listing all logged SAT Bugs.
 
 
 #### 4. Sprint Analysis

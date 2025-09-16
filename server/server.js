@@ -1301,7 +1301,7 @@ app.post("/api/archives/:id/complete", async (req, res) => {
 
         db.get("SELECT * FROM releases WHERE id = ?", [archive.original_release_id], (err, release) => {
             if (err) return res.status(500).json({ error: "DB error fetching original release info." });
-            // Original release might be deleted, so we proceed with caution
+            
             const projectName = release ? release.name : archive.name;
             const projectId = release ? release.project_id : archive.project_id;
 
@@ -1418,6 +1418,76 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
             return res.status(500).json({ error: "Database error saving SAT report: " + err.message });
         }
         res.status(201).json({ message: "SAT report saved successfully." });
+    });
+});
+
+app.get("/api/archives/:archiveId/sat-bugs", (req, res) => {
+    const archiveId = req.params.archiveId;
+    const sql = `
+        SELECT id, title, link
+        FROM sat_bugs
+        WHERE archive_id = ?
+        ORDER BY created_at ASC
+    `;
+    db.all(sql, [archiveId], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: "Database error fetching SAT bugs: " + err.message });
+        }
+        res.json({ message: "success", data: rows });
+    });
+});
+
+app.post("/api/archives/:archiveId/sat-bugs", (req, res) => {
+    const archiveId = req.params.archiveId;
+    const { title, link } = req.body;
+
+    if (!title || !link || title.trim() === '' || link.trim() === '') {
+        return res.status(400).json({ error: "Title and link are required." });
+    }
+
+    const sql = `INSERT INTO sat_bugs (archive_id, title, link) VALUES (?, ?, ?)`;
+    db.run(sql, [archiveId, title.trim(), link.trim()], function(err) {
+        if (err) {
+            return res.status(500).json({ error: "Database error saving SAT bug: " + err.message });
+        }
+        res.status(201).json({
+            message: "SAT bug added successfully.",
+            data: { id: this.lastID, archive_id: archiveId, title: title.trim(), link: link.trim() }
+        });
+    });
+});
+
+app.put("/api/archives/sat-bugs/:bugId", (req, res) => {
+    const bugId = req.params.bugId;
+    const { title, link } = req.body;
+
+    if (!title || !link || title.trim() === '' || link.trim() === '') {
+        return res.status(400).json({ error: "Title and link are required." });
+    }
+
+    const sql = `UPDATE sat_bugs SET title = ?, link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(sql, [title.trim(), link.trim(), bugId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: "Database error updating SAT bug: " + err.message });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: `SAT bug with id ${bugId} not found.` });
+        }
+        res.json({ message: "SAT bug updated successfully.", changes: this.changes });
+    });
+});
+
+app.delete("/api/archives/sat-bugs/:bugId", (req, res) => {
+    const bugId = req.params.bugId;
+    const sql = 'DELETE FROM sat_bugs WHERE id = ?';
+    db.run(sql, [bugId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: "Database error deleting SAT bug: " + err.message });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: `SAT bug with id ${bugId} not found.` });
+        }
+        res.json({ message: "SAT bug deleted successfully.", changes: this.changes });
     });
 });
 

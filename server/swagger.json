@@ -25,6 +25,10 @@
       "description": "Operations for managing archived releases"
     },
     {
+      "name": "SAT Bugs",
+      "description": "Operations for managing SAT bugs associated with an archived release"
+    },
+    {
       "name": "Requirements",
       "description": "Operations related to sprint requirements and activities"
     },
@@ -566,6 +570,136 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/archives/{archiveId}/sat-bugs": {
+      "get": {
+        "summary": "Get all SAT bugs for an archived release",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of SAT bugs for the specified archive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SatBug"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add a new SAT bug to an archived release",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatBugInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "SAT bug added successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/sat-bugs/{bugId}": {
+      "put": {
+        "summary": "Update an existing SAT bug",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SatBugIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatBugInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SAT bug updated successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a SAT bug",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SatBugIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SAT bug deleted successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
@@ -2417,6 +2551,39 @@
         },
         "minProperties": 1
       },
+      "SatBug": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "SatBugInput": {
+        "type": "object",
+        "required": [
+          "title",
+          "link"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the SAT bug."
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "description": "A URL link to the bug tracking system (e.g., Jira)."
+          }
+        }
+      },
       "SatReport": {
         "type": "object",
         "properties": {
@@ -2545,6 +2712,15 @@
         "in": "path",
         "required": true,
         "description": "ID of the requirement group",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "SatBugIdPath": {
+        "name": "bugId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the SAT bug",
         "schema": {
           "type": "integer"
         }

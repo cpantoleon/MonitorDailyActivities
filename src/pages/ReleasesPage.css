@@ -339,10 +339,10 @@
 
 .archived-details-charts-container {
     display: flex;
-    flex-direction: column;
     gap: 20px;
-    align-items: center;
+    align-items: flex-start;
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .archived-details-chart-wrapper {
@@ -561,4 +561,121 @@
 
 .comparison-view {
     position: relative;
+}
+
+.sat-bugs-container {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sat-bugs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.sat-bugs-header h4 {
+    margin: 0;
+    font-size: 1.1em;
+    color: #5C4033;
+}
+
+.add-sat-bug-button {
+    background-color: transparent; /* Make background see-through */
+    color: #8B4513; /* Use a dark brown for the '+' sign */
+    border: 2px solid #D2B48C; /* Add a subtle border */
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 1.4em; /* Slightly larger '+' */
+    font-weight: 300; /* Thinner '+' sign */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: all 0.2s ease-in-out; /* Smooth hover effect */
+}
+
+.add-sat-bug-button:hover {
+    background-color: #8B4513; /* Fill with dark brown on hover */
+    color: white; /* Make '+' white on hover */
+    border-color: #8B4513; /* Match border to background */
+    transform: rotate(90deg); /* Optional: Fun little animation */
+}
+
+.sat-bugs-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.9em;
+}
+
+.sat-bugs-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #f0e6d6;
+}
+
+.sat-bugs-list li:last-child {
+    border-bottom: none;
+}
+
+.sat-bugs-list a {
+    color: #A0522D;
+    text-decoration: none;
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sat-bugs-list a:hover {
+    text-decoration: underline;
+}
+
+.bug-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.bug-edit-btn, .bug-delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8em;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.bug-edit-btn {
+    color: #007bff; /* A standard, clear blue for actions */
+    font-weight: 500;
+}
+.bug-edit-btn:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+.bug-delete-btn {
+    color: #dc3545;
+    font-weight: bold;
+}
+.bug-delete-btn:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+.no-bugs-message {
+    color: #999;
+    font-style: italic;
+    padding: 10px 0;
 }

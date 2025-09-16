@@ -7,6 +7,7 @@ import FinalizeReleaseModal from '../components/FinalizeReleaseModal';
 import EditReleaseModal from '../components/EditReleaseModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/ReleaseModal';
+import SatBugModal from '../components/SatBugModal';
 import Tooltip from '../components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
@@ -429,15 +430,31 @@ const ArchivedDefectList = ({ defects, onNavigate }) => {
     );
 };
 
-const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements, onAddSatReport, onCompleteRelease, onExportToExcel, onExportToPdf }) => {
+const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNavigateToDefect, allProcessedRequirements, onAddSatReport, onCompleteRelease, onExportToExcel, onExportToPdf, showMainMessage }) => {
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [defects, setDefects] = useState([]);
     const [isPdfExporting, setIsPdfExporting] = useState(false);
     const [isExcelExporting, setIsExcelExporting] = useState(false);
+    const [satBugs, setSatBugs] = useState([]);
+    const [isSatBugModalOpen, setIsSatBugModalOpen] = useState(false);
+    const [bugToEdit, setBugToEdit] = useState(null);
+    const [bugToDelete, setBugToDelete] = useState(null);
 
     const metricsChartRef = useRef(null);
     const satChartRef = useRef(null);
+
+    const fetchSatBugs = useCallback(async () => {
+        if (!archive.id) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/sat-bugs`);
+            if (!response.ok) throw new Error('Failed to fetch SAT bugs.');
+            const data = await response.json();
+            setSatBugs(data.data || []);
+        } catch (err) {
+            console.error(err);
+        }
+    }, [archive.id]);
 
     useEffect(() => {
         setIsLoading(true);
@@ -451,7 +468,8 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 console.error(err);
                 setIsLoading(false);
             });
-    }, [archive.id]);
+        fetchSatBugs();
+    }, [archive.id, fetchSatBugs]);
 
     useEffect(() => {
         if (items.length > 0 && allProcessedRequirements.length > 0) {
@@ -475,7 +493,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     const handlePdfExport = async () => {
         setIsPdfExporting(true);
-        await onExportToPdf(archive, items, defects, {
+        await onExportToPdf(archive, items, defects, satBugs, {
             metricsChart: metricsChartRef.current,
             satChart: satChartRef.current
         });
@@ -484,8 +502,40 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     const handleExcelExport = async () => {
         setIsExcelExporting(true);
-        await onExportToExcel(archive, items, defects);
+        await onExportToExcel(archive, items, defects, satBugs);
         setIsExcelExporting(false);
+    };
+
+    const handleOpenSatBugModal = (bug = null) => {
+        setBugToEdit(bug);
+        setIsSatBugModalOpen(true);
+    };
+
+    const handleSaveSatBug = () => {
+        setIsSatBugModalOpen(false);
+        setBugToEdit(null);
+        fetchSatBugs();
+    };
+
+    const handleDeleteSatBugRequest = (bug) => {
+        setBugToDelete(bug);
+    };
+
+    const handleConfirmDeleteSatBug = async () => {
+        if (!bugToDelete) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/archives/sat-bugs/${bugToDelete.id}`, {
+                method: 'DELETE',
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to delete bug.');
+            showMainMessage(result.message, 'success');
+            fetchSatBugs();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        } finally {
+            setBugToDelete(null);
+        }
     };
 
     const ourMetricsChartData = {
@@ -547,6 +597,25 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                 <ChartLegend items={satLegendItems} />
                             </div>
                         )}
+                        {satChartData && (
+                            <div className="sat-bugs-container">
+                                <div className="sat-bugs-header">
+                                    <h4>SAT Bugs ({satBugs.length})</h4>
+                                    <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
+                                </div>
+                                <ul className="sat-bugs-list">
+                                    {satBugs.length > 0 ? satBugs.map(bug => (
+                                        <li key={bug.id}>
+                                            <a href={bug.link} target="_blank" rel="noopener noreferrer">{bug.title}</a>
+                                            <div className="bug-actions">
+                                                <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
+                                                <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
+                                            </div>
+                                        </li>
+                                    )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
+                                </ul>
+                            </div>
+                        )}
                     </div>
 
                     <div className="release-requirements">
@@ -586,6 +655,21 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     </div>
                 </div>
             </div>
+            <SatBugModal
+                isOpen={isSatBugModalOpen}
+                onClose={() => setIsSatBugModalOpen(false)}
+                onSave={handleSaveSatBug}
+                archiveId={archive.id}
+                bugToEdit={bugToEdit}
+                showMainMessage={showMainMessage}
+            />
+            <ConfirmationModal
+                isOpen={!!bugToDelete}
+                onClose={() => setBugToDelete(null)}
+                onConfirm={handleConfirmDeleteSatBug}
+                title="Confirm Delete"
+                message={`Are you sure you want to delete the SAT bug "${bugToDelete?.title}"?`}
+            />
         </div>
     );
 };
@@ -728,6 +812,10 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     yPos = 15;
                 }
 
+                const allDefects = archive.requirements.flatMap(req => req.linkedDefects);
+                const uniqueDefects = Array.from(new Map(allDefects.map(d => [d.id, d])).values());
+                const defectCount = uniqueDefects.length;
+
                 pdf.setFontSize(16);
                 pdf.text(archive.name, leftMargin, yPos);
                 yPos += 8;
@@ -736,7 +824,9 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                 pdf.text(`Closed: ${new Date(archive.closed_at).toLocaleDateString()}`, leftMargin, yPos);
                 yPos += 5;
                 pdf.text(`Total Requirements: ${archive.metrics.doneCount + archive.metrics.notDoneCount}`, leftMargin, yPos);
-                yPos += 15;
+                yPos += 5;
+                pdf.text(`Total Defects: ${defectCount}`, leftMargin, yPos);
+                yPos += 10;
 
                 const chartStartY = yPos;
                 const chartWidth = 45;
@@ -987,17 +1077,27 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     };
 
-    const releasesPageTooltipContent = (
-        <>
-            <strong>Releases Page Guide</strong>
-            <p>This page shows all active and archived releases for the selected project.</p>
-            <ul>
-                <li><strong>Active Releases:</strong> View real-time progress of ongoing releases. You can filter by sprint, export details, edit, or finalize them.</li>
-                <li><strong>Archived Releases:</strong> View a permanent snapshot of finalized releases. Select multiple to compare them side-by-side.</li>
-                <li><strong>Defects Count:</strong> This number represents unique defects linked to the requirements currently displayed for the release.</li>
-            </ul>
-        </>
-    );
+const releasesPageTooltipContent = (
+    <>
+        <strong>Release Dashboard Guide</strong>
+        <p>Manage your project's release lifecycle. Switch between Active and Archived views to see current progress or historical data.</p>
+        
+        <strong style={{ marginTop: '10px', display: 'block' }}>Active Releases</strong>
+        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+            <li>Track real-time progress with live charts.</li>
+            <li>Filter requirements by sprint to focus your view.</li>
+            <li>Export detailed reports in Excel or PDF format.</li>
+            <li>Finalize a release to create a permanent record in the archives.</li>
+        </ul>
+
+        <strong style={{ marginTop: '10px', display: 'block' }}>Archived Releases</strong>
+        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+            <li>Review final metrics and frozen requirement lists.</li>
+            <li>Add SAT results and log specific SAT Bugs found during testing.</li>
+            <li>Check the boxes on multiple archives and click 'Compare Selected' for a side-by-side analysis!</li>
+        </ul>
+    </>
+);
 
     useEffect(() => {
         const savedProject = sessionStorage.getItem('releasePageSelectedProject');
@@ -1018,6 +1118,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         setSelectedProject(project);
         setComparisonList([]);
         setIsComparing(false);
+        setSelectedArchive(null);
     };
     
     const fetchActiveReleases = useCallback(async () => {
@@ -1213,7 +1314,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                         cell.s = headerStyle;
                     } else {
                         const headerName = headers[C];
-                        if ((headerName === 'Requirement Link' || headerName === 'Defect Link') && cell.v) {
+                        if ((headerName === 'Requirement Link' || headerName === 'Defect Link' || headerName === 'Link') && cell.v) {
                             cell.l = { Target: cell.v, Tooltip: `Click to open link` };
                             cell.s = linkStyle;
                         } else {
@@ -1336,10 +1437,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     };
 
     const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs) => {
-        // NOTE: We no longer use the chartRefs, but keep the signature for consistency if needed elsewhere.
         const { reqChart, defectChart } = chartRefs;
-
-        // We will now use the data directly to build a new, off-screen chart for the PDF.
         const reqChartData = reqChart?.data;
         const defectChartData = defectChart?.data;
     
@@ -1355,19 +1453,17 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         const generateChartImage = (data) => {
             if (!data) return null;
             
-            // 1. Create a temporary, off-screen canvas
             const canvas = document.createElement('canvas');
             canvas.width = 800;
-            canvas.height = 800; // Force a 1:1 aspect ratio
+            canvas.height = 800;
             const ctx = canvas.getContext('2d');
     
-            // 2. Create a new chart instance on our temporary canvas
             const tempChart = new ChartJS(ctx, {
                 type: 'pie',
                 data: data,
                 options: {
-                    responsive: false, // Must be false for off-screen rendering
-                    animation: { duration: 0 }, // No animation
+                    responsive: false,
+                    animation: { duration: 0 },
                     plugins: {
                         legend: { display: false },
                         title: { display: false },
@@ -1375,7 +1471,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 },
             });
     
-            // 3. Get the high-quality image and destroy the temporary chart to prevent memory leaks
             const imageData = tempChart.toBase64Image('image/png', 1.0);
             tempChart.destroy();
     
@@ -1403,7 +1498,9 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             pdf.text(`Due: ${new Date(release.release_date).toLocaleDateString()}`, leftMargin, yPos);
             yPos += 5;
             pdf.text(`Total Requirements: ${requirements.length}`, leftMargin, yPos);
-            yPos += 15;
+            yPos += 5;
+            pdf.text(`Total Defects: ${defects.length}`, leftMargin, yPos);
+            yPos += 10;
     
             const chartStartY = yPos;
             const chartWidth = 60;
@@ -1473,17 +1570,28 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 pdf.setFontSize(14);
                 pdf.text('Requirements', leftMargin, yPos);
                 yPos += 8;
+                const body = requirements.map(r => [
+                    { content: r.requirementUserIdentifier, data: { url: r.currentStatusDetails.link || '' } },
+                    r.currentStatusDetails.sprint || 'N/A',
+                    r.currentStatusDetails.status
+                ]);
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Requirement', 'Sprint', 'Status']],
-                    body: requirements.map(r => [
-                        r.requirementUserIdentifier,
-                        r.currentStatusDetails.sprint || 'N/A',
-                        r.currentStatusDetails.status
-                    ]),
+                    body: body,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
                     columnStyles: { 1: { cellWidth: 25 } },
+                    didParseCell: function (data) {
+                        if (data.cell.raw?.data?.url) {
+                            data.cell.styles.textColor = [0, 0, 255];
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
+                            pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+                    }
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
@@ -1493,12 +1601,26 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 pdf.setFontSize(14);
                 pdf.text('Defects', leftMargin, yPos);
                 yPos += 8;
+                const body = defects.map(d => [
+                    { content: d.title, data: { url: d.link || '' } },
+                    d.status
+                ]);
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
-                    body: defects.map(d => [d.title, d.status]),
+                    body: body,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
+                    didParseCell: function (data) {
+                        if (data.cell.raw?.data?.url) {
+                            data.cell.styles.textColor = [0, 0, 255];
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
+                            pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+                    }
                 });
             }
     
@@ -1510,13 +1632,52 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     };
 
-    const handleExportArchivedReleaseToExcel = async (archive, items, defects) => {
+    const handleExportArchivedReleaseToExcel = async (archive, items, defects, satBugs) => {
+        const returnCountsMap = new Map();
+
+        try {
+            const project = archive.project;
+            if (project) {
+                const [activeRes, closedRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=active`),
+                    fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=closed`)
+                ]);
+
+                if (activeRes.ok) {
+                    const activeData = await activeRes.json();
+                    (activeData.data || []).forEach(item => returnCountsMap.set(item.id, item.return_count));
+                }
+                if (closedRes.ok) {
+                    const closedData = await closedRes.json();
+                    (closedData.data || []).forEach(item => returnCountsMap.set(item.id, item.return_count));
+                }
+            }
+        } catch (error) {
+            console.error("Could not fetch defect return counts for export:", error);
+            showMainMessage("Could not fetch return-to-dev counts for the export, they will be omitted.", "warning");
+        }
+
         const MAX_WIDTH = 70;
         const borderStyle = { style: "thin", color: { auto: 1 } };
         const border = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
-        const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E9E9E9" } }, border: border, alignment: { vertical: 'center', horizontal: 'center' } };
-        const cellStyle = { border: border, alignment: { wrapText: true, vertical: 'top' } };
-        const linkStyle = { font: { color: { rgb: "0000FF" }, underline: true }, border: border, alignment: { wrapText: true, vertical: 'top' } };
+
+        const headerStyle = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "E9E9E9" } },
+            border: border,
+            alignment: { vertical: 'center', horizontal: 'center' }
+        };
+        
+        const cellStyle = {
+            border: border,
+            alignment: { wrapText: true, vertical: 'top' }
+        };
+
+        const linkStyle = {
+            font: { color: { rgb: "0000FF" }, underline: true },
+            border: border,
+            alignment: { wrapText: true, vertical: 'top' }
+        };
 
         const fitToColumn = (arrayOfArrays) => {
             if (!arrayOfArrays || arrayOfArrays.length === 0) return [];
@@ -1537,6 +1698,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
         const processSheet = (data, headers) => {
             const dataAsArray = [headers, ...data.map(row => headers.map(header => row[header]))];
+            
             const ws = XLSX.utils.aoa_to_sheet(dataAsArray);
             ws['!cols'] = fitToColumn(dataAsArray);
 
@@ -1551,7 +1713,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                         cell.s = headerStyle;
                     } else {
                         const headerName = headers[C];
-                        if (headerName === 'Defect Link' && cell.v) {
+                        if ((headerName === 'Requirement Link' || headerName === 'Defect Link' || headerName === 'Link') && cell.v) {
                             cell.l = { Target: cell.v, Tooltip: `Click to open link` };
                             cell.s = linkStyle;
                         } else {
@@ -1565,32 +1727,81 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
         const wb = XLSX.utils.book_new();
 
-        const reqHeaders = ['Release Name', 'Requirement Name', 'Final Status'];
-        const requirementsData = items.map(item => ({
-            'Release Name': archive.name,
-            'Requirement Name': item.requirement_title,
-            'Final Status': item.final_status
-        }));
+        const reqHeaders = ['Release Name', 'Requirement Name', 'Requirement Link', 'Type', 'Linked Defects', 'Final Status'];
+        const requirementsData = items.map(item => {
+            const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+            return {
+                'Release Name': archive.name,
+                'Requirement Name': item.requirement_title,
+                'Requirement Link': requirement ? requirement.currentStatusDetails.link : '',
+                'Type': requirement ? requirement.currentStatusDetails.type : '',
+                'Linked Defects': requirement ? (requirement.linkedDefects || []).map(d => d.title).join('\n') : '',
+                'Final Status': item.final_status
+            };
+        });
+
         if (requirementsData.length > 0) {
             const wsReqs = processSheet(requirementsData, reqHeaders);
             XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
         }
 
-        const defectHeaders = ['Defect Name', 'Defect Link', 'Status'];
-        const defectsData = defects.map(defect => ({
-            'Defect Name': defect.title,
-            'Defect Link': defect.link || '',
-            'Status': defect.status,
-        }));
+        const reqDefectHeaders = ['Requirement Name', 'Requirement Link', 'Type', 'Defect Name', 'Defect Link', 'Return to Dev Count'];
+        const reqDefectData = [];
+        items.forEach(item => {
+            const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+            if (requirement && requirement.linkedDefects && requirement.linkedDefects.length > 0) {
+                requirement.linkedDefects.forEach(defect => {
+                    reqDefectData.push({
+                        'Requirement Name': item.requirement_title,
+                        'Requirement Link': requirement.currentStatusDetails.link,
+                        'Type': requirement.currentStatusDetails.type || '',
+                        'Defect Name': defect.title,
+                        'Defect Link': defect.link,
+                        'Return to Dev Count': returnCountsMap.get(defect.id) || 0
+                    });
+                });
+            }
+        });
+
+        if (reqDefectData.length > 0) {
+            const wsReqDefects = processSheet(reqDefectData, reqDefectHeaders);
+            XLSX.utils.book_append_sheet(wb, wsReqDefects, 'Requirements with Defects');
+        }
+
+        const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
+        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Status', 'Return to Dev Count'];
+        const defectsData = uniqueDefects.map(defect => {
+            const linkedRequirements = allProcessedRequirements
+                .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
+            const linkedRequirementsNames = linkedRequirements.map(req => req.requirementUserIdentifier);
+            return {
+                'Defect Name': defect.title,
+                'Defect Link': defect.link || '',
+                'Linked Requirements': linkedRequirementsNames.join('\n'),
+                'Status': defect.status,
+                'Return to Dev Count': returnCountsMap.get(defect.id) || 0
+            };
+        });
+
         if (defectsData.length > 0) {
             const wsDefects = processSheet(defectsData, defectHeaders);
             XLSX.utils.book_append_sheet(wb, wsDefects, 'Defects');
+        }
+
+        if (satBugs && satBugs.length > 0) {
+            const satBugsHeaders = ['Title', 'Link'];
+            const satBugsData = satBugs.map(bug => ({
+                'Title': bug.title,
+                'Link': bug.link
+            }));
+            const wsSatBugs = processSheet(satBugsData, satBugsHeaders);
+            XLSX.utils.book_append_sheet(wb, wsSatBugs, 'SAT Bugs');
         }
         
         XLSX.writeFile(wb, `${archive.name}_Archive_Details.xlsx`);
     };
 
-    const handleExportArchivedReleaseToPdf = async (archive, items, defects, chartRefs) => {
+    const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs, chartRefs) => {
         if (!chartRefs || !chartRefs.metricsChart) {
             showMainMessage('Could not generate PDF. Chart data is not available.', 'error');
             return;
@@ -1608,7 +1819,9 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             pdf.text(`Closed: ${new Date(archive.closed_at).toLocaleString()}`, leftMargin, yPos);
             yPos += 5;
             pdf.text(`Total Requirements: ${archive.metrics.doneCount + archive.metrics.notDoneCount}`, leftMargin, yPos);
-            yPos += 15;
+            yPos += 5;
+            pdf.text(`Total Defects: ${defects.length}`, leftMargin, yPos);
+            yPos += 10;
 
             const chartStartY = yPos;
             const chartWidth = 60;
@@ -1668,23 +1881,83 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             yPos = Math.max(finalMetricsLegendY, finalSatLegendY) + 10;
 
             if (items.length > 0) {
+                const body = items.map(item => {
+                    const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
+                    return [
+                        { content: item.requirement_title, data: { url: req ? req.currentStatusDetails.link : '' } },
+                        item.final_status
+                    ];
+                });
+
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Requirement', 'Final Status']],
-                    body: items.map(item => [item.requirement_title, item.final_status]),
+                    body: body,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
+                    didParseCell: function (data) {
+                        if (data.cell.raw?.data?.url) {
+                            data.cell.styles.textColor = [0, 0, 255];
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
+                            pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+                    }
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
 
             if (defects.length > 0) {
+                const body = defects.map(d => [
+                    { content: d.title, data: { url: d.link || '' } },
+                    d.status
+                ]);
+
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
-                    body: defects.map(d => [d.title, d.status]),
+                    body: body,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
+                    didParseCell: function (data) {
+                        if (data.cell.raw?.data?.url) {
+                            data.cell.styles.textColor = [0, 0, 255];
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
+                            pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+                    }
+                });
+                yPos = pdf.lastAutoTable.finalY + 10;
+            }
+
+            if (satBugs && satBugs.length > 0) {
+                const body = satBugs.map(bug => [
+                    { content: bug.title, data: { url: bug.link } }
+                ]);
+                pdf.setFontSize(12);
+                pdf.text('SAT Bugs', leftMargin, yPos);
+                yPos += 6;
+                autoTable(pdf, {
+                    startY: yPos,
+                    head: [['Title']],
+                    body: body,
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 56, 48] },
+                    didParseCell: function (data) {
+                        if (data.cell.raw?.data?.url) {
+                            data.cell.styles.textColor = [0, 0, 255];
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
+                            pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+                    }
                 });
             }
 
@@ -1742,6 +2015,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 onCompleteRelease={handleCompleteRelease}
                 onExportToExcel={handleExportArchivedReleaseToExcel}
                 onExportToPdf={handleExportArchivedReleaseToPdf}
+                showMainMessage={showMainMessage}
             />;
         }
 
