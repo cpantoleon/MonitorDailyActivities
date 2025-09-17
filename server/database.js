@@ -259,6 +259,24 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 }
             });
 
+            db.all("PRAGMA table_info(sat_bugs)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching sat_bugs table info:", err.message);
+                    return;
+                }
+                
+                const hasEstimationColumn = columns.some(col => col.name === 'estimation');
+                if (!hasEstimationColumn) {
+                    db.run("ALTER TABLE sat_bugs ADD COLUMN estimation INTEGER NULL", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding estimation column to sat_bugs:", alterErr.message);
+                        } else {
+                            console.log("Column 'estimation' added to sat_bugs table.");
+                        }
+                    });
+                }
+            });
+
             console.log("All table checks/creations complete.");
         });
     }

@@ -1257,6 +1257,7 @@ app.get("/api/archives/:project", async (req, res) => {
                 try {
                     return {
                         id: row.id,
+                        project: req.params.project,
                         original_release_id: row.original_release_id,
                         name: row.name,
                         closed_at: row.closed_at,
@@ -1266,7 +1267,7 @@ app.get("/api/archives/:project", async (req, res) => {
                     };
                 } catch (e) {
                     console.error("Failed to parse metrics_json for archive:", row.id, e);
-                    return { ...row, metrics: {}, sat_report: sat_report };
+                    return { ...row, project: req.params.project, metrics: {}, sat_report: sat_report };
                 }
             });
             res.json({ message: "success", data: archives });
@@ -1424,7 +1425,7 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
 app.get("/api/archives/:archiveId/sat-bugs", (req, res) => {
     const archiveId = req.params.archiveId;
     const sql = `
-        SELECT id, title, link
+        SELECT id, title, link, estimation
         FROM sat_bugs
         WHERE archive_id = ?
         ORDER BY created_at ASC
@@ -1439,34 +1440,58 @@ app.get("/api/archives/:archiveId/sat-bugs", (req, res) => {
 
 app.post("/api/archives/:archiveId/sat-bugs", (req, res) => {
     const archiveId = req.params.archiveId;
-    const { title, link } = req.body;
+    const { title, link, estimation, estimation_unit } = req.body;
 
     if (!title || !link || title.trim() === '' || link.trim() === '') {
         return res.status(400).json({ error: "Title and link are required." });
     }
 
-    const sql = `INSERT INTO sat_bugs (archive_id, title, link) VALUES (?, ?, ?)`;
-    db.run(sql, [archiveId, title.trim(), link.trim()], function(err) {
+    let estimationInHours = null;
+    if (estimation) {
+        const est = parseInt(estimation, 10);
+        if (!isNaN(est)) {
+            if (estimation_unit === 'd') {
+                estimationInHours = est * 8;
+            } else {
+                estimationInHours = est;
+            }
+        }
+    }
+
+    const sql = `INSERT INTO sat_bugs (archive_id, title, link, estimation) VALUES (?, ?, ?, ?)`;
+    db.run(sql, [archiveId, title.trim(), link.trim(), estimationInHours], function(err) {
         if (err) {
             return res.status(500).json({ error: "Database error saving SAT bug: " + err.message });
         }
         res.status(201).json({
             message: "SAT bug added successfully.",
-            data: { id: this.lastID, archive_id: archiveId, title: title.trim(), link: link.trim() }
+            data: { id: this.lastID, archive_id: archiveId, title: title.trim(), link: link.trim(), estimation: estimationInHours }
         });
     });
 });
 
 app.put("/api/archives/sat-bugs/:bugId", (req, res) => {
     const bugId = req.params.bugId;
-    const { title, link } = req.body;
+    const { title, link, estimation, estimation_unit } = req.body;
 
     if (!title || !link || title.trim() === '' || link.trim() === '') {
         return res.status(400).json({ error: "Title and link are required." });
     }
 
-    const sql = `UPDATE sat_bugs SET title = ?, link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-    db.run(sql, [title.trim(), link.trim(), bugId], function(err) {
+    let estimationInHours = null;
+    if (estimation) {
+        const est = parseInt(estimation, 10);
+        if (!isNaN(est)) {
+            if (estimation_unit === 'd') {
+                estimationInHours = est * 8;
+            } else {
+                estimationInHours = est;
+            }
+        }
+    }
+
+    const sql = `UPDATE sat_bugs SET title = ?, link = ?, estimation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(sql, [title.trim(), link.trim(), estimationInHours, bugId], function(err) {
         if (err) {
             return res.status(500).json({ error: "Database error updating SAT bug: " + err.message });
         }

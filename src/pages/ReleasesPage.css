@@ -679,3 +679,11 @@
     font-style: italic;
     padding: 10px 0;
 }
+
+/* ADD THIS RULE FOR PERFECT TITLE ALIGNMENT */
+.release-card-body .archived-details-chart-wrapper h4,
+.release-card-body .sat-bugs-container h4,
+.release-card-body .release-requirements h4,
+.release-card-body .defect-list h4 {
+    margin-top: 0;
+}

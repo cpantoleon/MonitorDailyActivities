@@ -183,7 +183,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         await onExportToPdf(release, filteredRequirements, uniqueFilteredDefects, {
             reqChart: reqChartRef.current,
             defectChart: defectChartRef.current,
-        });
+        }, { selectedSprints, availableSprints });
         setIsPdfExporting(false);
     };
 
@@ -415,7 +415,7 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
 
 const ArchivedDefectList = ({ defects, onNavigate }) => {
     return (
-        <div className="defect-list" style={{ borderLeft: '1px solid #E3C9A6', paddingLeft: '20px', flexGrow: 1 }}>
+        <div className="defect-list">
             <h4>Defects ({defects.length})</h4>
             <ul className="requirement-list">
                 {defects.length > 0 ? defects.map(defect => (
@@ -579,47 +579,49 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleString()}</span>
                     </div>
                 </div>
-                <div className="release-card-body">
-                    <div className="archived-details-charts-container">
-                        <div className="archived-details-chart-wrapper">
-                            <h4>Our Final Metrics</h4>
-                            <div className="archived-details-chart">
-                                <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
-                            </div>
-                            <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
+                {/* START: Final corrected layout */}
+                <div className="release-card-body" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: '25px' }}>
+                    
+                    <div className="archived-details-chart-wrapper" style={{ flexShrink: 0 }}>
+                        <h4>Our Final Metrics</h4>
+                        <div className="archived-details-chart">
+                            <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
                         </div>
-                        {satChartData && (
-                            <div className="archived-details-chart-wrapper">
-                                <h4>SAT Report</h4>
-                                <div className="archived-details-chart">
-                                    <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
-                                </div>
-                                <ChartLegend items={satLegendItems} />
-                            </div>
-                        )}
-                        {satChartData && (
-                            <div className="sat-bugs-container">
-                                <div className="sat-bugs-header">
-                                    <h4>SAT Bugs ({satBugs.length})</h4>
-                                    <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
-                                </div>
-                                <ul className="sat-bugs-list">
-                                    {satBugs.length > 0 ? satBugs.map(bug => (
-                                        <li key={bug.id}>
-                                            <a href={bug.link} target="_blank" rel="noopener noreferrer">{bug.title}</a>
-                                            <div className="bug-actions">
-                                                <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
-                                                <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
-                                            </div>
-                                        </li>
-                                    )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
-                                </ul>
-                            </div>
-                        )}
+                        <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
                     </div>
 
-                    <div className="release-requirements">
-                        <h4>Frozen Requirements ({items.length})</h4>
+                    {satChartData && (
+                        <div className="archived-details-chart-wrapper" style={{ flexShrink: 0 }}>
+                            <h4>SAT Report</h4>
+                            <div className="archived-details-chart">
+                                <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
+                            </div>
+                            <ChartLegend items={satLegendItems} />
+                        </div>
+                    )}
+
+                    {satChartData && (
+                        <div className="sat-bugs-container" style={{ flexShrink: 0 }}>
+                            <div className="sat-bugs-header">
+                                <h4>SAT Bugs ({satBugs.length})</h4>
+                                <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
+                            </div>
+                            <ul className="sat-bugs-list">
+                                {satBugs.length > 0 ? satBugs.map(bug => (
+                                    <li key={bug.id}>
+                                        <a href={bug.link} target="_blank" rel="noopener noreferrer">{bug.title}</a>
+                                        <div className="bug-actions">
+                                            <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
+                                            <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
+                                        </div>
+                                    </li>
+                                )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
+                            </ul>
+                        </div>
+                    )}
+
+                    <div className="release-requirements" style={{ flex: '2 1 0%', minWidth: '200px' }}>
+                        <h4>Requirements ({items.length})</h4>
                         <div className="requirements-list-wrapper">
                             {isLoading ? <LoadingSpinner /> : (
                                 <ul className="requirement-list frozen">
@@ -636,8 +638,12 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         </div>
                     </div>
 
-                    <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
+                    <div style={{ flex: '1 1 0%', borderLeft: '1px solid #E3C9A6', paddingLeft: '20px', minWidth: '200px' }}>
+                        <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
+                    </div>
+
                 </div>
+                {/* END: Final corrected layout */}
                 <div className="release-card-footer">
                     <div className="release-card-actions">
                         {archive.close_action === 'archive_only' && (
@@ -1436,7 +1442,7 @@ const releasesPageTooltipContent = (
         XLSX.writeFile(wb, `${release.name}_Details.xlsx`);
     };
 
-    const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs) => {
+    const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs, sprintInfo) => {
         const { reqChart, defectChart } = chartRefs;
         const reqChartData = reqChart?.data;
         const defectChartData = defectChart?.data;
@@ -1491,8 +1497,18 @@ const releasesPageTooltipContent = (
         };
     
         try {
+            const { selectedSprints, availableSprints } = sprintInfo || {};
+
+            let sprintTitle = '';
+            if (selectedSprints && availableSprints && selectedSprints.length > 0 && selectedSprints.length < availableSprints.length) {
+                const sprintNumbers = selectedSprints.filter(s => s !== 'All').join(', ');
+                if (sprintNumbers) {
+                    sprintTitle = ` - ${selectedSprints.length > 1 ? '' : ''} ${sprintNumbers}`;
+                }
+            }
+
             pdf.setFontSize(18);
-            pdf.text(release.name, leftMargin, yPos);
+            pdf.text(release.name + sprintTitle, leftMargin, yPos);
             yPos += 8;
             pdf.setFontSize(12);
             pdf.text(`Due: ${new Date(release.release_date).toLocaleDateString()}`, leftMargin, yPos);
@@ -1624,7 +1640,7 @@ const releasesPageTooltipContent = (
                 });
             }
     
-            pdf.save(`${release.name}_Details.pdf`);
+            pdf.save(`${release.name}${sprintTitle}_Details.pdf`);
             showMainMessage('PDF exported successfully!', 'success');
         } catch (error) {
             console.error("Active Release PDF Export Error:", error);
@@ -1632,12 +1648,16 @@ const releasesPageTooltipContent = (
         }
     };
 
+// In ReleasesPage.js
+
     const handleExportArchivedReleaseToExcel = async (archive, items, defects, satBugs) => {
+        // START: ADD THIS SECTION TO FETCH RETURN COUNTS
         const returnCountsMap = new Map();
 
         try {
             const project = archive.project;
             if (project) {
+                // Fetch counts for both active and closed defects to be safe
                 const [activeRes, closedRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=active`),
                     fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=closed`)
@@ -1656,6 +1676,7 @@ const releasesPageTooltipContent = (
             console.error("Could not fetch defect return counts for export:", error);
             showMainMessage("Could not fetch return-to-dev counts for the export, they will be omitted.", "warning");
         }
+        // END: ADD THIS SECTION
 
         const MAX_WIDTH = 70;
         const borderStyle = { style: "thin", color: { auto: 1 } };
@@ -1757,6 +1778,7 @@ const releasesPageTooltipContent = (
                         'Type': requirement.currentStatusDetails.type || '',
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
+                        // CHANGE THIS LINE
                         'Return to Dev Count': returnCountsMap.get(defect.id) || 0
                     });
                 });
@@ -1779,6 +1801,7 @@ const releasesPageTooltipContent = (
                 'Defect Link': defect.link || '',
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Status': defect.status,
+                // AND CHANGE THIS LINE
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });
@@ -1789,11 +1812,31 @@ const releasesPageTooltipContent = (
         }
 
         if (satBugs && satBugs.length > 0) {
-            const satBugsHeaders = ['Title', 'Link'];
-            const satBugsData = satBugs.map(bug => ({
-                'Title': bug.title,
-                'Link': bug.link
-            }));
+            const satBugsHeaders = ['Title', 'Link', 'Estimation (h)'];
+            let totalEstimationInHours = 0;
+
+            const satBugsData = satBugs.map(bug => {
+                const estimationInHours = bug.estimation || 0;
+                totalEstimationInHours += estimationInHours;
+                return {
+                    'Title': bug.title,
+                    'Link': bug.link,
+                    'Estimation (h)': estimationInHours
+                };
+            });
+
+            const totalDays = Math.floor(totalEstimationInHours / 8);
+            const remainingHours = totalEstimationInHours % 8;
+            const totalEstimationFormatted = `${totalDays}d ${remainingHours}h`;
+
+            const totalRow = {
+                'Title': 'Total Estimation',
+                'Link': '',
+                'Estimation (h)': totalEstimationFormatted
+            };
+
+            satBugsData.push(totalRow);
+
             const wsSatBugs = processSheet(satBugsData, satBugsHeaders);
             XLSX.utils.book_append_sheet(wb, wsSatBugs, 'SAT Bugs');
         }
