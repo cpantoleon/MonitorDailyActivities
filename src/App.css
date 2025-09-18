@@ -1539,3 +1539,16 @@ body {
         opacity: 1;
     }
 }
+
+.info-button {
+    background: #eee;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    line-height: 18px;
+}

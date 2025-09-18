@@ -337,14 +337,6 @@
     background-color: #5C4033;
 }
 
-.archived-details-charts-container {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
 .archived-details-chart-wrapper {
     display: flex;
     flex-direction: column;
@@ -378,12 +370,6 @@
     margin: 0;
 }
 
-.frozen-list-container h4 {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-}
-
 .requirement-list.frozen li {
     display: flex;
     justify-content: space-between;
@@ -391,16 +377,17 @@
 }
 
 .status-badge {
-    padding: 4px 8px;
+    padding: 5px 12px;
     border-radius: 12px;
     font-size: 0.8em;
     font-weight: bold;
     color: white;
+    white-space: nowrap;
     text-transform: uppercase;
 }
 
 .status-badge.status-done { background-color: #28a745; }
-.status-badge.status-to-do { background-color: #ffc107; color: black; }
+.status-badge.status-to-do { background-color: #ffc107; color: black; border: 1px solid #e0a800;}
 .status-badge.status-in-progress { background-color: #17a2b8; }
 .status-badge.status-testing { background-color: #fd7e14; }
 .status-badge.status-blocked { background-color: #dc3545; }
@@ -458,8 +445,25 @@
 .comparison-chart-wrapper .chart-container { height: 180px; display: flex; align-items: center; justify-content: center; position: relative; }
 .comparison-chart-wrapper .empty-chart-placeholder { border: 1px dashed #E3C9A6; border-radius: 4px; background-color: #FAF0E6; width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; }
 
-.chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 15px; margin-top: 15px; list-style: none; padding: 0; }
-.legend-item { display: flex; align-items: center; font-size: 0.85em; color: #5C4033; }
+.legend-item {
+    display: flex;
+    align-items: flex-start;  /* Aligns the color box to the top of wrapped text */
+    font-size: 0.85em;
+    color: #5C4033;
+    max-width: 160px;       /* Constrains width, forcing long text to wrap */
+    word-break: break-word; /* Allows long words/URLs to wrap to the next line */
+    text-align: left;         /* Align wrapped text naturally */
+}
+
+/* Replace the old .legend-color-box rule with this */
+.legend-color-box {
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    border-radius: 2px;
+    flex-shrink: 0;         /* Prevents the color box from shrinking */
+    margin-top: 2px;        /* Vertically aligns the box with the first line of text */
+}
 .legend-color-box { width: 12px; height: 12px; margin-right: 6px; border-radius: 2px; }
 
 .sat-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 20px; margin-bottom: 20px; }
@@ -583,27 +587,27 @@
 }
 
 .add-sat-bug-button {
-    background-color: transparent; /* Make background see-through */
-    color: #8B4513; /* Use a dark brown for the '+' sign */
-    border: 2px solid #D2B48C; /* Add a subtle border */
+    background-color: transparent;
+    color: #8B4513;
+    border: 2px solid #D2B48C;
     border-radius: 50%;
     width: 24px;
     height: 24px;
-    font-size: 1.4em; /* Slightly larger '+' */
-    font-weight: 300; /* Thinner '+' sign */
+    font-size: 1.4em;
+    font-weight: 300;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-    transition: all 0.2s ease-in-out; /* Smooth hover effect */
+    transition: all 0.2s ease-in-out;
 }
 
 .add-sat-bug-button:hover {
-    background-color: #8B4513; /* Fill with dark brown on hover */
-    color: white; /* Make '+' white on hover */
-    border-color: #8B4513; /* Match border to background */
-    transform: rotate(90deg); /* Optional: Fun little animation */
+    background-color: #8B4513;
+    color: white;
+    border-color: #8B4513;
+    transform: rotate(90deg);
 }
 
 .sat-bugs-list {
@@ -634,6 +638,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .sat-bugs-list a:hover {
@@ -657,7 +662,7 @@
 }
 
 .bug-edit-btn {
-    color: #007bff; /* A standard, clear blue for actions */
+    color: #007bff;
     font-weight: 500;
 }
 .bug-edit-btn:hover {
@@ -680,10 +685,65 @@
     padding: 10px 0;
 }
 
-/* ADD THIS RULE FOR PERFECT TITLE ALIGNMENT */
 .release-card-body .archived-details-chart-wrapper h4,
 .release-card-body .sat-bugs-container h4,
 .release-card-body .release-requirements h4,
 .release-card-body .defect-list h4 {
     margin-top: 0;
+}
+
+/* --- FINAL STYLES FOR ARCHIVED DETAILS VIEW --- */
+
+.release-card-body.archived-details-body {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0;
+}
+
+.archived-details-column {
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Prevents content from breaking flexbox */
+}
+
+.archived-details-column:not(:first-child) {
+    border-left: 1px solid #E3C9A6;
+}
+
+.archived-details-column.archived-charts-column {
+    flex: 0 0 200px;
+    padding-left: 0;
+    gap: 30px;
+}
+
+.archived-details-column.sat-bugs-column {
+    flex: 0 0 240px; /* Fixed width for the SAT Bugs column */
+}
+
+.archived-details-column .sat-bugs-container {
+    width: 100%;
+}
+
+.archived-details-column.requirements-column,
+.archived-details-column.defects-column {
+    flex: 1 1 0; /* Makes them share remaining space equally */
+    min-width: 250px;
+}
+
+.archived-details-column.defects-column {
+    padding-right: 0;
+}
+
+.archived-details-column .release-requirements,
+.archived-details-column .defect-list,
+.archived-details-column .sat-bugs-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.archived-details-column .requirements-list-wrapper {
+    flex-grow: 1;
 }

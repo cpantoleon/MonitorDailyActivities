@@ -443,6 +443,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     const metricsChartRef = useRef(null);
     const satChartRef = useRef(null);
+    const bugLabelsChartRef = useRef(null);
 
     const fetchSatBugs = useCallback(async () => {
         if (!archive.id) return;
@@ -495,7 +496,8 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         setIsPdfExporting(true);
         await onExportToPdf(archive, items, defects, satBugs, {
             metricsChart: metricsChartRef.current,
-            satChart: satChartRef.current
+            satChart: satChartRef.current,
+            bugLabelsChart: bugLabelsChartRef.current
         });
         setIsPdfExporting(false);
     };
@@ -548,17 +550,84 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         }],
     };
 
+    const ourMetricsLegendItems = [];
+    if (archive.metrics.doneCount > 0) {
+        ourMetricsLegendItems.push({ text: 'Done', color: '#28a745' });
+    }
+    if (archive.metrics.notDoneCount > 0) {
+        ourMetricsLegendItems.push({ text: 'Not Done', color: '#dc3545' });
+    }
+
     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
     
+    const getBugLabelsChartConfig = (bugs) => {
+        if (!bugs || bugs.length === 0) return { data: null, legendItems: [] };
+    
+        const labeledBugs = bugs.filter(bug => bug.label);
+    
+        if (labeledBugs.length === 0) {
+            return { data: null, legendItems: [] };
+        }
+    
+        const labelCounts = labeledBugs.reduce((acc, bug) => {
+            acc[bug.label] = (acc[bug.label] || 0) + 1;
+            return acc;
+        }, {});
+    
+        const labels = Object.keys(labelCounts);
+        const data = Object.values(labelCounts);
+    
+        const colorPalette = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#f8f9fc', '#5e72e4', '#ffd600', '#2dce89', '#fb6340'];
+        const labelColorMap = {};
+        let colorIndex = 0;
+        
+        const backgroundColor = labels.map(label => {
+            if (!labelColorMap[label]) {
+                labelColorMap[label] = colorPalette[colorIndex % colorPalette.length];
+                colorIndex++;
+            }
+            return labelColorMap[label];
+        });
+    
+        const legendItems = labels.map(label => ({
+            text: `${label} (${labelCounts[label]})`,
+            color: labelColorMap[label]
+        }));
+    
+        return {
+            data: {
+                labels,
+                datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+            },
+            legendItems
+        };
+    };
+
+    const { data: bugLabelsChartData, legendItems: bugLabelsLegendItems } = getBugLabelsChartConfig(satBugs);
+
+    // --- MODIFICATION START ---
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
             title: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.label || '';
+                        if (label.length > 30) { // Truncate labels longer than 30 chars
+                            label = label.substring(0, 30) + '...';
+                        }
+                        const value = context.formattedValue || '';
+                        return `${label}: ${value}`;
+                    }
+                }
+            }
         },
         animation: false
     };
+    // --- MODIFICATION END ---
 
     return (
         <div className="archived-details-view">
@@ -579,71 +648,86 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleString()}</span>
                     </div>
                 </div>
-                {/* START: Final corrected layout */}
-                <div className="release-card-body" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: '25px' }}>
+
+                <div className="release-card-body archived-details-body">
                     
-                    <div className="archived-details-chart-wrapper" style={{ flexShrink: 0 }}>
-                        <h4>Our Final Metrics</h4>
-                        <div className="archived-details-chart">
-                            <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
-                        </div>
-                        <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
-                    </div>
-
-                    {satChartData && (
-                        <div className="archived-details-chart-wrapper" style={{ flexShrink: 0 }}>
-                            <h4>SAT Report</h4>
+                    <div className="archived-details-column archived-charts-column">
+                        <div className="archived-details-chart-wrapper">
+                            <h4>Our Final Metrics</h4>
                             <div className="archived-details-chart">
-                                <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
+                                <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
                             </div>
-                            <ChartLegend items={satLegendItems} />
+                            <ChartLegend items={ourMetricsLegendItems} />
                         </div>
-                    )}
 
-                    {satChartData && (
-                        <div className="sat-bugs-container" style={{ flexShrink: 0 }}>
-                            <div className="sat-bugs-header">
-                                <h4>SAT Bugs ({satBugs.length})</h4>
-                                <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
+                        {satChartData && (
+                            <div className="archived-details-chart-wrapper">
+                                <h4>SAT Report</h4>
+                                <div className="archived-details-chart">
+                                    <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
+                                </div>
+                                <ChartLegend items={satLegendItems} />
                             </div>
-                            <ul className="sat-bugs-list">
-                                {satBugs.length > 0 ? satBugs.map(bug => (
-                                    <li key={bug.id}>
-                                        <a href={bug.link} target="_blank" rel="noopener noreferrer">{bug.title}</a>
-                                        <div className="bug-actions">
-                                            <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
-                                            <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
-                                        </div>
-                                    </li>
-                                )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
-                            </ul>
-                        </div>
-                    )}
+                        )}
 
-                    <div className="release-requirements" style={{ flex: '2 1 0%', minWidth: '200px' }}>
-                        <h4>Requirements ({items.length})</h4>
-                        <div className="requirements-list-wrapper">
-                            {isLoading ? <LoadingSpinner /> : (
-                                <ul className="requirement-list frozen">
-                                    {items.length > 0 ? items.map(item => (
-                                        <li key={item.id}>
-                                            <button type="button" onClick={() => handleRequirementClick(item)} className="link-button">
-                                                {item.requirement_title}
-                                            </button>
-                                            <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
+                        {bugLabelsChartData && (
+                            <div className="archived-details-chart-wrapper">
+                                <h4>SAT Bug Labels</h4>
+                                <div className="archived-details-chart">
+                                    <Pie data={bugLabelsChartData} options={chartOptions} ref={bugLabelsChartRef} />
+                                </div>
+                                <ChartLegend items={bugLabelsLegendItems} />
+                            </div>
+                        )}
+                    </div>
+
+                    {archive.sat_report && (
+                        <div className="archived-details-column sat-bugs-column">
+                            <div className="sat-bugs-container">
+                                <div className="sat-bugs-header">
+                                    <h4>SAT Bugs ({satBugs.length})</h4>
+                                    <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
+                                </div>
+                                <ul className="sat-bugs-list">
+                                    {satBugs.length > 0 ? satBugs.map(bug => (
+                                        <li key={bug.id}>
+                                            <a href={bug.link} target="_blank" rel="noopener noreferrer" title={bug.title}>{bug.title}</a>
+                                            <div className="bug-actions">
+                                                <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
+                                                <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
+                                            </div>
                                         </li>
-                                    )) : <li>No requirements were in this release.</li>}
+                                    )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
                                 </ul>
-                            )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="archived-details-column requirements-column">
+                        <div className="release-requirements">
+                             <h4>Requirements ({items.length})</h4>
+                            <div className="requirements-list-wrapper">
+                                {isLoading ? <LoadingSpinner /> : (
+                                    <ul className="requirement-list frozen">
+                                        {items.length > 0 ? items.map(item => (
+                                            <li key={item.id}>
+                                                <button type="button" onClick={() => handleRequirementClick(item)} className="link-button">
+                                                    {item.requirement_title}
+                                                </button>
+                                                <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
+                                            </li>
+                                        )) : <li>No requirements were in this release.</li>}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{ flex: '1 1 0%', borderLeft: '1px solid #E3C9A6', paddingLeft: '20px', minWidth: '200px' }}>
+                    <div className="archived-details-column defects-column">
                         <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
                     </div>
 
                 </div>
-                {/* END: Final corrected layout */}
                 <div className="release-card-footer">
                     <div className="release-card-actions">
                         {archive.close_action === 'archive_only' && (
@@ -1648,16 +1732,12 @@ const releasesPageTooltipContent = (
         }
     };
 
-// In ReleasesPage.js
-
     const handleExportArchivedReleaseToExcel = async (archive, items, defects, satBugs) => {
-        // START: ADD THIS SECTION TO FETCH RETURN COUNTS
         const returnCountsMap = new Map();
 
         try {
             const project = archive.project;
             if (project) {
-                // Fetch counts for both active and closed defects to be safe
                 const [activeRes, closedRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=active`),
                     fetch(`${API_BASE_URL}/defects/${project}/return-counts?statusType=closed`)
@@ -1676,7 +1756,6 @@ const releasesPageTooltipContent = (
             console.error("Could not fetch defect return counts for export:", error);
             showMainMessage("Could not fetch return-to-dev counts for the export, they will be omitted.", "warning");
         }
-        // END: ADD THIS SECTION
 
         const MAX_WIDTH = 70;
         const borderStyle = { style: "thin", color: { auto: 1 } };
@@ -1778,7 +1857,6 @@ const releasesPageTooltipContent = (
                         'Type': requirement.currentStatusDetails.type || '',
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
-                        // CHANGE THIS LINE
                         'Return to Dev Count': returnCountsMap.get(defect.id) || 0
                     });
                 });
@@ -1801,7 +1879,6 @@ const releasesPageTooltipContent = (
                 'Defect Link': defect.link || '',
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Status': defect.status,
-                // AND CHANGE THIS LINE
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });
@@ -1812,7 +1889,7 @@ const releasesPageTooltipContent = (
         }
 
         if (satBugs && satBugs.length > 0) {
-            const satBugsHeaders = ['Title', 'Link', 'Estimation (h)'];
+            const satBugsHeaders = ['Title', 'Link', 'Estimation (h)', 'Label'];
             let totalEstimationInHours = 0;
 
             const satBugsData = satBugs.map(bug => {
@@ -1821,7 +1898,8 @@ const releasesPageTooltipContent = (
                 return {
                     'Title': bug.title,
                     'Link': bug.link,
-                    'Estimation (h)': estimationInHours
+                    'Estimation (h)': estimationInHours,
+                    'Label': bug.label || ''
                 };
             });
 
@@ -1832,7 +1910,8 @@ const releasesPageTooltipContent = (
             const totalRow = {
                 'Title': 'Total Estimation',
                 'Link': '',
-                'Estimation (h)': totalEstimationFormatted
+                'Estimation (h)': totalEstimationFormatted,
+                'Label': ''
             };
 
             satBugsData.push(totalRow);
@@ -1849,12 +1928,12 @@ const releasesPageTooltipContent = (
             showMainMessage('Could not generate PDF. Chart data is not available.', 'error');
             return;
         }
-
+    
         try {
             const pdf = new jsPDF('p', 'mm', 'a4');
             let yPos = 15;
             const leftMargin = 15;
-
+    
             pdf.setFontSize(18);
             pdf.text(archive.name, leftMargin, yPos);
             yPos += 8;
@@ -1865,64 +1944,104 @@ const releasesPageTooltipContent = (
             yPos += 5;
             pdf.text(`Total Defects: ${defects.length}`, leftMargin, yPos);
             yPos += 10;
-
+    
             const chartStartY = yPos;
-            const chartWidth = 60;
-            const chartHeight = 60;
+            const chartWidth = 45;
+            const chartHeight = 45;
+            const chartSpacing = 15;
             const metricsChart = chartRefs.metricsChart;
             const satChart = chartRefs.satChart;
+            const bugLabelsChart = chartRefs.bugLabelsChart;
+            
+            let currentX = leftMargin;
+            const finalYPositions = [];
 
-            const metricsChartX = leftMargin + 10;
+            // --- 1. Our Final Metrics Chart (Always drawn) ---
             pdf.setFontSize(12);
-            pdf.text('Our Final Metrics', metricsChartX, yPos);
-            yPos += 5;
+            pdf.text('Our Final Metrics', currentX, chartStartY);
+            let currentChartY = chartStartY + 5;
+            
             metricsChart.resize(300, 300);
             const metricsImg = metricsChart.toBase64Image();
             metricsChart.resize();
-            pdf.addImage(metricsImg, 'PNG', metricsChartX, yPos, chartWidth, chartHeight);
-            const metricsLegend = [{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}];
-            let legendY = yPos + chartHeight + 5;
+            pdf.addImage(metricsImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
+            
+            const metricsLegend = [];
+            if (archive.metrics.doneCount > 0) metricsLegend.push({ text: 'Done', color: '#28a745' });
+            if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: 'Not Done', color: '#dc3545' });
+            
+            let legendY = currentChartY + chartHeight + 5;
             pdf.setFontSize(9);
             metricsLegend.forEach(item => {
                 pdf.setFillColor(item.color);
-                pdf.rect(metricsChartX, legendY, 3, 3, 'F');
-                pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
+                pdf.rect(currentX, legendY, 3, 3, 'F');
+                pdf.text(item.text, currentX + 5, legendY + 2.5);
                 legendY += 5;
             });
-            let finalMetricsLegendY = legendY;
+            finalYPositions.push(legendY);
+            currentX += chartWidth + chartSpacing; // Prepare for the next chart
 
-            const satChartX = leftMargin + chartWidth + 30;
-            yPos = chartStartY;
-            pdf.setFontSize(12);
-            pdf.text('SAT Report', satChartX, yPos);
-            yPos += 5;
+            // --- 2. SAT Report Chart (Conditional) ---
             const { legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
-            let finalSatLegendY = chartStartY + chartHeight + 5;
             if (satChart && satLegendItems.length > 0) {
+                pdf.setFontSize(12);
+                pdf.text('SAT Report', currentX, chartStartY);
+                currentChartY = chartStartY + 5;
+
                 satChart.resize(300, 300);
                 const satImg = satChart.toBase64Image();
                 satChart.resize();
-                pdf.addImage(satImg, 'PNG', satChartX, yPos, chartWidth, chartHeight);
-                let satLegendY = yPos + chartHeight + 5;
+                pdf.addImage(satImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
+
+                let satLegendY = currentChartY + chartHeight + 5;
                 pdf.setFontSize(9);
                 satLegendItems.forEach(item => {
                     pdf.setFillColor(item.color);
-                    pdf.rect(satChartX, satLegendY, 3, 3, 'F');
-                    pdf.text(item.text, satChartX + 5, satLegendY + 2.5);
+                    pdf.rect(currentX, satLegendY, 3, 3, 'F');
+                    pdf.text(item.text, currentX + 5, satLegendY + 2.5);
                     satLegendY += 5;
                 });
-                finalSatLegendY = satLegendY;
-            } else {
-                pdf.setDrawColor(220, 220, 220);
-                pdf.setFillColor(250, 250, 250);
-                pdf.rect(satChartX, yPos, chartWidth, chartHeight, 'FD');
-                pdf.setTextColor(150, 150, 150);
-                pdf.text('No SAT Report', satChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
-                pdf.setTextColor(0, 0, 0);
+                finalYPositions.push(satLegendY);
+                currentX += chartWidth + chartSpacing; // Prepare for the next chart
             }
 
-            yPos = Math.max(finalMetricsLegendY, finalSatLegendY) + 10;
+            // --- 3. SAT Bug Labels Chart (Conditional) ---
+            if (bugLabelsChart && bugLabelsChart.data.labels && bugLabelsChart.data.labels.length > 0) {
+                pdf.setFontSize(12);
+                pdf.text('SAT Bug Labels', currentX, chartStartY);
+                currentChartY = chartStartY + 5;
 
+                bugLabelsChart.resize(300, 300);
+                const bugLabelsImg = bugLabelsChart.toBase64Image();
+                bugLabelsChart.resize();
+                pdf.addImage(bugLabelsImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
+                
+                const bugLabelCounts = satBugs.reduce((acc, bug) => {
+                    if (bug.label) {
+                        acc[bug.label] = (acc[bug.label] || 0) + 1;
+                    }
+                    return acc;
+                }, {});
+    
+                const bugLabelsLegendItems = bugLabelsChart.data.labels.map((label, index) => ({
+                    text: `${label} (${bugLabelCounts[label] || 0})`,
+                    color: bugLabelsChart.data.datasets[0].backgroundColor[index]
+                }));
+    
+                let bugLabelsLegendY = currentChartY + chartHeight + 5;
+                pdf.setFontSize(8);
+                bugLabelsLegendItems.forEach(item => {
+                    pdf.setFillColor(item.color);
+                    pdf.rect(currentX, bugLabelsLegendY, 3, 3, 'F');
+                    pdf.text(item.text, currentX + 5, bugLabelsLegendY + 2.5);
+                    bugLabelsLegendY += 5;
+                });
+                finalYPositions.push(bugLabelsLegendY);
+            }
+    
+            // Set yPos to start after the tallest chart + legend
+            yPos = (finalYPositions.length > 0 ? Math.max(...finalYPositions) : chartStartY + chartHeight + 5) + 10;
+    
             if (items.length > 0) {
                 const body = items.map(item => {
                     const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
@@ -1931,7 +2050,7 @@ const releasesPageTooltipContent = (
                         item.final_status
                     ];
                 });
-
+    
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Requirement', 'Final Status']],
@@ -1951,13 +2070,13 @@ const releasesPageTooltipContent = (
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
-
+    
             if (defects.length > 0) {
                 const body = defects.map(d => [
                     { content: d.title, data: { url: d.link || '' } },
                     d.status
                 ]);
-
+    
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
@@ -1977,22 +2096,23 @@ const releasesPageTooltipContent = (
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
-
+    
             if (satBugs && satBugs.length > 0) {
                 const body = satBugs.map(bug => [
-                    { content: bug.title, data: { url: bug.link } }
+                    { content: bug.title, data: { url: bug.link } },
+                    bug.label || 'N/A'
                 ]);
                 pdf.setFontSize(12);
                 pdf.text('SAT Bugs', leftMargin, yPos);
                 yPos += 6;
                 autoTable(pdf, {
                     startY: yPos,
-                    head: [['Title']],
+                    head: [['Title', 'Label']],
                     body: body,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
                     didParseCell: function (data) {
-                        if (data.cell.raw?.data?.url) {
+                        if (data.column.index === 0 && data.cell.raw?.data?.url) {
                             data.cell.styles.textColor = [0, 0, 255];
                         }
                     },
@@ -2003,7 +2123,7 @@ const releasesPageTooltipContent = (
                     }
                 });
             }
-
+    
             pdf.save(`${archive.name}_Archive_Details.pdf`);
             showMainMessage('PDF exported successfully!', 'success');
         } catch (error) {

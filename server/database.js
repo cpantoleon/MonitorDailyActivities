@@ -275,6 +275,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         }
                     });
                 }
+
+                const hasLabelColumn = columns.some(col => col.name === 'label');
+                if (!hasLabelColumn) {
+                    db.run("ALTER TABLE sat_bugs ADD COLUMN label TEXT NULL", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding label column to sat_bugs:", alterErr.message);
+                        } else {
+                            console.log("Column 'label' added to sat_bugs table.");
+                        }
+                    });
+                }
             });
 
             console.log("All table checks/creations complete.");

@@ -1,20 +1,34 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import useClickOutside from '../hooks/useClickOutside';
 import './CustomDropdown.css';
 
-const CustomDropdown = ({ options, value, onChange, id, name, placeholder, disabled = false }) => {
+const CustomDropdown = ({
+  options,
+  value,
+  onChange,
+  id,
+  name,
+  placeholder,
+  disabled = false,
+  isComboBox = false
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({});
-  const buttonRef = useRef(null);
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef(null);
 
-  // We use a separate ref for the click-outside logic to avoid conflicts
   const dropdownContainerRef = useClickOutside(() => setIsOpen(false));
+
+  useEffect(() => {
+    const selectedOption = options.find(opt => String(opt.value) === String(value));
+    setInputValue(selectedOption ? selectedOption.label : '');
+  }, [value, options]);
 
   useLayoutEffect(() => {
     const updatePosition = () => {
-      if (isOpen && buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
+      if (isOpen && inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
         setCoords({
           top: rect.bottom,
           left: rect.left,
@@ -25,12 +39,10 @@ const CustomDropdown = ({ options, value, onChange, id, name, placeholder, disab
 
     if (isOpen) {
       updatePosition();
-      // Add event listeners to handle scrolling and resizing
-      window.addEventListener('scroll', updatePosition, true); // Use capture phase
+      window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
     }
 
-    // Cleanup function
     return () => {
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
@@ -45,28 +57,74 @@ const CustomDropdown = ({ options, value, onChange, id, name, placeholder, disab
       },
     };
     onChange(event);
+    const selectedOption = options.find(opt => String(opt.value) === String(optionValue));
+    setInputValue(selectedOption ? selectedOption.label : '');
     setIsOpen(false);
   };
 
-  const selectedOption = options.find(opt => String(opt.value) === String(value));
-  const displayLabel = selectedOption ? selectedOption.label : placeholder;
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
+    if (!isOpen) {
+      setIsOpen(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (inputValue === '') {
+        handleSelect('');
+        return;
+    }
+    const match = options.find(opt => opt.label.toLowerCase() === inputValue.toLowerCase());
+    if (match) {
+        handleSelect(match.value);
+    } else {
+        const selectedOption = options.find(opt => String(opt.value) === String(value));
+        setInputValue(selectedOption ? selectedOption.label : '');
+    }
+  };
+
+  const filteredOptions = isComboBox
+    ? options.filter(option =>
+        option.label.toLowerCase().includes(inputValue.toLowerCase())
+      )
+    : options;
+
   const labelId = `${id}-label`;
 
   return (
     <div className="custom-dropdown" ref={dropdownContainerRef}>
-      <button
-        ref={buttonRef}
-        type="button"
-        id={`${id}-button`}
-        className={`custom-dropdown-button ${isOpen ? 'open' : ''}`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-labelledby={labelId}
-      >
-        {displayLabel}
-      </button>
+      {isComboBox ? (
+        <input
+          ref={inputRef}
+          type="text"
+          id={id}
+          name={name}
+          className="custom-dropdown-input"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onClick={() => setIsOpen(true)}
+          placeholder={placeholder}
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          autoComplete="off"
+        />
+      ) : (
+        <button
+          ref={inputRef}
+          type="button"
+          id={`${id}-button`}
+          className={`custom-dropdown-button ${isOpen ? 'open' : ''}`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-labelledby={labelId}
+        >
+          {options.find(opt => String(opt.value) === String(value))?.label || placeholder}
+        </button>
+      )}
       {isOpen && ReactDOM.createPortal(
         <ul
           className="custom-dropdown-options"
@@ -79,20 +137,22 @@ const CustomDropdown = ({ options, value, onChange, id, name, placeholder, disab
           id={`${id}-options`}
           aria-labelledby={labelId}
         >
-          {options.map(option => (
+          {filteredOptions.map(option => (
             <li
               key={option.value}
               className={`custom-dropdown-option ${String(option.value) === String(value) ? 'selected' : ''}`}
               onClick={() => handleSelect(option.value)}
+              onMouseDown={(e) => e.preventDefault()}
               data-value={option.value}
               role="option"
               aria-selected={String(option.value) === String(value)}
+              title={option.description}
             >
               {option.label}
             </li>
           ))}
         </ul>,
-        document.body // Render the dropdown options at the end of the body
+        document.body
       )}
     </div>
   );

@@ -5,7 +5,7 @@
   font-family: inherit;
 }
 
-.custom-dropdown-button {
+.custom-dropdown-button, .custom-dropdown-input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #DEB887;
@@ -15,13 +15,16 @@
   font-size: 0.95em;
   text-align: left;
   cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   box-sizing: border-box;
 }
 
-.custom-dropdown-button:disabled {
+.custom-dropdown-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.custom-dropdown-button:disabled, .custom-dropdown-input:disabled {
   background-color: #e9ecef;
   color: #6c757d;
   cursor: not-allowed;
@@ -53,7 +56,7 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 210px;
+  max-height: 150px;
   overflow-y: auto;
   box-sizing: border-box;
 }
