@@ -4,6 +4,7 @@ import CustomDropdown from './CustomDropdown';
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import ToggleSwitch from './ToggleSwitch';
 
 const API_BASE_URL = '/api';
 const DEFECT_STATUSES = ['Assigned to Developer', 'Assigned to Tester', 'Done'];
@@ -20,6 +21,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     created_date: new Date(),
     comment: '',
     linkedRequirementGroupIds: [],
+    is_fat_defect: false,
   });
 
   const [formData, setFormData] = useState(getInitialFormState(currentSelectedProject));
@@ -55,6 +57,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           created_date: defect.created_date ? new Date(defect.created_date + 'T00:00:00') : new Date(),
           comment: '',
           linkedRequirementGroupIds: defect.linkedRequirements ? defect.linkedRequirements.map(r => r.groupId) : [],
+          is_fat_defect: defect.is_fat_defect || false,
         };
       } else {
         const initialProject = currentSelectedProject || '';
@@ -83,6 +86,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
            formData.link !== initialFormData.link ||
            formData.created_date.toISOString().split('T')[0] !== initialFormData.created_date.toISOString().split('T')[0] ||
            formData.comment.trim() !== '' ||
+           formData.is_fat_defect !== initialFormData.is_fat_defect ||
            linksChanged;
   }, [formData, initialFormData]);
 
@@ -148,6 +152,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         ...getInitialFormState(value),
         project: value,
       }));
+    } else if (name === 'is_fat_defect') {
+      setFormData(prev => ({ ...prev, [name]: e.target.checked }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -211,7 +217,12 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     <>
       <div className="add-new-modal-overlay">
         <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '800px' }}>
-          <h2>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
+            <h2 style={{ marginRight: 'auto' }}>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
+            <div style={{ marginLeft: '20px' }}>
+              <ToggleSwitch name="is_fat_defect" checked={formData.is_fat_defect} onChange={handleChange} label="FAT Defect" />
+            </div>
+          </div>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label id="defect-project-label" htmlFor="defect-project-button">Project:</label>

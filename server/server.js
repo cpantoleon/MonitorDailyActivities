@@ -1728,7 +1728,7 @@ app.get("/api/defects/:project/return-counts", async (req, res) => {
 });
 
 app.post("/api/defects", async (req, res) => {
-    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds } = req.body;
+    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect } = req.body;
     if (!project || !title || !area || !status || !created_date) {
         return res.status(400).json({ error: "Missing required fields" });
     }
@@ -1739,11 +1739,12 @@ app.post("/api/defects", async (req, res) => {
         created_date = new Date(created_date).toISOString().split('T')[0];
         link = link ? link.trim() : null; description = description ? description.trim() : null;
         comment = comment ? comment.trim() : null;
+        const isFatDefect = is_fat_defect ? 1 : 0;
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date) VALUES (?,?,?,?,?,?,?)`;
-            const defectParams = [projectId, title, description, area, status, link, created_date];
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date, is_fat_defect) VALUES (?,?,?,?,?,?,?,?)`;
+            const defectParams = [projectId, title, description, area, status, link, created_date, isFatDefect];
             
             db.run(insertDefectSql, defectParams, function(err) {
                 if (err) {
@@ -1784,7 +1785,7 @@ app.post("/api/defects", async (req, res) => {
 
 app.put("/api/defects/:id", (req, res) => {
     const defectId = parseInt(req.params.id, 10);
-    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds } = req.body;
+    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect } = req.body;
 
     db.get("SELECT * FROM defects WHERE id = ?", [defectId], (err, currentDefect) => {
         if (err) return res.status(500).json({ error: "Error fetching current defect state." });
@@ -1812,6 +1813,12 @@ app.put("/api/defects/:id", (req, res) => {
 
         const formattedNewDate = created_date ? new Date(created_date).toISOString().split('T')[0] : currentDefect.created_date;
         addChange("created_date", formattedNewDate, currentDefect.created_date);
+
+        if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
+            updates.push(`is_fat_defect = ?`);
+            updateParamsList.push(is_fat_defect ? 1 : 0);
+            changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
+        }
 
         const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
         const hasComment = comment && comment.trim() !== "";

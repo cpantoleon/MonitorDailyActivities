@@ -604,9 +604,66 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setDefectToMove(null);
   };
 
-  const pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
-  const doneNotDonePieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: `Active Defect Status for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } } }, };
-  const returnToDevChartOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 20 } }, plugins: { legend: { display: false }, title: { display: true, text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`, font: { size: 14 } }, tooltip: { callbacks: { title: function(context) { const dataIndex = context[0].dataIndex; const fullLabel = context[0].dataset.fullLabels[dataIndex]; return fullLabel; }, label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.x !== null) { label += context.parsed.x; } return label; } } } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } }, y: {ticks: {autoSkip: false}} } };
+  const baseChartOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, font: { size: 16 } },
+      tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
+    },
+  };
+
+  const pieChartOptions = {
+    ...baseChartOptions,
+    plugins: { ...baseChartOptions.plugins, title: { ...baseChartOptions.plugins.title, text: `${showClosedView ? 'Closed' : 'Active'} Defect Distribution by Area for ${selectedProject || 'Project'}` } }
+  };
+  const doneNotDonePieChartOptions = {
+    ...baseChartOptions,
+    plugins: { ...baseChartOptions.plugins, title: { ...baseChartOptions.plugins.title, text: `Active Defect Status for ${selectedProject || 'Project'}` } }
+  };
+  const returnToDevChartOptions = {
+    ...baseChartOptions,
+    indexAxis: 'y',
+    layout: { padding: { left: 20 } },
+    plugins: {
+        ...baseChartOptions.plugins,
+        legend: { display: false },
+        title: { 
+            ...baseChartOptions.plugins.title,
+            text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`
+        },
+        tooltip: {
+            callbacks: {
+                title: function(context) { 
+                    const dataIndex = context[0].dataIndex; 
+                    const fullLabel = context[0].dataset.fullLabels[dataIndex]; 
+                    return fullLabel; 
+                }, 
+                label: function(context) { 
+                    let label = context.dataset.label || ''; 
+                    if (label) { 
+                        label += ': '; 
+                    } 
+                    if (context.parsed.x !== null) { 
+                        label += context.parsed.x; 
+                    } 
+                    return label; 
+                } 
+            } 
+        } 
+    },
+    scales: { 
+        x: { 
+            beginAtZero: true, 
+            ticks: { 
+                stepSize: 1 
+            } 
+        }, 
+        y: {
+            ticks: {autoSkip: false}
+        } 
+    } 
+  };
 
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {
@@ -629,10 +686,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   return (
     <div className="main-content-area">
-       <style>{`
-        .defect-charts-wrapper { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 20px; }
-        .defect-charts-wrapper .defect-chart-container { flex: 1 1 30%; min-width: 350px; max-width: 500px; height: 320px; padding: 10px; border: 1px solid #DEB887; border-radius: 8px; background-color: #FFF8DC; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
-      `}</style>
+
       <div className="selection-controls">
         <div className="selection-group-container">
             <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={onSelectProject} />
@@ -667,16 +721,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       {!isLoading && !isSearching && !selectedProject && <p className="select-project-prompt-defects">Please select a project to view defects, or use the search bar for all projects.</p>}
       
       {showAreaChart && selectedProject && (
-        <div className="defect-charts-wrapper">
+        <div className="charts-wrapper">
           {doneNotDoneChartData && !showClosedView && (
-            <div className="defect-chart-container">
+            <div className="chart-container">
               <Pie data={doneNotDoneChartData} options={doneNotDonePieChartOptions} />
             </div>
           )}
-          {areaChartData && <div className="defect-chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
-          {returnToDevChartData && <div className="defect-chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
+          {areaChartData && <div className="chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
+          {returnToDevChartData && <div className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
           {!areaChartData && !returnToDevChartData && (showClosedView || !doneNotDoneChartData) && !isLoading && (
-            <div className="defect-chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
+            <div className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
               <p>No chart data available for the selected project.</p>
             </div>
           )}

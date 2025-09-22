@@ -288,6 +288,24 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 }
             });
 
+            db.all("PRAGMA table_info(defects)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching defects table info:", err.message);
+                    return;
+                }
+
+                const hasIsFatDefectColumn = columns.some(col => col.name === 'is_fat_defect');
+                if (!hasIsFatDefectColumn) {
+                    db.run("ALTER TABLE defects ADD COLUMN is_fat_defect INTEGER DEFAULT 0", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding is_fat_defect column to defects:", alterErr.message);
+                        } else {
+                            console.log("Column 'is_fat_defect' added to defects table.");
+                        }
+                    });
+                }
+            });
+
             console.log("All table checks/creations complete.");
         });
     }

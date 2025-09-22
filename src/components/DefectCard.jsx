@@ -33,7 +33,10 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
       onDragEnd={handleDragEnd}
       style={{ cursor: isDraggable ? 'grab' : 'default' }}
     >
-      <h4 className="defect-card-title">{defect.title}</h4>
+      <h4 className="defect-card-title">
+        {defect.title}
+        {defect.is_fat_defect ? <span className="fat-defect-badge">FAT</span> : null}
+      </h4>
       {defect.area !== 'Imported' && <p className="defect-card-area"><strong>Area:</strong> {defect.area}</p>}
       {defect.description && <p className="defect-card-description"><strong>Description:</strong> {defect.description}</p>}
       
