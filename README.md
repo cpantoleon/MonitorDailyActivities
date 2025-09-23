@@ -143,19 +143,31 @@ Once synced, you can start asking questions! For a full list of example commands
 -   Visualize defect distribution by area and "return to developer" counts with dynamic charts.
 
 #### 3. Releases
--   View active and archived releases for a selected project.
+
+Manage your project's complete release lifecycle, from active development and testing to a permanent, comparable archive.
+
 -   **Active Releases**:
-    -   Track real-time progress with a live pie chart showing done vs. not-done requirements.
+    -   Track real-time progress with a pie chart showing done vs. not-done requirements.
+    -   After a FAT period is completed for a release, its progress chart is replaced with a detailed **FAT Execution Report**.
     -   View and filter the list of associated requirements by sprint.
     -   Quickly access all defects linked to the release's requirements.
     -   Export a comprehensive report to Excel or PDF.
-    -   Finalize a release with two options: "Archive Only" (creates a permanent record) or "Archive & Complete Items" (archives the release and marks all associated requirements as 'Done').
+    -   **Finalize a release** with two options: "Archive Only" (creates a permanent record) or "Archive & Complete Items" (archives the release and marks all associated requirements as 'Done').
+
 -   **Archived Releases**:
-    -   Review a permanent snapshot with final metrics and the frozen list of requirements.
+    -   Review a permanent snapshot with the **original final metrics** and the frozen list of requirements from the moment it was closed.
     -   **Add/Update SAT Reports**: Log a SAT (System Acceptance Testing) report by entering the percentage of tests that Passed, Failed, Blocked, etc. The data is visualized in a dedicated pie chart.
     -   **Log SAT Bugs**: Once a SAT report is added, you can log, edit, and delete specific bugs found during testing. Each bug includes a title and a direct URL link for easy access.
     -   **Compare Archives**: Select multiple archived releases to view a side-by-side comparison of their final metrics and SAT reports.
     -   **Export Archives**: Generate detailed Excel or PDF reports for an archive, which now include a dedicated section listing all logged SAT Bugs.
+
+-   **FAT (Factory Acceptance Testing)**:
+    -   Initiate a dedicated FAT period against a **single active release** to perform focused regression testing before it's archived.
+    -   The active FAT dashboard aggregates all requirements from the selected release.
+    -   It also automatically includes all defects marked with the special **'FAT' tag** from the project, creating a centralized list of regression-critical issues to verify.
+    -   Log the results of the FAT period (Passed, Failed, Blocked, etc.), which will then be displayed on the corresponding *active release* card upon completion.
+    -   Review a history of completed FAT periods, including their duration and the release they covered.
+    -   Cancel an active period or delete a completed one as needed.
 
 
 #### 4. Sprint Analysis

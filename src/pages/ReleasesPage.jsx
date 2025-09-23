@@ -18,6 +18,533 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
+const KpiModal = ({ isOpen, onClose }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="FAT KPIs">
+            <div className="fat-kpi-modal-content">
+                <p>This is a placeholder for the FAT KPIs and metrics.</p>
+                <p>The specific calculations and charts will be defined in the next development phase.</p>
+            </div>
+            <div className="modal-actions">
+                <button type="button" onClick={onClose} className="modal-button-cancel">Close</button>
+            </div>
+        </Modal>
+    );
+};
+
+const DefectFilter = ({ selectedFilter, onChange }) => {
+    const filters = ['All', 'FAT', 'Not FAT'];
+
+    return (
+        <div className="sprint-filter-options-container">
+            {filters.map(filter => (
+                <label key={filter} className="sprint-filter-label">
+                    <input
+                        type="radio"
+                        name="defect-filter"
+                        value={filter}
+                        checked={selectedFilter === filter}
+                        onChange={() => onChange(filter)}
+                    />
+                    {filter}
+                </label>
+            ))}
+        </div>
+    );
+};
+
+const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessage }) => {
+    const [selectableReleases, setSelectableReleases] = useState([]);
+    const [selectedReleaseId, setSelectedReleaseId] = useState(null);
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && project) {
+            setIsLoading(true);
+            fetch(`${API_BASE_URL}/releases/${project}/selectable`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.data) {
+                        setSelectableReleases(data.data);
+                        setSelectedReleaseId(null);
+                    }
+                })
+                .catch(err => showMainMessage('Failed to load releases for selection.', 'error'))
+                .finally(() => setIsLoading(false));
+        }
+    }, [isOpen, project, showMainMessage]);
+
+    const handleStart = () => {
+        if (!startDate || !selectedReleaseId) {
+            showMainMessage('Please select a start date and a release.', 'error');
+            return;
+        }
+        onStart(startDate, selectedReleaseId);
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Start New FAT Period for ${project}`}>
+            <div className="form-group">
+                <label htmlFor="fat-start-date">Start Date (Time will be set to 9:00 AM)</label>
+                <input
+                    type="date"
+                    id="fat-start-date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                />
+            </div>
+            <div className="form-group">
+                <label>Select a Release to Include:</label>
+                {isLoading ? <LoadingSpinner /> : (
+                    <div className="fat-release-selection-list">
+                        {selectableReleases.length > 0 ? selectableReleases.map(release => (
+                            <label key={`${release.type}-${release.id}`} className="fat-release-selection-item">
+                                <input
+                                    type="radio"
+                                    name="fat-release-selection"
+                                    checked={selectedReleaseId === release.id}
+                                    onChange={() => setSelectedReleaseId(release.id)}
+                                />
+                                <span className="fat-release-name">{release.name}</span>
+                                <span className={`fat-release-type-badge type-${release.type}`}>{release.type}</span>
+                            </label>
+                        )) : <p>No active releases found for this project.</p>}
+                    </div>
+                )}
+            </div>
+            <div className="modal-actions">
+                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+                <button type="button" onClick={handleStart} className="modal-button-save" disabled={isLoading || !selectedReleaseId}>Start Period</button>
+            </div>
+        </Modal>
+    );
+};
+
+const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequirements, showMainMessage }) => {
+    const initialData = {
+        passed: fatPeriod?.fat_report?.passed || 0,
+        failed: fatPeriod?.fat_report?.failed || 0,
+        blocked: fatPeriod?.fat_report?.blocked || 0,
+        caution: fatPeriod?.fat_report?.caution || 0,
+        not_run: fatPeriod?.fat_report?.not_run || 0,
+    };
+    const [fatData, setFatData] = useState(initialData);
+
+    useEffect(() => {
+        if (isOpen) {
+            setFatData({
+                passed: fatPeriod?.fat_report?.passed || 0,
+                failed: fatPeriod?.fat_report?.failed || 0,
+                blocked: fatPeriod?.fat_report?.blocked || 0,
+                caution: fatPeriod?.fat_report?.caution || 0,
+                not_run: fatPeriod?.fat_report?.not_run || 0,
+            });
+        }
+    }, [fatPeriod, isOpen]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFatData(prev => ({ ...prev, [name]: value === '' ? 0 : parseInt(value, 10) }));
+    };
+
+    const handleReset = () => {
+        setFatData({ passed: 0, failed: 0, blocked: 0, caution: 0, not_run: 0 });
+    };
+
+    const total = useMemo(() => Object.values(fatData).reduce((sum, val) => sum + (val || 0), 0), [fatData]);
+    const isTotalValid = useMemo(() => total === totalRequirements || total === 0, [total, totalRequirements]);
+
+    const handleSave = async () => {
+        if (!isTotalValid) {
+            showMainMessage(`Total must be exactly ${totalRequirements} or 0 to clear the report.`, 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${fatPeriod.id}/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fatData),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to save FAT report.');
+            showMainMessage(result.message, 'success');
+            onSave();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const fields = ['passed', 'failed', 'blocked', 'caution', 'not_run'];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`FAT Results for ${fatPeriod?.project}`}>
+            <div className="sat-modal-grid">
+                {fields.map(field => (
+                    <div className="form-group" key={field}>
+                        <label htmlFor={`fat-${field}`}>{field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')}</label>
+                        <input
+                            type="number"
+                            id={`fat-${field}`}
+                            name={field}
+                            value={fatData[field]}
+                            onChange={handleChange}
+                            onFocus={e => e.target.select()}
+                            min="0"
+                        />
+                    </div>
+                ))}
+            </div>
+            <div className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
+                Total: {total} / {totalRequirements}
+                {!isTotalValid && <div style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be {totalRequirements} to save, or 0 to clear.</div>}
+            </div>
+            <div className="modal-actions">
+                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+                <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
+                <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
+            </div>
+        </Modal>
+    );
+};
+
+const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigateToDefect, onNavigateToRequirement, allProcessedRequirements, onSaveFatReport, showMainMessage }) => {
+    const [details, setDetails] = useState({ requirements: [], defects: [] });
+    const [isLoading, setIsLoading] = useState(true);
+    const [isKpiModalOpen, setIsKpiModalOpen] = useState(false);
+    const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
+    const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
+    const [isFatReportModalOpen, setIsFatReportModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (fatPeriod?.id) {
+            setIsLoading(true);
+            fetch(`${API_BASE_URL}/fat/details/${fatPeriod.id}`)
+                .then(res => res.json())
+                .then(data => setDetails(data.data || { requirements: [], defects: [] }))
+                .catch(console.error)
+                .finally(() => setIsLoading(false));
+        }
+    }, [fatPeriod]);
+
+    const totalRequirements = details.requirements.length;
+
+    const getFatChartConfig = (fat_report) => {
+        if (!fat_report) return { data: null, legendItems: [] };
+
+        const allLabels = ['Passed', 'Failed', 'Blocked', 'Caution', 'Not Run'];
+        const allKeys = ['passed', 'failed', 'blocked', 'caution', 'not_run'];
+        const allColors = ['#28a745', '#dc3545', '#ffc107', '#fd7e14', '#6c757d'];
+
+        const data = [];
+        const labels = [];
+        const backgroundColor = [];
+        const legendItems = [];
+
+        allKeys.forEach((key, index) => {
+            const value = fat_report[key];
+            if (value > 0) {
+                data.push(value);
+                labels.push(allLabels[index]);
+                backgroundColor.push(allColors[index]);
+                legendItems.push({ text: `${allLabels[index]} (${value})`, color: allColors[index] });
+            }
+        });
+
+        if (data.length === 0) return { data: null, legendItems: [] };
+
+        return {
+            data: {
+                labels,
+                datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+            },
+            legendItems
+        };
+    };
+    
+    const { data: fatChartData, legendItems: fatLegendItems } = getFatChartConfig(fatPeriod.fat_report);
+    const totalReported = fatPeriod.fat_report ? Object.values(fatPeriod.fat_report).reduce((a, b) => a + b, 0) : 0;
+
+    const filteredDefects = useMemo(() => {
+        if (!details.defects) return [];
+        switch (selectedDefectFilter) {
+            case 'FAT':
+                return details.defects.filter(d => d.is_fat_defect);
+            case 'Not FAT':
+                return details.defects.filter(d => !d.is_fat_defect);
+            case 'All':
+            default:
+                return details.defects;
+        }
+    }, [details.defects, selectedDefectFilter]);
+
+    const handleDefectClick = (defect) => {
+        const defectForNav = { ...defect, project: project, status: 'Unknown' };
+        onNavigateToDefect(defectForNav, false);
+    };
+    
+    const handleRequirementClick = (req) => {
+        const fullRequirement = allProcessedRequirements.find(fullReq => fullReq.id === req.id);
+        if (fullRequirement) {
+            onNavigateToRequirement(fullRequirement);
+        } else {
+            console.warn("Could not find full requirement object for navigation. ID:", req.id);
+        }
+    };
+
+    return (
+        <div className="fat-details-view">
+            <div className="fat-details-header">
+                <h2>FAT Period for {project}</h2>
+                <div className="fat-details-actions">
+                    <button onClick={() => onCancel(fatPeriod)} className="button-cancel-fat">Cancel FAT</button>
+                    <button onClick={() => setIsKpiModalOpen(true)} className="button-edit">Calculate KPIs</button>
+                    <button onClick={onComplete} className="button-complete">
+                        Complete FAT
+                    </button>
+                </div>
+            </div>
+            <div className="fat-details-card">
+                <div className="fat-details-meta">
+                    <span><strong>Status:</strong> <span className="fat-status-active">Active</span></span>
+                    <span><strong>Started:</strong> {new Date(fatPeriod.start_date).toLocaleString()}</span>
+                </div>
+
+                <div style={{ padding: '20px 0', borderBottom: '1px solid #E3C9A6', borderTop: '1px solid #E3C9A6', margin: '20px 0' }}>
+                    <button onClick={() => setIsFatReportModalOpen(true)} className="button-edit" disabled={isLoading}>
+                        {fatPeriod.fat_report ? 'Update FAT Results' : 'Add FAT Results'}
+                    </button>
+                </div>
+
+                {isDefectFilterVisible && (
+                    <div className="fat-filter-container">
+                        <DefectFilter
+                            selectedFilter={selectedDefectFilter}
+                            onChange={setSelectedDefectFilter}
+                        />
+                    </div>
+                )}
+
+                <div className="fat-details-body">
+                    <div className="fat-details-column">
+                        <h4>Releases in Scope ({fatPeriod.selected_releases.length})</h4>
+                        <ul className="fat-scoped-release-list">
+                            {fatPeriod.selected_releases.map(r => (
+                                <li key={r.name}>
+                                    {r.name}
+                                    <span className={`fat-release-type-badge type-${r.type}`}>{r.type}</span>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {fatPeriod.fat_report && totalReported > 0 && (
+                            <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                                <h4>FAT Execution Results</h4>
+                                <div style={{ width: '200px', height: '200px' }}>
+                                    <Pie data={fatChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+                                </div>
+                                <ChartLegend items={fatLegendItems} />
+                            </div>
+                        )}
+                    </div>
+                    <div className="fat-details-column">
+                        <h4>Requirements to Test ({totalRequirements})</h4>
+                        {isLoading ? <LoadingSpinner /> : (
+                            <ul className="fat-item-list">
+                                {details.requirements.map(req => (
+                                    <li key={req.id}>
+                                        <button onClick={() => handleRequirementClick(req)} className="link-button">{req.title}</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div className="fat-details-column">
+                        <h4>Defects ({filteredDefects.length})</h4>
+                        {isLoading ? <LoadingSpinner /> : (
+                            <ul className="fat-item-list">
+                                {filteredDefects.map(def => (
+                                    <li key={def.id}>
+                                        <button onClick={() => handleDefectClick(def)} className="link-button">{def.title}</button>
+                                        {def.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <KpiModal isOpen={isKpiModalOpen} onClose={() => setIsKpiModalOpen(false)} />
+
+            <AddFatReportModal
+                isOpen={isFatReportModalOpen}
+                onClose={() => setIsFatReportModalOpen(false)}
+                onSave={() => {
+                    onSaveFatReport();
+                    setIsFatReportModalOpen(false);
+                }}
+                fatPeriod={fatPeriod}
+                totalRequirements={totalRequirements}
+                showMainMessage={showMainMessage}
+            />
+        </div>
+    );
+};
+
+
+const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToRequirement, allProcessedRequirements }) => {
+    const [activeFatPeriod, setActiveFatPeriod] = useState(null);
+    const [completedFatPeriods, setCompletedFatPeriods] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isStartModalOpen, setIsStartModalOpen] = useState(false);
+    const [fatPeriodToDelete, setFatPeriodToDelete] = useState(null);
+
+    const fetchFatData = useCallback(() => {
+        if (!project) return;
+        setIsLoading(true);
+        fetch(`${API_BASE_URL}/fat/${project}`)
+            .then(res => res.json())
+            .then(data => {
+                const allPeriods = data.data || [];
+                setActiveFatPeriod(allPeriods.find(p => p.status === 'active') || null);
+                setCompletedFatPeriods(allPeriods.filter(p => p.status === 'completed'));
+            })
+            .catch(err => showMainMessage('Failed to load FAT data.', 'error'))
+            .finally(() => setIsLoading(false));
+    }, [project, showMainMessage]);
+
+    useEffect(() => {
+        fetchFatData();
+    }, [fetchFatData]);
+
+    const handleStartPeriod = async (startDate, releaseId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${project}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_date: startDate, release_id: releaseId })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
+            showMainMessage(result.message, 'success');
+            setIsStartModalOpen(false);
+            fetchFatData();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const handleCompletePeriod = async () => {
+        if (!activeFatPeriod) return;
+
+        if (!activeFatPeriod.fat_report) {
+            showMainMessage("Please add FAT results before completing the period.", "error");
+            return; 
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, {
+                method: 'PUT',
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
+            showMainMessage(result.message, 'success');
+            fetchFatData();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const handleDeleteRequest = (period) => {
+        setFatPeriodToDelete(period);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!fatPeriodToDelete) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${fatPeriodToDelete.id}`, {
+                method: 'DELETE',
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
+            showMainMessage(result.message, 'success');
+            fetchFatData();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        } finally {
+            setFatPeriodToDelete(null);
+        }
+    };
+
+    if (isLoading) return <LoadingSpinner />;
+
+    return (
+        <div className="fat-page-container">
+            {activeFatPeriod ? (
+                <FatPeriodDetails
+                    fatPeriod={activeFatPeriod}
+                    project={project}
+                    onComplete={handleCompletePeriod}
+                    onCancel={handleDeleteRequest}
+                    onNavigateToDefect={onNavigateToDefect}
+                    onNavigateToRequirement={onNavigateToRequirement}
+                    allProcessedRequirements={allProcessedRequirements}
+                    onSaveFatReport={fetchFatData}
+                    showMainMessage={showMainMessage}
+                />
+            ) : (
+                <div className="fat-no-active-view">
+                    <h2>FAT Dashboard for {project}</h2>
+                    <p>There is no active FAT period for this project.</p>
+                    <button className="fat-start-button" onClick={() => setIsStartModalOpen(true)}>
+                        Start New FAT Period
+                    </button>
+                </div>
+            )}
+
+            {completedFatPeriods.length > 0 && (
+                <div className="fat-completed-list">
+                    <h3>Completed FAT Periods</h3>
+                    {completedFatPeriods.map(period => (
+                        <div key={period.id} className="fat-completed-card">
+                            <div className="fat-completed-card-header">
+                                <div className="fat-completed-dates">
+                                    <span><strong>Started:</strong> {new Date(period.start_date).toLocaleString()}</span>
+                                    <span><strong>Completed:</strong> {new Date(period.completion_date).toLocaleString()}</span>
+                                </div>
+                                <button onClick={() => handleDeleteRequest(period)} className="button-delete-fat">Delete</button>
+                            </div>
+                            <div className="fat-completed-card-body">
+                                <strong>Releases Tested:</strong>
+                                <ul>
+                                    {period.selected_releases.map(r => <li key={r.name}>{r.name}</li>)}
+                                </ul>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <StartFatPeriodModal
+                isOpen={isStartModalOpen}
+                onClose={() => setIsStartModalOpen(false)}
+                onStart={handleStartPeriod}
+                project={project}
+                showMainMessage={showMainMessage}
+            />
+
+            <ConfirmationModal
+                isOpen={!!fatPeriodToDelete}
+                onClose={() => setFatPeriodToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title={`Confirm ${fatPeriodToDelete?.status === 'active' ? 'Cancel' : 'Delete'} FAT Period`}
+                message={`Are you sure you want to permanently ${fatPeriodToDelete?.status === 'active' ? 'cancel this active' : 'delete this completed'} FAT period? This action cannot be undone.`}
+            />
+        </div>
+    );
+};
+
 const getSatChartConfig = (sat_report) => {
     if (!sat_report) return { data: null, legendItems: [] };
 
@@ -50,6 +577,40 @@ const getSatChartConfig = (sat_report) => {
         legendItems
     };
 };
+
+const getFatExecutionChartConfig = (fat_report) => {
+    if (!fat_report) return { data: null, legendItems: [] };
+
+    const allLabels = ['Passed', 'Failed', 'Blocked', 'Caution', 'Not Run'];
+    const allKeys = ['passed', 'failed', 'blocked', 'caution', 'not_run'];
+    const allColors = ['#28a745', '#dc3545', '#ffc107', '#fd7e14', '#6c757d'];
+
+    const data = [];
+    const labels = [];
+    const backgroundColor = [];
+    const legendItems = [];
+
+    allKeys.forEach((key, index) => {
+        const value = fat_report[key];
+        if (value > 0) {
+            data.push(value);
+            labels.push(allLabels[index]);
+            backgroundColor.push(allColors[index]);
+            legendItems.push({ text: `${allLabels[index]} (${value})`, color: allColors[index] });
+        }
+    });
+
+    if (data.length === 0) return { data: null, legendItems: [] };
+
+    return {
+        data: {
+            labels,
+            datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+        },
+        legendItems
+    };
+};
+
 
 const ChartLegend = ({ items }) => {
     if (!items || items.length === 0) return null;
@@ -105,12 +666,14 @@ const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
     );
 };
 
-
 const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportReleaseToExcel, onExportToPdf }) => {
     const [selectedSprints, setSelectedSprints] = useState(['All']);
     const [isDefectsCardOpen, setIsDefectsCardOpen] = useState(false);
     const [isFilterVisible, setIsFilterVisible] = useState(false);
     const [isPdfExporting, setIsPdfExporting] = useState(false);
+    
+    const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
+    const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
 
     const reqChartRef = useRef(null);
     const defectChartRef = useRef(null);
@@ -132,37 +695,66 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         return releaseRequirements.filter(r => selectedSprints.includes(r.currentStatusDetails.sprint));
     }, [releaseRequirements, selectedSprints]);
 
-    const filteredDefects = useMemo(() => 
-        filteredRequirements.flatMap(r => r.linkedDefects || []),
+    const uniqueFilteredDefects = useMemo(() => 
+        Array.from(new Map(filteredRequirements.flatMap(r => r.linkedDefects || []).map(d => [d.id, d])).values()),
         [filteredRequirements]
     );
 
-    const uniqueFilteredDefects = useMemo(() => 
-        Array.from(new Map(filteredDefects.map(d => [d.id, d])).values()),
-        [filteredDefects]
-    );
+    const displayDefects = useMemo(() => {
+        if (selectedDefectFilter === 'All') return uniqueFilteredDefects;
+        if (selectedDefectFilter === 'FAT') return uniqueFilteredDefects.filter(d => d.is_fat_defect);
+        if (selectedDefectFilter === 'Not FAT') return uniqueFilteredDefects.filter(d => !d.is_fat_defect);
+        return uniqueFilteredDefects;
+    }, [uniqueFilteredDefects, selectedDefectFilter]);
 
     const defectCount = uniqueFilteredDefects.length;
 
-    const reqChartData = useMemo(() => {
-        if (!filteredRequirements || filteredRequirements.length === 0) return null;
+    const { chartData, chartTitle, chartAriaLabel, legendItems } = useMemo(() => {
+        if (release.fat_execution_report) {
+            const { data, legendItems } = getFatExecutionChartConfig(release.fat_execution_report);
+            return {
+                chartData: data,
+                chartTitle: 'FAT Execution Results',
+                chartAriaLabel: `Pie chart showing FAT results for release ${release.name}.`,
+                legendItems: legendItems
+            };
+        }
+
+        if (!filteredRequirements || filteredRequirements.length === 0) {
+            return { chartData: null, chartTitle: `Progress (0 items)`, chartAriaLabel: 'No requirement data to display.', legendItems: [] };
+        }
         let done = 0;
         let notDone = 0;
         filteredRequirements.forEach(req => {
             if (req.currentStatusDetails.status === 'Done') done++;
             else notDone++;
         });
-        if (done === 0 && notDone === 0) return null;
-        return {
+
+        if (done === 0 && notDone === 0) {
+             return { chartData: null, chartTitle: `Progress (${filteredRequirements.length} items)`, chartAriaLabel: 'No requirement data to display.', legendItems: [] };
+        }
+
+        const data = {
             labels: ['Done', 'Not Done'],
             datasets: [{ data: [done, notDone], backgroundColor: ['#4CAF50', '#F44336'], borderColor: ['#ffffff'], borderWidth: 1 }],
         };
-    }, [filteredRequirements]);
+        
+        const dynamicLegendItems = [];
+        if (done > 0) dynamicLegendItems.push({ text: `Done (${done})`, color: '#4CAF50' });
+        if (notDone > 0) dynamicLegendItems.push({ text: `Not Done (${notDone})`, color: '#F44336' });
+
+        return {
+            chartData: data,
+            chartTitle: `Progress (${filteredRequirements.length} items)`,
+            chartAriaLabel: `Pie chart showing requirement progress for release ${release.name}. ${done} items are done and ${notDone} items are not done.`,
+            legendItems: dynamicLegendItems
+        };
+    }, [release.fat_execution_report, filteredRequirements, release.name]);
 
     const defectChartData = useMemo(() => {
-        if (!uniqueFilteredDefects || uniqueFilteredDefects.length === 0) return null;
+        if (!displayDefects || displayDefects.length === 0) return null;
         let done = 0, notDone = 0, closed = 0;
-        uniqueFilteredDefects.forEach(defect => {
+        displayDefects.forEach(defect => {
             if (defect.status === 'Done') done++;
             else if (defect.status === 'Closed') closed++;
             else notDone++;
@@ -172,7 +764,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             labels: ['Done', 'Not Done', 'Closed'],
             datasets: [{ data: [done, notDone, closed], backgroundColor: ['#4CAF50', '#F44336', '#808080'], borderColor: ['#ffffff'], borderWidth: 1 }],
         };
-    }, [uniqueFilteredDefects]);
+    }, [displayDefects]);
 
     const handlePdfExport = async () => {
         if (!reqChartRef.current) {
@@ -214,7 +806,10 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             sprintFilter={sprintFilterElement}
             onToggleFilter={() => setIsFilterVisible(prev => !prev)}
             showFilterToggle={availableSprints.length > 2}
-            chartData={reqChartData}
+            chartData={chartData}
+            chartTitle={chartTitle}
+            chartAriaLabel={chartAriaLabel}
+            legendItems={legendItems}
             chartRef={reqChartRef}
         />
     );
@@ -223,10 +818,14 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         <DefectDetailsCard
             key={`defect-details-${release.id}`}
             release={release}
-            defects={uniqueFilteredDefects}
+            defects={displayDefects}
             onClose={() => setIsDefectsCardOpen(false)}
             onNavigate={onNavigateToDefect}
             chartData={defectChartData}
+            onToggleFilter={() => setIsDefectFilterVisible(prev => !prev)}
+            isFilterVisible={isDefectFilterVisible}
+            selectedDefectFilter={selectedDefectFilter}
+            onFilterChange={setSelectedDefectFilter}
         />
     ) : null;
 
@@ -273,7 +872,7 @@ const ReleaseCountdown = ({ activeReleases }) => {
 
 const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
-const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData }) => {
+const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, onToggleFilter, isFilterVisible, selectedDefectFilter, onFilterChange }) => {
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -285,8 +884,24 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData })
     };
 
     const chartAriaLabel = chartData
-        ? `Pie chart showing defect status for release ${release.name}. ${chartData.datasets[0].data[0]} defects are done, ${chartData.datasets[0].data[1]} are not done, and ${chartData.datasets[0].data[2]} are closed.`
+        ? `Pie chart showing defect status for release ${release.name}.`
         : 'No defect data to display in a chart.';
+
+    const defectLegendItems = useMemo(() => {
+        if (!defects || defects.length === 0) return [];
+        let done = 0, notDone = 0, closed = 0;
+        defects.forEach(defect => {
+            if (defect.status === 'Done') done++;
+            else if (defect.status === 'Closed') closed++;
+            else notDone++;
+        });
+
+        const items = [];
+        if (done > 0) items.push({ text: `Done (${done})`, color: '#4CAF50' });
+        if (notDone > 0) items.push({ text: `Not Done (${notDone})`, color: '#F44336' });
+        if (closed > 0) items.push({ text: `Closed (${closed})`, color: '#808080' });
+        return items;
+    }, [defects]);
 
     return (
         <div className="defect-details-card">
@@ -294,12 +909,27 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData })
                 <h3>Defects for {release.name}</h3>
                 <button type="button" onClick={onClose} className="close-button">X</button>
             </div>
+            
+            {isFilterVisible && (
+                <div className="fat-filter-container">
+                    <DefectFilter
+                        selectedFilter={selectedDefectFilter}
+                        onChange={onFilterChange}
+                    />
+                </div>
+            )}
+
             <div className="defect-details-card-body">
                 <div className="defect-charts">
                     {chartData ? (
-                        <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                        <>
+                            <div className="release-pie-chart-container">
+                                <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                            </div>
+                            <ChartLegend items={defectLegendItems} />
+                        </>
                     ) : (
-                        <div className="empty-chart-placeholder">No defects for this release</div>
+                        <div className="empty-chart-placeholder">No defects to display</div>
                     )}
                 </div>
                 <div className="defect-list">
@@ -309,17 +939,22 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData })
                             <li key={defect.id}>
                                 <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
                                     {defect.title}
+                                    {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
                                 </button>
                             </li>
-                        )) : <li>No defects in this release.</li>}
+                        )) : <li>No defects match the current filter.</li>}
                     </ul>
                 </div>
+            </div>
+
+            <div className="defect-details-card-footer">
+                <button type="button" onClick={onToggleFilter} className="button-filter">Filter Defects</button>
             </div>
         </div>
     );
 };
 
-const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef }) => {
+const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef, chartTitle, chartAriaLabel, legendItems }) => {
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const exportContainerRef = useRef(null);
 
@@ -338,14 +973,10 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            title: { display: true, text: `Progress (${requirements.length} items)`, font: { size: 14 } },
+            title: { display: true, text: chartTitle, font: { size: 14 } },
             tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / (c.dataset.data.reduce((a, b) => a + b, 0) || 1)) * 100).toFixed(1)}%)` } }
         },
     };
-
-    const chartAriaLabel = chartData
-        ? `Pie chart showing requirement progress for release ${release.name}. ${chartData.datasets[0].data[0]} items are done and ${chartData.datasets[0].data[1]} items are not done.`
-        : 'No requirement data to display in a chart.';
 
     return (
         <div className="release-card">
@@ -362,7 +993,12 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
             <div className="release-card-body">
                 <div className="release-charts">
                     {chartData ? (
-                        <Pie ref={chartRef} data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                        <>
+                            <div className="release-pie-chart-container">
+                                <Pie ref={chartRef} data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
+                            </div>
+                            <ChartLegend items={legendItems} />
+                        </>
                     ) : (
                         <div className="empty-chart-placeholder">No requirements assigned</div>
                     )}
@@ -539,7 +1175,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
             setBugToDelete(null);
         }
     };
-
+    
     const ourMetricsChartData = {
         labels: ['Done', 'Not Done'],
         datasets: [{
@@ -552,10 +1188,10 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     const ourMetricsLegendItems = [];
     if (archive.metrics.doneCount > 0) {
-        ourMetricsLegendItems.push({ text: 'Done', color: '#28a745' });
+        ourMetricsLegendItems.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
     }
     if (archive.metrics.notDoneCount > 0) {
-        ourMetricsLegendItems.push({ text: 'Not Done', color: '#dc3545' });
+        ourMetricsLegendItems.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
     }
 
     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
@@ -605,7 +1241,6 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     const { data: bugLabelsChartData, legendItems: bugLabelsLegendItems } = getBugLabelsChartConfig(satBugs);
 
-    // --- MODIFICATION START ---
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -616,7 +1251,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 callbacks: {
                     label: function(context) {
                         let label = context.label || '';
-                        if (label.length > 30) { // Truncate labels longer than 30 chars
+                        if (label.length > 30) {
                             label = label.substring(0, 30) + '...';
                         }
                         const value = context.formattedValue || '';
@@ -627,7 +1262,6 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         },
         animation: false
     };
-    // --- MODIFICATION END ---
 
     return (
         <div className="archived-details-view">
@@ -929,8 +1563,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                 let finalSatLegendY = chartStartY + chartHeight + 5;
 
                 const metricsChartX = leftMargin + 15;
-                pdf.setFontSize(12);
-                pdf.text('Our Final Metrics', metricsChartX, yPos);
+                
                 yPos += 5;
                 if (metricsChart) {
                     metricsChart.resize(300, 300);
@@ -939,15 +1572,33 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
 
                     pdf.addImage(metricsImg, 'PNG', metricsChartX, yPos, chartWidth, chartHeight);
 
-                    const metricsLegend = [{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}];
                     let legendY = yPos + chartHeight + 5;
                     pdf.setFontSize(9);
-                    metricsLegend.forEach(item => {
-                        pdf.setFillColor(item.color);
-                        pdf.rect(metricsChartX, legendY, 3, 3, 'F');
-                        pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
-                        legendY += 5;
-                    });
+
+                    if (archive.fat_execution_report) {
+                        pdf.setFontSize(12);
+                        pdf.text('FAT Execution Results', metricsChartX, yPos - 5);
+                        const { legendItems: fatLegend } = getFatExecutionChartConfig(archive.fat_execution_report);
+                        fatLegend.forEach(item => {
+                            pdf.setFillColor(item.color);
+                            pdf.rect(metricsChartX, legendY, 3, 3, 'F');
+                            pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
+                            legendY += 5;
+                        });
+                    } else {
+                        pdf.setFontSize(12);
+                        pdf.text('Our Final Metrics', metricsChartX, yPos - 5);
+                        const metricsLegend = [];
+                        if (archive.metrics.doneCount > 0) metricsLegend.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
+                        if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
+                        
+                        metricsLegend.forEach(item => {
+                            pdf.setFillColor(item.color);
+                            pdf.rect(metricsChartX, legendY, 3, 3, 'F');
+                            pdf.text(item.text, metricsChartX + 5, legendY + 2.5);
+                            legendY += 5;
+                        });
+                    }
                     finalMetricsLegendY = legendY;
                 }
                 
@@ -1071,7 +1722,17 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
             <div className="comparison-container">
                 {detailedArchives.map(archive => {
                     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+                    const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
                     const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
+
+                    const metricsLegendItems = [];
+                    if (archive.metrics.doneCount > 0) {
+                        metricsLegendItems.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
+                    }
+                    if (archive.metrics.notDoneCount > 0) {
+                        metricsLegendItems.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
+                    }
+
                     return (
                         <div key={archive.id} className="comparison-column">
                             <h3>{archive.name}</h3>
@@ -1087,25 +1748,43 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                             </div>
                             <div className="comparison-charts">
                                 <div className="comparison-chart-wrapper">
-                                    <h4>Our Final Metrics</h4>
-                                    <div className="chart-container">
-                                        <Pie
-                                            ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
-                                            data={{
-                                                labels: ['Done', 'Not Done'],
-                                                datasets: [{
-                                                    data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
-                                                    backgroundColor: ['#28a745', '#dc3545'],
-                                                    borderColor: '#FFFAF0',
-                                                    borderWidth: 2,
-                                                }],
-                                            }}
-                                            options={onScreenChartOptions}
-                                        />
-                                    </div>
-                                    <div className="legend-wrapper">
-                                        <ChartLegend items={[{text: 'Done', color: '#28a745'}, {text: 'Not Done', color: '#dc3545'}]} />
-                                    </div>
+                                    {archive.fat_execution_report ? (
+                                        <>
+                                            <h4>FAT Execution Results</h4>
+                                            <div className="chart-container">
+                                                <Pie
+                                                    ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
+                                                    data={fatExecutionChartData}
+                                                    options={onScreenChartOptions}
+                                                />
+                                            </div>
+                                            <div className="legend-wrapper">
+                                                <ChartLegend items={fatExecutionLegendItems} />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h4>Our Final Metrics</h4>
+                                            <div className="chart-container">
+                                                <Pie
+                                                    ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
+                                                    data={{
+                                                        labels: ['Done', 'Not Done'],
+                                                        datasets: [{
+                                                            data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
+                                                            backgroundColor: ['#28a745', '#dc3545'],
+                                                            borderColor: '#FFFAF0',
+                                                            borderWidth: 2,
+                                                        }],
+                                                    }}
+                                                    options={onScreenChartOptions}
+                                                />
+                                            </div>
+                                            <div className="legend-wrapper">
+                                                <ChartLegend items={metricsLegendItems} />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="comparison-chart-wrapper">
                                     <h4>SAT Report</h4>
@@ -1170,21 +1849,25 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 const releasesPageTooltipContent = (
     <>
         <strong>Release Dashboard Guide</strong>
-        <p>Manage your project's release lifecycle. Switch between Active and Archived views to see current progress or historical data.</p>
+        <p>Manage your project's release lifecycle. Switch between Active, Archived, and FAT views.</p>
         
         <strong style={{ marginTop: '10px', display: 'block' }}>Active Releases</strong>
         <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
             <li>Track real-time progress with live charts.</li>
-            <li>Filter requirements by sprint to focus your view.</li>
-            <li>Export detailed reports in Excel or PDF format.</li>
             <li>Finalize a release to create a permanent record in the archives.</li>
         </ul>
 
         <strong style={{ marginTop: '10px', display: 'block' }}>Archived Releases</strong>
         <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
-            <li>Review final metrics and frozen requirement lists.</li>
-            <li>Add SAT results and log specific SAT Bugs found during testing.</li>
-            <li>Check the boxes on multiple archives and click 'Compare Selected' for a side-by-side analysis!</li>
+            <li>Review final metrics and add SAT results.</li>
+            <li>Select multiple archives and click 'Compare Selected' for a side-by-side analysis.</li>
+        </ul>
+
+        <strong style={{ marginTop: '10px', display: 'block' }}>FAT (Factory Acceptance Testing)</strong>
+        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+            <li>Start a new FAT period for regression testing.</li>
+            <li>Select requirements from any combination of active and archived releases.</li>
+            <li>Automatically includes defects marked with the 'FAT Defect' flag.</li>
         </ul>
     </>
 );
@@ -1209,6 +1892,7 @@ const releasesPageTooltipContent = (
         setComparisonList([]);
         setIsComparing(false);
         setSelectedArchive(null);
+        setView('active');
     };
     
     const fetchActiveReleases = useCallback(async () => {
@@ -1249,7 +1933,7 @@ const releasesPageTooltipContent = (
         if (selectedProject) {
             if (view === 'active') {
                 fetchActiveReleases();
-            } else {
+            } else if (view === 'archived') {
                 fetchArchivedReleases();
             }
         }
@@ -1607,24 +2291,34 @@ const releasesPageTooltipContent = (
             const chartHeight = 60;
     
             const reqChartX = leftMargin + 10;
-            pdf.setFontSize(14);
-            pdf.text('Requirements Progress', reqChartX, yPos);
+            
             yPos += 5;
     
-            const reqImg = generateChartImage(reqChartData);
+            const chartDataSource = release.fat_execution_report ? getFatExecutionChartConfig(release.fat_execution_report).data : reqChartData;
+            const reqImg = generateChartImage(chartDataSource);
+
             if (reqImg) {
                 pdf.addImage(reqImg, 'PNG', reqChartX, yPos, chartWidth, chartHeight);
             }
             let reqLegendY = yPos + chartHeight + 5;
     
-            let reqDone = 0;
-            requirements.forEach(r => { if (r.currentStatusDetails.status === 'Done') reqDone++; });
-            const reqNotDone = requirements.length - reqDone;
-            const reqLegendItems = [
-                { text: `Done (${reqDone})`, color: '#4CAF50' },
-                { text: `Not Done (${reqNotDone})`, color: '#F44336' }
-            ];
-            const finalReqY = drawLegend(pdf, reqChartX + 15, reqLegendY, reqLegendItems);
+            let finalReqY;
+            if (release.fat_execution_report) {
+                pdf.setFontSize(14);
+                pdf.text('FAT Execution Results', reqChartX, yPos - 5);
+                const { legendItems: fatLegend } = getFatExecutionChartConfig(release.fat_execution_report);
+                finalReqY = drawLegend(pdf, reqChartX + 15, reqLegendY, fatLegend);
+            } else {
+                pdf.setFontSize(14);
+                pdf.text('Requirements Progress', reqChartX, yPos - 5);
+                let reqDone = 0;
+                requirements.forEach(r => { if (r.currentStatusDetails.status === 'Done') reqDone++; });
+                const reqNotDone = requirements.length - reqDone;
+                const reqLegendItems = [];
+                if (reqDone > 0) reqLegendItems.push({ text: `Done (${reqDone})`, color: '#4CAF50' });
+                if (reqNotDone > 0) reqLegendItems.push({ text: `Not Done (${reqNotDone})`, color: '#F44336' });
+                finalReqY = drawLegend(pdf, reqChartX + 15, reqLegendY, reqLegendItems);
+            }
     
             yPos = chartStartY;
             const defectChartX = leftMargin + chartWidth + 30;
@@ -1956,9 +2650,7 @@ const releasesPageTooltipContent = (
             let currentX = leftMargin;
             const finalYPositions = [];
 
-            // --- 1. Our Final Metrics Chart (Always drawn) ---
-            pdf.setFontSize(12);
-            pdf.text('Our Final Metrics', currentX, chartStartY);
+            
             let currentChartY = chartStartY + 5;
             
             metricsChart.resize(300, 300);
@@ -1966,22 +2658,36 @@ const releasesPageTooltipContent = (
             metricsChart.resize();
             pdf.addImage(metricsImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
             
-            const metricsLegend = [];
-            if (archive.metrics.doneCount > 0) metricsLegend.push({ text: 'Done', color: '#28a745' });
-            if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: 'Not Done', color: '#dc3545' });
-            
             let legendY = currentChartY + chartHeight + 5;
             pdf.setFontSize(9);
-            metricsLegend.forEach(item => {
-                pdf.setFillColor(item.color);
-                pdf.rect(currentX, legendY, 3, 3, 'F');
-                pdf.text(item.text, currentX + 5, legendY + 2.5);
-                legendY += 5;
-            });
-            finalYPositions.push(legendY);
-            currentX += chartWidth + chartSpacing; // Prepare for the next chart
 
-            // --- 2. SAT Report Chart (Conditional) ---
+            if (archive.fat_execution_report) {
+                pdf.setFontSize(12);
+                pdf.text('FAT Execution Results', currentX, chartStartY);
+                const { legendItems: fatLegend } = getFatExecutionChartConfig(archive.fat_execution_report);
+                fatLegend.forEach(item => {
+                    pdf.setFillColor(item.color);
+                    pdf.rect(currentX, legendY, 3, 3, 'F');
+                    pdf.text(item.text, currentX + 5, legendY + 2.5);
+                    legendY += 5;
+                });
+            } else {
+                pdf.setFontSize(12);
+                pdf.text('Our Final Metrics', currentX, chartStartY);
+                const metricsLegend = [];
+                if (archive.metrics.doneCount > 0) metricsLegend.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
+                if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
+                
+                metricsLegend.forEach(item => {
+                    pdf.setFillColor(item.color);
+                    pdf.rect(currentX, legendY, 3, 3, 'F');
+                    pdf.text(item.text, currentX + 5, legendY + 2.5);
+                    legendY += 5;
+                });
+            }
+            finalYPositions.push(legendY);
+            currentX += chartWidth + chartSpacing;
+
             const { legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
             if (satChart && satLegendItems.length > 0) {
                 pdf.setFontSize(12);
@@ -2002,10 +2708,9 @@ const releasesPageTooltipContent = (
                     satLegendY += 5;
                 });
                 finalYPositions.push(satLegendY);
-                currentX += chartWidth + chartSpacing; // Prepare for the next chart
+                currentX += chartWidth + chartSpacing;
             }
 
-            // --- 3. SAT Bug Labels Chart (Conditional) ---
             if (bugLabelsChart && bugLabelsChart.data.labels && bugLabelsChart.data.labels.length > 0) {
                 pdf.setFontSize(12);
                 pdf.text('SAT Bug Labels', currentX, chartStartY);
@@ -2039,7 +2744,6 @@ const releasesPageTooltipContent = (
                 finalYPositions.push(bugLabelsLegendY);
             }
     
-            // Set yPos to start after the tallest chart + legend
             yPos = (finalYPositions.length > 0 ? Math.max(...finalYPositions) : chartStartY + chartHeight + 5) + 10;
     
             if (items.length > 0) {
@@ -2223,6 +2927,25 @@ const releasesPageTooltipContent = (
         );
     };
 
+    const renderContent = () => {
+        switch (view) {
+            case 'active':
+                return renderActiveView();
+            case 'archived':
+                return renderArchivedView();
+            case 'fat':
+                return <FatPage
+                    project={selectedProject}
+                    showMainMessage={showMainMessage}
+                    onNavigateToDefect={onNavigateToDefect}
+                    onNavigateToRequirement={onNavigateToRequirement}
+                    allProcessedRequirements={allProcessedRequirements}
+                />;
+            default:
+                return <div className="empty-column-message">Please select a view.</div>;
+        }
+    };
+
     return (
         <div className="main-content-area">
             <div className="selection-controls">
@@ -2233,10 +2956,11 @@ const releasesPageTooltipContent = (
                         <ReleaseCountdown activeReleases={activeReleases} />
                         <button type="button" onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
                         <button type="button" onClick={() => setView('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
+                        <button type="button" onClick={() => setView('fat')} className={view === 'fat' ? 'active' : ''}>FAT</button>
                     </div>
                 )}
             </div>
-            {selectedProject ? (view === 'active' ? renderActiveView() : renderArchivedView()) : (
+            {selectedProject ? renderContent() : (
                 <div className="empty-column-message">Please select a project to view releases.</div>
             )}
 

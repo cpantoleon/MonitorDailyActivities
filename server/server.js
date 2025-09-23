@@ -269,10 +269,10 @@ app.get("/api/requirements", (req, res) => {
                  LEFT JOIN releases rel ON act.release_id = rel.id
                  ORDER BY act.requirementGroupId, act.created_at DESC`;
     
-    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name
-                      FROM defect_requirement_links l
-                      JOIN defects d ON l.defect_id = d.id
-                      JOIN projects p ON d.project_id = p.id`;
+    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect
+                    FROM defect_requirement_links l
+                    JOIN defects d ON l.defect_id = d.id
+                    JOIN projects p ON d.project_id = p.id`;
 
     const changesSql = `SELECT requirement_group_id, COUNT(id) as change_count FROM requirement_changes GROUP BY requirement_group_id`;
 
@@ -286,7 +286,7 @@ app.get("/api/requirements", (req, res) => {
             if (!linksMap.has(link.requirement_group_id)) {
                 linksMap.set(link.requirement_group_id, []);
             }
-            linksMap.get(link.requirement_group_id).push({ id: link.defect_id, title: link.defect_title, status: link.defect_status, link: link.defect_link, project: link.project_name });
+            linksMap.get(link.requirement_group_id).push({ id: link.defect_id, title: link.defect_title, status: link.defect_status, link: link.defect_link, project: link.project_name, is_fat_defect: link.is_fat_defect });
         });
 
         const changesMap = new Map();
@@ -912,10 +912,49 @@ app.delete("/api/retrospective/:id", (req, res) => {
 app.get("/api/releases/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
-        const sql = "SELECT id, name, release_date, is_current FROM releases WHERE project_id = ? AND status = 'active' ORDER BY release_date DESC";
+        const sql = `
+            SELECT
+                r.id, r.name, r.release_date, r.is_current,
+                fr.passed, fr.failed, fr.blocked, fr.caution, fr.not_run
+            FROM releases r
+            LEFT JOIN (
+                SELECT 
+                    fsr.release_id, 
+                    MAX(fp.completion_date) as max_date
+                FROM fat_selected_releases fsr
+                JOIN fat_periods fp ON fsr.fat_period_id = fp.id
+                WHERE fp.status = 'completed' AND fsr.release_type = 'active'
+                GROUP BY fsr.release_id
+            ) latest_fat ON r.id = latest_fat.release_id
+            LEFT JOIN fat_periods fp ON latest_fat.max_date = fp.completion_date
+            LEFT JOIN fat_reports fr ON fp.id = fr.fat_period_id
+            WHERE r.project_id = ? AND r.status = 'active'
+            ORDER BY r.release_date DESC
+        `;
+
         db.all(sql, [projectId], (err, rows) => {
             if (err) return res.status(400).json({ "error": err.message });
-            const data = rows.map(r => ({...r, project: req.params.project}));
+            
+            const data = rows.map(row => {
+                let fat_execution_report = null;
+                if (row.passed !== null) {
+                    fat_execution_report = {
+                        passed: row.passed,
+                        failed: row.failed,
+                        blocked: row.blocked,
+                        caution: row.caution,
+                        not_run: row.not_run
+                    };
+                }
+                return {
+                    id: row.id,
+                    name: row.name,
+                    release_date: row.release_date,
+                    is_current: row.is_current,
+                    project: req.params.project,
+                    fat_execution_report: fat_execution_report
+                };
+            });
             res.json({ message: "success", data });
         });
     } catch (error) {
@@ -1163,52 +1202,72 @@ app.post("/api/releases/:id/close", async (req, res) => {
                     }
 
                     function finalizeProcess(archiveId) {
-                        const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
-                        db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
-                            if (err) {
-                                db.run("ROLLBACK");
-                                if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
-                                return;
+                        const checkFatSql = `
+                            SELECT fr.id 
+                            FROM fat_reports fr
+                            JOIN fat_periods fp ON fr.fat_period_id = fp.id
+                            JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
+                            WHERE fsr.release_id = ? AND fp.status = 'completed'
+                            ORDER BY fp.completion_date DESC
+                            LIMIT 1
+                        `;
+                        db.get(checkFatSql, [releaseId], (fatErr, fatReport) => {
+                            if (fatErr) {
+                                console.error("Error checking for completed FAT reports:", fatErr.message);
+                            }
+                            if (fatReport) {
+                                db.run("UPDATE archived_releases SET fat_report_id = ? WHERE id = ?", [fatReport.id, archiveId], (updateFatErr) => {
+                                    if (updateFatErr) console.error("Error linking FAT report to new archive:", updateFatErr.message);
+                                });
                             }
 
-                            if (closeAction === 'archive_only') {
-                                commitTransaction();
-                            } else if (closeAction === 'archive_and_complete') {
-                                const now = new Date().toISOString();
-                                const statusDate = now.split('T')[0];
-                                const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
-                                
-                                const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
-                                                           VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
-                                const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+                            const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
+                            db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
+                                if (err) {
+                                    db.run("ROLLBACK");
+                                    if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
+                                    return;
+                                }
 
-                                let activitiesProcessed = 0;
-                                if (requirements.length === 0) {
+                                if (closeAction === 'archive_only') {
                                     commitTransaction();
-                                } else {
-                                    requirements.forEach(req => {
-                                        db.run(updateOldSql, [req.requirementGroupId], function(err) {
-                                            if (err) {
-                                                db.run("ROLLBACK");
-                                                if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
-                                                return;
-                                            }
-                                            const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                            db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, now, now], function(err) {
+                                } else if (closeAction === 'archive_and_complete') {
+                                    const now = new Date().toISOString();
+                                    const statusDate = now.split('T')[0];
+                                    const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
+                                    
+                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
+                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
+                                    const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+
+                                    let activitiesProcessed = 0;
+                                    if (requirements.length === 0) {
+                                        commitTransaction();
+                                    } else {
+                                        requirements.forEach(req => {
+                                            db.run(updateOldSql, [req.requirementGroupId], function(err) {
                                                 if (err) {
                                                     db.run("ROLLBACK");
-                                                    if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                    if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                                     return;
                                                 }
-                                                activitiesProcessed++;
-                                                if (activitiesProcessed === requirements.length) {
-                                                    commitTransaction();
-                                                }
+                                                const comment = `Item completed as part of finalizing release '${release.name}'`;
+                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, now, now], function(err) {
+                                                    if (err) {
+                                                        db.run("ROLLBACK");
+                                                        if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                        return;
+                                                    }
+                                                    activitiesProcessed++;
+                                                    if (activitiesProcessed === requirements.length) {
+                                                        commitTransaction();
+                                                    }
+                                                });
                                             });
                                         });
-                                    });
+                                    }
                                 }
-                            }
+                            });
                         });
                     }
 
@@ -1234,9 +1293,10 @@ app.get("/api/archives/:project", async (req, res) => {
         const sql = `
             SELECT
                 ar.id, ar.original_release_id, ar.name, ar.closed_at, ar.metrics_json, ar.close_action,
-                sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed, sr.pending
+                sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed as sat_passed, sr.pending
             FROM archived_releases ar
             LEFT JOIN sat_reports sr ON ar.id = sr.archive_id
+            -- REMOVED: LEFT JOIN fat_reports fr ON ar.fat_report_id = fr.id
             WHERE ar.project_id = ?
             ORDER BY ar.closed_at DESC
         `;
@@ -1250,10 +1310,14 @@ app.get("/api/archives/:project", async (req, res) => {
                         failed: row.failed,
                         executing: row.executing,
                         aborted: row.aborted,
-                        passed: row.passed,
+                        passed: row.sat_passed,
                         pending: row.pending
                     };
                 }
+                
+                // REMOVED: The logic for fat_execution_report is gone.
+                // It will never be included in the response for an archived release.
+
                 try {
                     return {
                         id: row.id,
@@ -1263,11 +1327,12 @@ app.get("/api/archives/:project", async (req, res) => {
                         closed_at: row.closed_at,
                         metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {},
                         sat_report: sat_report,
+                        fat_execution_report: null, // Always null now
                         close_action: row.close_action
                     };
                 } catch (e) {
                     console.error("Failed to parse metrics_json for archive:", row.id, e);
-                    return { ...row, project: req.params.project, metrics: {}, sat_report: sat_report };
+                    return { ...row, project: req.params.project, metrics: {}, sat_report: sat_report, fat_execution_report: null };
                 }
             });
             res.json({ message: "success", data: archives });
@@ -1557,6 +1622,308 @@ app.delete("/api/archives/:id", (req, res) => {
     });
 });
 
+const getFatTotalRequirements = (fatPeriodId) => {
+    return new Promise((resolve, reject) => {
+        const getSelectedReleasesSql = `SELECT release_id, archived_release_id, release_type FROM fat_selected_releases WHERE fat_period_id = ?`;
+        db.all(getSelectedReleasesSql, [fatPeriodId], async (err, selectedReleases) => {
+            if (err) return reject(new Error("DB error getting selected releases."));
+
+            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => r.release_id);
+            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => r.archived_release_id);
+
+            const reqsPromises = [];
+            if (activeReleaseIds.length > 0) {
+                const activeReqsSql = `SELECT COUNT(*) as count FROM activities WHERE release_id IN (${activeReleaseIds.join(',')}) AND isCurrent = 1`;
+                reqsPromises.push(new Promise((resolve, reject) => db.get(activeReqsSql, [], (err, row) => err ? reject(err) : resolve(row.count))));
+            }
+            if (archivedReleaseIds.length > 0) {
+                const archivedReqsSql = `SELECT COUNT(*) as count FROM archived_release_items WHERE archive_id IN (${archivedReleaseIds.join(',')})`;
+                reqsPromises.push(new Promise((resolve, reject) => db.get(archivedReqsSql, [], (err, row) => err ? reject(err) : resolve(row.count))));
+            }
+
+            try {
+                const counts = await Promise.all(reqsPromises);
+                const total = counts.reduce((sum, count) => sum + count, 0);
+                resolve(total);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    });
+};
+
+app.get("/api/releases/:project/selectable", async (req, res) => {
+    try {
+        const projectId = await getProjectId(req.params.project);
+        const activeSql = "SELECT id, name FROM releases WHERE project_id = ? AND status = 'active' ORDER BY release_date DESC";
+
+        db.all(activeSql, [projectId], (err, activeRows) => {
+            if (err) return res.status(500).json({ error: "DB error fetching selectable releases." });
+            
+            // We no longer fetch or return archived releases here.
+            const selectableReleases = activeRows.map(r => ({ ...r, type: 'active' }));
+            res.json({ message: "success", data: selectableReleases });
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.delete("/api/fat/:fat_period_id", (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+    const sql = 'DELETE FROM fat_periods WHERE id = ?';
+    db.run(sql, [fatPeriodId], function (err) {
+        if (err) return res.status(500).json({ error: "DB error deleting FAT period: " + err.message });
+        if (this.changes === 0) return res.status(404).json({ error: `FAT period with id ${fatPeriodId} not found.`});
+        res.json({ message: "FAT period successfully deleted.", changes: this.changes });
+    });
+});
+
+app.get("/api/fat/:project", async (req, res) => {
+    try {
+        const projectId = await getProjectId(req.params.project);
+        const sql = `
+            SELECT fp.id, fp.project_id, fp.start_date, fp.completion_date, fp.status,
+                   fsr.release_name, fsr.release_type,
+                   fr.passed, fr.failed, fr.blocked, fr.caution, fr.not_run
+            FROM fat_periods fp
+            LEFT JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
+            LEFT JOIN fat_reports fr ON fp.id = fr.fat_period_id
+            WHERE fp.project_id = ?
+            ORDER BY fp.start_date DESC, fsr.release_name ASC
+        `;
+        db.all(sql, [projectId], (err, rows) => {
+            if (err) return res.status(500).json({ error: "DB error fetching FAT periods." });
+
+            const fatPeriodsMap = new Map();
+            rows.forEach(row => {
+                if (!fatPeriodsMap.has(row.id)) {
+                    let fat_report = null;
+                    if (row.passed !== null) {
+                        fat_report = {
+                            passed: row.passed,
+                            failed: row.failed,
+                            blocked: row.blocked,
+                            caution: row.caution,
+                            not_run: row.not_run
+                        };
+                    }
+                    fatPeriodsMap.set(row.id, {
+                        id: row.id,
+                        project_id: row.project_id,
+                        start_date: row.start_date,
+                        completion_date: row.completion_date,
+                        status: row.status,
+                        selected_releases: [],
+                        fat_report: fat_report
+                    });
+                }
+                if (row.release_name) {
+                    fatPeriodsMap.get(row.id).selected_releases.push({
+                        name: row.release_name,
+                        type: row.release_type
+                    });
+                }
+            });
+
+            res.json({ message: "success", data: Array.from(fatPeriodsMap.values()) });
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.post("/api/fat/:project", async (req, res) => {
+    // Changed from selected_releases to release_id
+    const { start_date, release_id } = req.body; 
+    if (!start_date || !release_id) {
+        return res.status(400).json({ error: "Start date and a selected release are required." });
+    }
+
+    try {
+        const projectId = await getProjectId(req.params.project);
+
+        db.get("SELECT id FROM fat_periods WHERE project_id = ? AND status = 'active'", [projectId], (err, activeFat) => {
+            if (err) return res.status(500).json({ error: "DB error checking for active FAT periods." });
+            if (activeFat) return res.status(409).json({ error: "An active FAT period already exists for this project. Please complete it before starting a new one." });
+
+            const startDateWithTime = `${start_date} 09:00:00`;
+
+            // Get the name of the selected release to store it
+            db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
+                if (nameErr || !release) {
+                    return res.status(404).json({ error: "Selected release not found." });
+                }
+
+                db.serialize(() => {
+                    db.run("BEGIN TRANSACTION");
+                    const insertPeriodSql = `INSERT INTO fat_periods (project_id, start_date) VALUES (?, ?)`;
+                    db.run(insertPeriodSql, [projectId, startDateWithTime], function(err) {
+                        if (err) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: "Failed to create FAT period." });
+                        }
+                        const fatPeriodId = this.lastID;
+                        const insertReleaseSql = `INSERT INTO fat_selected_releases (fat_period_id, release_id, archived_release_id, release_name, release_type) VALUES (?, ?, ?, ?, ?)`;
+                        
+                        // Insert only the single selected release
+                        db.run(insertReleaseSql, [fatPeriodId, release_id, null, release.name, 'active'], (insertErr) => {
+                            if (insertErr) {
+                                db.run("ROLLBACK");
+                                return res.status(500).json({ error: "Failed to link release to FAT period." });
+                            }
+                            
+                            db.run("COMMIT", (commitErr) => {
+                                if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                                res.status(201).json({ message: "FAT period started successfully.", data: { id: fatPeriodId } });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get("/api/fat/details/:fat_period_id", (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+    
+    const getSelectedReleasesSql = `SELECT release_id, archived_release_id, release_type FROM fat_selected_releases WHERE fat_period_id = ?`;
+
+    db.all(getSelectedReleasesSql, [fatPeriodId], async (err, selectedReleases) => {
+        if (err) return res.status(500).json({ error: "DB error getting selected releases." });
+
+        try {
+            const fatPeriod = await new Promise((resolve, reject) => db.get("SELECT project_id FROM fat_periods WHERE id = ?", [fatPeriodId], (err, row) => err ? reject(err) : resolve(row)));
+            if (!fatPeriod) return res.status(404).json({ error: "FAT Period not found." });
+
+            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => r.release_id);
+            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => r.archived_release_id);
+
+            const reqsPromises = [];
+            if (activeReleaseIds.length > 0) {
+                const activeReqsSql = `SELECT requirementGroupId as id, requirementUserIdentifier as title, 'active' as source FROM activities WHERE release_id IN (${activeReleaseIds.join(',')}) AND isCurrent = 1`;
+                reqsPromises.push(new Promise((resolve, reject) => db.all(activeReqsSql, [], (err, rows) => err ? reject(err) : resolve(rows))));
+            }
+            if (archivedReleaseIds.length > 0) {
+                const archivedReqsSql = `SELECT requirement_group_id as id, requirement_title as title, 'archived' as source FROM archived_release_items WHERE archive_id IN (${archivedReleaseIds.join(',')})`;
+                reqsPromises.push(new Promise((resolve, reject) => db.all(archivedReqsSql, [], (err, rows) => err ? reject(err) : resolve(rows))));
+            }
+            
+            const defectsSql = `SELECT id, title, link FROM defects WHERE project_id = ? AND is_fat_defect = 1 AND status != 'Closed'`;
+            const defectsPromise = new Promise((resolve, reject) => db.all(defectsSql, [fatPeriod.project_id], (err, rows) => err ? reject(err) : resolve(rows)));
+
+            const [reqsResults, defects] = await Promise.all([Promise.all(reqsPromises), defectsPromise]);
+            const requirements = reqsResults.flat();
+
+            res.json({ message: "success", data: { requirements, defects } });
+        } catch (error) {
+            res.status(500).json({ error: "Failed to fetch FAT details: " + error.message });
+        }
+    });
+});
+
+app.put("/api/fat/:fat_period_id/complete", (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+    const completionDate = new Date().toISOString();
+
+    db.get("SELECT id FROM fat_reports WHERE fat_period_id = ?", [fatPeriodId], (err, report) => {
+        if (err) return res.status(500).json({ error: "DB error checking for FAT report." });
+        if (!report) return res.status(400).json({ error: "Cannot complete a FAT period without results. Please add FAT results first." });
+
+        const fatReportId = report.id;
+
+        db.all("SELECT archived_release_id FROM fat_selected_releases WHERE fat_period_id = ? AND release_type = 'archived'", [fatPeriodId], (err, archivedReleasesInScope) => {
+            if (err) {
+                return res.status(500).json({ error: "DB error fetching selected archived releases." });
+            }
+
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
+
+                if (archivedReleasesInScope.length > 0) {
+                    const updateArchivedSql = `UPDATE archived_releases SET fat_report_id = ? WHERE id = ?`;
+                    archivedReleasesInScope.forEach(ar => {
+                        if (ar.archived_release_id) {
+                            db.run(updateArchivedSql, [fatReportId, ar.archived_release_id], (updateErr) => {
+                                if (updateErr) console.error("Error linking FAT report to archived release:", updateErr.message);
+                            });
+                        }
+                    });
+                }
+
+                const sql = `UPDATE fat_periods SET status = 'completed', completion_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'active'`;
+                db.run(sql, [completionDate, fatPeriodId], function(err) {
+                    if (err) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: "DB error completing FAT period." });
+                    }
+                    if (this.changes === 0) {
+                        db.run("ROLLBACK");
+                        return res.status(404).json({ error: "Active FAT period not found or already completed." });
+                    }
+                    
+                    db.run("COMMIT", (commitErr) => {
+                        if (commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                        res.json({ message: "FAT period completed successfully." });
+                    });
+                });
+            });
+        });
+    });
+});
+
+app.post("/api/fat/:fat_period_id/report", async (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+    const { passed, failed, blocked, caution, not_run } = req.body;
+
+    const values = [passed, failed, blocked, caution, not_run];
+    const numericValues = values.map(v => v === '' || v === null ? 0 : parseInt(v, 10));
+
+    if (numericValues.some(isNaN)) {
+        return res.status(400).json({ error: "All fields must be numbers." });
+    }
+
+    const totalFromUser = numericValues.reduce((sum, v) => sum + v, 0);
+
+    if (totalFromUser === 0) {
+        const deleteSql = `DELETE FROM fat_reports WHERE fat_period_id = ?`;
+        db.run(deleteSql, [fatPeriodId], function(err) {
+            if (err) return res.status(500).json({ error: "Database error clearing FAT report: " + err.message });
+            return res.status(200).json({ message: "FAT report cleared successfully." });
+        });
+        return;
+    }
+
+    try {
+        const totalRequirements = await getFatTotalRequirements(fatPeriodId);
+        
+        if (totalFromUser !== totalRequirements) {
+            return res.status(400).json({ error: `The sum of all fields must be exactly ${totalRequirements}. Current sum is ${totalFromUser}.` });
+        }
+
+        const sql = `
+            INSERT INTO fat_reports (fat_period_id, passed, failed, blocked, caution, not_run)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(fat_period_id) DO UPDATE SET
+                passed = excluded.passed,
+                failed = excluded.failed,
+                blocked = excluded.blocked,
+                caution = excluded.caution,
+                not_run = excluded.not_run,
+                created_at = CURRENT_TIMESTAMP;
+        `;
+
+        db.run(sql, [fatPeriodId, ...numericValues], function(err) {
+            if (err) return res.status(500).json({ error: "Database error saving FAT report: " + err.message });
+            res.status(201).json({ message: "FAT report saved successfully." });
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to process FAT report: " + error.message });
+    }
+});
 
 app.get("/api/defects/all", (req, res) => {
     const defectsSql = `

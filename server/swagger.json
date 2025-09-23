@@ -25,6 +25,10 @@
       "description": "Operations for managing archived releases"
     },
     {
+      "name": "FAT",
+      "description": "Operations for managing Factory Acceptance Testing (FAT) periods"
+    },
+    {
       "name": "SAT Bugs",
       "description": "Operations for managing SAT bugs associated with an archived release"
     },
@@ -278,6 +282,60 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/Release"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/releases/{project}/selectable": {
+      "get": {
+        "summary": "Get all selectable active releases for a project",
+        "description": "Retrieves a list of active releases suitable for selection in a new FAT period.",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of selectable active releases.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "active"
+                            ]
+                          }
+                        }
                       }
                     }
                   }
@@ -570,6 +628,155 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/fat/{project}": {
+      "get": {
+        "summary": "Get all FAT periods for a project",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of all FAT periods (active and completed) for the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FatPeriod"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Start a new FAT period for a project",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FatPeriodInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FAT period started successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "An active FAT period already exists for this project."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}": {
+      "delete": {
+        "summary": "Delete or cancel a FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FAT period deleted successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/details/{fat_period_id}": {
+      "get": {
+        "summary": "Get details for a specific FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of requirements and defects for the FAT period."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/complete": {
+      "put": {
+        "summary": "Complete an active FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FAT period completed successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
@@ -1931,6 +2138,14 @@
             "$ref": "#/components/schemas/SatReport",
             "nullable": true,
             "description": "The SAT (System Acceptance Testing) report associated with this archive, if available."
+          },
+          "close_action": {
+            "type": "string",
+            "enum": [
+              "archive_only",
+              "archive_and_complete"
+            ],
+            "description": "The action taken when the release was closed."
           }
         }
       },
@@ -2061,6 +2276,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "is_fat_defect": {
+            "type": "integer",
+            "description": "1 if it's a FAT defect, 0 otherwise."
+          },
           "linkedRequirements": {
             "type": "array",
             "items": {
@@ -2136,6 +2355,10 @@
             "type": "string",
             "nullable": true
           },
+          "is_fat_defect": {
+            "type": "boolean",
+            "description": "Set to true if this is a FAT defect."
+          },
           "linkedRequirementGroupIds": {
             "type": "array",
             "items": {
@@ -2197,6 +2420,10 @@
             "type": "string",
             "nullable": true
           },
+          "is_fat_defect": {
+            "type": "boolean",
+            "description": "Set to true if this is a FAT defect."
+          },
           "linkedRequirementGroupIds": {
             "type": "array",
             "items": {
@@ -2217,6 +2444,65 @@
           }
         }
       },
+      "FatPeriod": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completion_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "selected_releases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FatPeriodInput": {
+        "type": "object",
+        "required": [
+          "start_date",
+          "release_id"
+        ],
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "The start date for the FAT period."
+          },
+          "release_id": {
+            "type": "integer",
+            "description": "The ID of the single active release to be tested."
+          }
+        }
+      },
       "LinkedDefect": {
         "type": "object",
         "properties": {
@@ -2225,6 +2511,9 @@
           },
           "title": {
             "type": "string"
+          },
+          "is_fat_defect": {
+            "type": "integer"
           }
         }
       },
@@ -2667,6 +2956,15 @@
         "in": "path",
         "required": true,
         "description": "ID of the defect",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "FatPeriodIdPath": {
+        "name": "fat_period_id",
+        "in": "path",
+        "required": true,
+        "description": "ID of the FAT period",
         "schema": {
           "type": "integer"
         }

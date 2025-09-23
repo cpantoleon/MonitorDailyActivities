@@ -106,8 +106,16 @@
 
 .release-charts {
     width: 150px;
-    height: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     flex-shrink: 0;
+}
+
+.release-pie-chart-container {
+    width: 150px;
+    height: 150px;
 }
 
 .empty-chart-placeholder {
@@ -447,22 +455,21 @@
 
 .legend-item {
     display: flex;
-    align-items: flex-start;  /* Aligns the color box to the top of wrapped text */
+    align-items: flex-start;
     font-size: 0.85em;
     color: #5C4033;
-    max-width: 160px;       /* Constrains width, forcing long text to wrap */
-    word-break: break-word; /* Allows long words/URLs to wrap to the next line */
-    text-align: left;         /* Align wrapped text naturally */
+    max-width: 160px;
+    word-break: break-word;
+    text-align: left;
 }
 
-/* Replace the old .legend-color-box rule with this */
 .legend-color-box {
     width: 12px;
     height: 12px;
     margin-right: 6px;
     border-radius: 2px;
-    flex-shrink: 0;         /* Prevents the color box from shrinking */
-    margin-top: 2px;        /* Vertically aligns the box with the first line of text */
+    flex-shrink: 0;
+    margin-top: 2px;
 }
 .legend-color-box { width: 12px; height: 12px; margin-right: 6px; border-radius: 2px; }
 
@@ -501,11 +508,12 @@
 }
 
 .legend-wrapper {
-    height: 40px;
+    min-height: 40px; /* Maintain a minimum height for visual consistency */
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
+    padding: 5px 0; /* Add some vertical padding */
+    /* The fixed height and overflow properties have been removed to allow the content to grow */
 }
 
 .modal-button-reset {
@@ -692,8 +700,6 @@
     margin-top: 0;
 }
 
-/* --- FINAL STYLES FOR ARCHIVED DETAILS VIEW --- */
-
 .release-card-body.archived-details-body {
     display: flex;
     flex-wrap: nowrap;
@@ -705,7 +711,7 @@
     padding: 0 20px;
     display: flex;
     flex-direction: column;
-    min-width: 0; /* Prevents content from breaking flexbox */
+    min-width: 0;
 }
 
 .archived-details-column:not(:first-child) {
@@ -719,7 +725,7 @@
 }
 
 .archived-details-column.sat-bugs-column {
-    flex: 0 0 240px; /* Fixed width for the SAT Bugs column */
+    flex: 0 0 240px;
 }
 
 .archived-details-column .sat-bugs-container {
@@ -728,7 +734,7 @@
 
 .archived-details-column.requirements-column,
 .archived-details-column.defects-column {
-    flex: 1 1 0; /* Makes them share remaining space equally */
+    flex: 1 1 0;
     min-width: 250px;
 }
 
@@ -746,4 +752,254 @@
 
 .archived-details-column .requirements-list-wrapper {
     flex-grow: 1;
+}
+
+.fat-page-container {
+    padding: 10px;
+}
+
+.fat-no-active-view {
+    text-align: center;
+    padding: 40px;
+    background-color: #FAF0E6;
+    border: 1px solid #D2B48C;
+    border-radius: 8px;
+}
+
+.fat-no-active-view h2 {
+    color: #5C4033;
+}
+
+.fat-start-button {
+    padding: 12px 24px;
+    font-size: 1.1em;
+    font-weight: bold;
+    background-color: #8B4513;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.fat-start-button:hover {
+    background-color: #5C4033;
+}
+
+.fat-release-selection-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #D2B48C;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #fff;
+}
+
+.fat-release-selection-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    gap: 15px;
+}
+
+.fat-release-name {
+    flex-grow: 1;
+}
+
+.fat-release-selection-item:not(:last-child) {
+    border-bottom: 1px solid #f0e6d6;
+}
+
+.fat-release-selection-item input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
+}
+
+.fat-release-type-badge {
+    margin-left: 10px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: white;
+}
+
+.fat-release-type-badge.type-active {
+    background-color: #28a745;
+}
+
+.fat-release-type-badge.type-archived {
+    background-color: #6c757d;
+}
+
+.fat-details-view {
+    background-color: #FAF0E6;
+    border: 1px solid #D2B48C;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.fat-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #D2B48C;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.fat-details-header h2 {
+    margin: 0;
+    color: #5C4033;
+}
+
+.fat-details-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.fat-details-card {
+    background-color: #FFFAF0;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.fat-details-meta {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    font-size: 1.1em;
+}
+
+.fat-status-active {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.fat-details-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.fat-details-column h4 {
+    margin-top: 0;
+    border-bottom: 1px solid #E3C9A6;
+    padding-bottom: 8px;
+    color: #704214;
+}
+
+.fat-scoped-release-list, .fat-item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.fat-scoped-release-list li, .fat-item-list li {
+    padding: 6px 4px;
+    border-bottom: 1px solid #f5f5f5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fat-completed-list {
+    margin-top: 30px;
+}
+
+.fat-completed-list h3 {
+    color: #5C4033;
+}
+
+.fat-completed-card {
+    background-color: #FFFAF0;
+    border: 1px solid #D2B48C;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.fat-completed-card-header {
+    padding: 10px 15px;
+    background-color: #FAF0E6;
+    border-bottom: 1px solid #D2B48C;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.fat-completed-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.fat-completed-card-body {
+    padding: 15px;
+}
+
+.fat-completed-card-body ul {
+    list-style: disc;
+    padding-left: 20px;
+    margin-top: 5px;
+}
+
+.button-cancel-fat, .button-delete-fat {
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    background-color: #dc3545;
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.button-cancel-fat:hover, .button-delete-fat:hover {
+    background-color: #c82333;
+}
+
+.button-delete-fat {
+    font-size: 0.9em;
+    padding: 6px 10px;
+}
+
+.fat-filter-container {
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #E3C9A6;
+}
+
+.sprint-filter-label input[type="radio"] {
+    cursor: pointer;
+    margin: 0;
+}
+
+.fat-defect-tag {
+    background-color: #dc3545;
+    color: white;
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 8px;
+    margin-left: 10px; /* This adds the space after the title */
+    flex-shrink: 0; /* Prevents the tag from shrinking */
+}
+
+.defect-details-card-footer {
+    margin-top: auto;
+    padding-top: 15px;
+    display: flex;
+    justify-content: flex-start; /* Aligns button to the left */
+}
+.defect-details-card .defect-list ul li {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 5px; 
 }

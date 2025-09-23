@@ -183,6 +183,45 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             )`, (err) => {
                 if (err) console.error("Error creating defect_requirement_links table", err.message);
             });
+            
+            db.run(`CREATE TABLE IF NOT EXISTS fat_periods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                completion_date TEXT,
+                status TEXT NOT NULL CHECK(status IN ('active', 'completed')) DEFAULT 'active',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating fat_periods table", err.message);
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS fat_selected_releases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fat_period_id INTEGER NOT NULL,
+                release_id INTEGER,
+                archived_release_id INTEGER,
+                release_name TEXT NOT NULL,
+                release_type TEXT NOT NULL CHECK(release_type IN ('active', 'archived')),
+                FOREIGN KEY (fat_period_id) REFERENCES fat_periods(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating fat_selected_releases table", err.message);
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS fat_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fat_period_id INTEGER NOT NULL UNIQUE,
+                passed INTEGER DEFAULT 0,
+                failed INTEGER DEFAULT 0,
+                blocked INTEGER DEFAULT 0,
+                caution INTEGER DEFAULT 0,
+                not_run INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (fat_period_id) REFERENCES fat_periods(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating fat_reports table", err.message);
+            });
 
             db.all("PRAGMA table_info(retrospective_items)", (err, columns) => {
                 if (err) {
@@ -254,6 +293,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                             console.error("Error adding close_action column to archived_releases:", alterErr.message);
                         } else {
                             console.log("Column 'close_action' added to archived_releases table.");
+                        }
+                    });
+                }
+
+                const hasFatReportIdColumn = columns.some(col => col.name === 'fat_report_id');
+                if (!hasFatReportIdColumn) {
+                    db.run("ALTER TABLE archived_releases ADD COLUMN fat_report_id INTEGER NULL REFERENCES fat_reports(id) ON DELETE SET NULL", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding fat_report_id column to archived_releases:", alterErr.message);
+                        } else {
+                            console.log("Column 'fat_report_id' added to archived_releases table.");
                         }
                     });
                 }
