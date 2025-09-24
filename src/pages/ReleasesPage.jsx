@@ -18,12 +18,89 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
-const KpiModal = ({ isOpen, onClose }) => {
+const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage }) => {
+    const [kpis, setKpis] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && fatPeriod?.id) {
+            setIsLoading(true);
+            setKpis(null);
+            fetch(`${API_BASE_URL}/fat/${fatPeriod.id}/kpis`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    setKpis(data.data);
+                    if (data.message && data.message !== "success") {
+                        showMainMessage(data.message, 'info');
+                    }
+                })
+                .catch(err => showMainMessage(`Failed to calculate KPIs: ${err.message}`, 'error'))
+                .finally(() => setIsLoading(false));
+        }
+    }, [isOpen, fatPeriod, showMainMessage]);
+
+    const KpiDisplay = ({ title, value, unit, tooltipContent }) => {
+        const [copyText, setCopyText] = useState('Copy');
+
+        const handleCopy = () => {
+            navigator.clipboard.writeText(`${value}${unit}`);
+            setCopyText('Copied!');
+            setTimeout(() => setCopyText('Copy'), 2000);
+        };
+
+        return (
+            <div className="kpi-item">
+                <div className="kpi-title-container">
+                    <h4 className="kpi-title">{title}</h4>
+                    <Tooltip content={tooltipContent}>
+                        <span className="kpi-info-icon">ⓘ</span>
+                    </Tooltip>
+                </div>
+                <div className="kpi-value-container">
+                    <span className="kpi-value">{value} {unit}</span>
+                    <button onClick={handleCopy} className="kpi-copy-button">{copyText}</button>
+                </div>
+            </div>
+        );
+    };
+
+    const dreTooltip = (
+        <div>
+            <strong>Defect Removal Efficiency (DRE)</strong>
+            <p>Measures the percentage of defects found and fixed by the test team out of all defects found for this FAT period.</p>
+            <p><em>Formula: (FAT Defects in 'Done' or 'Closed' Status / Total FAT Defects) * 100</em></p>
+        </div>
+    );
+
+    const mttdTooltip = (
+        <div>
+            <strong>Mean Time to Detect (MTTD)</strong>
+            <p>The average time it takes to detect a defect after the FAT period begins. Time is measured in business days (weekends excluded).</p>
+            <p><em>Formula: Average of (Defect Created Date - FAT Start Date) for all FAT defects.</em></p>
+        </div>
+    );
+
+    const mttrTooltip = (
+        <div>
+            <strong>Mean Time to Repair (MTTR)</strong>
+            <p>The average time it takes to fix a defect after it's created. Time is measured in business days (weekends excluded).</p>
+            <p><em>Formula: Average of (Last 'Done' Date - Defect Created Date) for all FAT defects with status 'Done'.</em></p>
+        </div>
+    );
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="FAT KPIs">
+        <Modal isOpen={isOpen} onClose={onClose} title={`FAT KPIs for ${project}`}>
             <div className="fat-kpi-modal-content">
-                <p>This is a placeholder for the FAT KPIs and metrics.</p>
-                <p>The specific calculations and charts will be defined in the next development phase.</p>
+                {isLoading ? <LoadingSpinner /> : (
+                    kpis ? (
+                        <div className="kpi-grid">
+                            <KpiDisplay title="Defect Removal Efficiency (DRE)" value={kpis.dre} unit="%" tooltipContent={dreTooltip} />
+                            <KpiDisplay title="Mean Time to Detect (MTTD)" value={kpis.mttd} unit=" days" tooltipContent={mttdTooltip} />
+                            <KpiDisplay title="Mean Time to Repair (MTTR)" value={kpis.mttr} unit=" days" tooltipContent={mttrTooltip} />
+                        </div>
+                    ) : <p>Could not load KPI data.</p>
+                )}
             </div>
             <div className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Close</button>
@@ -375,7 +452,13 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                 </div>
             </div>
 
-            <KpiModal isOpen={isKpiModalOpen} onClose={() => setIsKpiModalOpen(false)} />
+            <KpiModal 
+                isOpen={isKpiModalOpen} 
+                onClose={() => setIsKpiModalOpen(false)} 
+                fatPeriod={fatPeriod}
+                project={project}
+                showMainMessage={showMainMessage}
+            />
 
             <AddFatReportModal
                 isOpen={isFatReportModalOpen}
@@ -563,7 +646,7 @@ const getSatChartConfig = (sat_report) => {
             data.push(value);
             labels.push(label);
             backgroundColor.push(allColors[index]);
-            legendItems.push({ text: label, color: allColors[index] });
+            legendItems.push({ text: `${label} (${value}%)`, color: allColors[index] });
         }
     });
 
@@ -1049,11 +1132,11 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
     );
 };
 
-const ArchivedDefectList = ({ defects, onNavigate }) => {
+const ArchivedDefectList = ({ defects, onNavigate, listHeightClass }) => {
     return (
         <div className="defect-list">
             <h4>Defects ({defects.length})</h4>
-            <ul className="requirement-list">
+            <ul className={`requirement-list ${listHeightClass}`}>
                 {defects.length > 0 ? defects.map(defect => (
                     <li key={defect.id}>
                         <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
@@ -1176,6 +1259,8 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         }
     };
     
+    const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
+
     const ourMetricsChartData = {
         labels: ['Done', 'Not Done'],
         datasets: [{
@@ -1193,6 +1278,10 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     if (archive.metrics.notDoneCount > 0) {
         ourMetricsLegendItems.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
     }
+
+    const primaryChartData = archive.fat_execution_report ? fatExecutionChartData : ourMetricsChartData;
+    const primaryChartLegendItems = archive.fat_execution_report ? fatExecutionLegendItems : ourMetricsLegendItems;
+    const primaryChartTitle = archive.fat_execution_report ? 'FAT Execution Results' : 'Our Final Metrics';
 
     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
     
@@ -1263,6 +1352,14 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         animation: false
     };
 
+    const listHeightClass = useMemo(() => {
+        const hasSatChart = !!satChartData;
+        const hasBugLabelsChart = !!bugLabelsChartData;
+        if (hasSatChart && hasBugLabelsChart) return 'height-750';
+        if (hasSatChart) return 'height-450';
+        return 'height-250';
+    }, [satChartData, bugLabelsChartData]);
+
     return (
         <div className="archived-details-view">
             {isPdfExporting && (
@@ -1287,11 +1384,15 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     
                     <div className="archived-details-column archived-charts-column">
                         <div className="archived-details-chart-wrapper">
-                            <h4>Our Final Metrics</h4>
+                            <h4>{primaryChartTitle}</h4>
                             <div className="archived-details-chart">
-                                <Pie data={ourMetricsChartData} options={chartOptions} ref={metricsChartRef} />
+                                {primaryChartData ? (
+                                    <Pie data={primaryChartData} options={chartOptions} ref={metricsChartRef} />
+                                ) : (
+                                    <div className="empty-chart-placeholder">No data to display</div>
+                                )}
                             </div>
-                            <ChartLegend items={ourMetricsLegendItems} />
+                            <ChartLegend items={primaryChartLegendItems} />
                         </div>
 
                         {satChartData && (
@@ -1322,7 +1423,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                     <h4>SAT Bugs ({satBugs.length})</h4>
                                     <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
                                 </div>
-                                <ul className="sat-bugs-list">
+                                <ul className={`sat-bugs-list ${listHeightClass}`}>
                                     {satBugs.length > 0 ? satBugs.map(bug => (
                                         <li key={bug.id}>
                                             <a href={bug.link} target="_blank" rel="noopener noreferrer" title={bug.title}>{bug.title}</a>
@@ -1342,7 +1443,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                              <h4>Requirements ({items.length})</h4>
                             <div className="requirements-list-wrapper">
                                 {isLoading ? <LoadingSpinner /> : (
-                                    <ul className="requirement-list frozen">
+                                    <ul className={`requirement-list frozen ${listHeightClass}`}>
                                         {items.length > 0 ? items.map(item => (
                                             <li key={item.id}>
                                                 <button type="button" onClick={() => handleRequirementClick(item)} className="link-button">
@@ -1358,7 +1459,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     </div>
 
                     <div className="archived-details-column defects-column">
-                        <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} />
+                        <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} listHeightClass={listHeightClass} />
                     </div>
 
                 </div>

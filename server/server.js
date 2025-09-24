@@ -1,6 +1,28 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database.js');
+
+const ensureGeneralProjectExists = () => {
+    const projectName = 'General';
+    db.get("SELECT id FROM projects WHERE name = ?", [projectName], (err, row) => {
+        if (err) {
+            console.error("Error checking for General project:", err.message);
+            return;
+        }
+        if (!row) {
+            db.run(`INSERT INTO projects (name) VALUES (?)`, [projectName], function(err) {
+                if (err) {
+                    console.error("Error creating General project:", err.message);
+                } else {
+                    console.log("'General' project created successfully.");
+                }
+            });
+        }
+    });
+};
+
+ensureGeneralProjectExists();
+
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
@@ -85,6 +107,59 @@ const getProjectId = (projectName) => {
             else resolve(row.id);
         });
     });
+};
+
+// Helper function to calculate duration in business hours, excluding weekends.
+const calculateBusinessHours = (start, end) => {
+    let startDate = new Date(start);
+    let endDate = new Date(end);
+
+    if (endDate <= startDate) return 0;
+
+    let totalHours = 0;
+    let current = new Date(startDate);
+
+    // Handle the first partial day
+    const firstDayEnd = new Date(current);
+    firstDayEnd.setUTCHours(23, 59, 59, 999);
+    if (firstDayEnd > endDate) { // If start and end are on the same day
+        const day = current.getUTCDay();
+        if (day !== 0 && day !== 6) { // Not a weekend
+            return (endDate - startDate) / (1000 * 60 * 60);
+        }
+        return 0;
+    } else {
+        const day = current.getUTCDay();
+        if (day !== 0 && day !== 6) {
+            totalHours += (firstDayEnd - current) / (1000 * 60 * 60);
+        }
+        current.setUTCDate(current.getUTCDate() + 1);
+        current.setUTCHours(0, 0, 0, 0);
+    }
+
+    // Handle full days in between
+    while (current < endDate) {
+        const day = current.getUTCDay();
+        if (day !== 0 && day !== 6) {
+            totalHours += 24;
+        }
+        if (current.getUTCFullYear() === endDate.getUTCFullYear() &&
+            current.getUTCMonth() === endDate.getUTCMonth() &&
+            current.getUTCDate() === endDate.getUTCDate()) {
+            break;
+        }
+        current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    // Handle the last partial day
+    const lastDayStart = new Date(endDate);
+    lastDayStart.setUTCHours(0, 0, 0, 0);
+    const day = endDate.getUTCDay();
+    if (day !== 0 && day !== 6) {
+        totalHours += (endDate - lastDayStart) / (1000 * 60 * 60);
+    }
+
+    return totalHours;
 };
 
 const processExcelData = (fileBuffer) => {
@@ -193,7 +268,7 @@ const processDefectExcelData = (fileBuffer) => {
 };
 
 app.get("/api/projects", (req, res) => {
-    const sql = "SELECT name FROM projects ORDER BY name ASC";
+    const sql = "SELECT name FROM projects WHERE name != 'General' ORDER BY name ASC";
     db.all(sql, [], (err, rows) => {
         if (err) return res.status(400).json({ "error": err.message });
         res.json({ message: "success", data: rows.map(row => row.name) });
@@ -707,7 +782,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
     try {
         const projectId = await getProjectId(project);
         const { validRows, skippedCount } = processDefectExcelData(req.file.buffer);
-        const created_date = new Date().toISOString().split('T')[0];
+        const now = new Date().toISOString();
 
         const getExistingDataSql = `SELECT link, title FROM defects WHERE project_id = ?`;
         db.all(getExistingDataSql, [projectId], (err, existingRows) => {
@@ -747,7 +822,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
 
             db.serialize(() => {
                 db.run("BEGIN TRANSACTION");
-                const insertDefectSql = `INSERT INTO defects (project_id, title, area, status, link, created_date) VALUES (?, ?, ?, ?, ?, ?)`;
+                const insertDefectSql = `INSERT INTO defects (project_id, title, area, status, link, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`;
                 const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
                 
                 let completedInserts = 0;
@@ -757,7 +832,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                     const defaultArea = 'Imported';
                     const defaultStatus = 'Assigned to Developer';
 
-                    db.run(insertDefectSql, [projectId, item.title, defaultArea, defaultStatus, item.link, created_date], function(err) {
+                    db.run(insertDefectSql, [projectId, item.title, defaultArea, defaultStatus, item.link, now, now], function(err) {
                         if (err) {
                             console.error("Error inserting imported defect:", err.message);
                         } else {
@@ -1293,10 +1368,11 @@ app.get("/api/archives/:project", async (req, res) => {
         const sql = `
             SELECT
                 ar.id, ar.original_release_id, ar.name, ar.closed_at, ar.metrics_json, ar.close_action,
-                sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed as sat_passed, sr.pending
+                sr.blocked, sr.failed, sr.executing, sr.aborted, sr.passed as sat_passed, sr.pending,
+                fr.passed as fat_passed, fr.failed as fat_failed, fr.blocked as fat_blocked, fr.caution as fat_caution, fr.not_run as fat_not_run
             FROM archived_releases ar
             LEFT JOIN sat_reports sr ON ar.id = sr.archive_id
-            -- REMOVED: LEFT JOIN fat_reports fr ON ar.fat_report_id = fr.id
+            LEFT JOIN fat_reports fr ON ar.fat_report_id = fr.id
             WHERE ar.project_id = ?
             ORDER BY ar.closed_at DESC
         `;
@@ -1314,10 +1390,18 @@ app.get("/api/archives/:project", async (req, res) => {
                         pending: row.pending
                     };
                 }
-                
-                // REMOVED: The logic for fat_execution_report is gone.
-                // It will never be included in the response for an archived release.
 
+                let fat_execution_report = null;
+                if (row.fat_passed !== null) {
+                    fat_execution_report = {
+                        passed: row.fat_passed,
+                        failed: row.fat_failed,
+                        blocked: row.fat_blocked,
+                        caution: row.fat_caution,
+                        not_run: row.fat_not_run
+                    };
+                }
+                
                 try {
                     return {
                         id: row.id,
@@ -1327,12 +1411,12 @@ app.get("/api/archives/:project", async (req, res) => {
                         closed_at: row.closed_at,
                         metrics: row.metrics_json ? JSON.parse(row.metrics_json) : {},
                         sat_report: sat_report,
-                        fat_execution_report: null, // Always null now
+                        fat_execution_report: fat_execution_report,
                         close_action: row.close_action
                     };
                 } catch (e) {
                     console.error("Failed to parse metrics_json for archive:", row.id, e);
-                    return { ...row, project: req.params.project, metrics: {}, sat_report: sat_report, fat_execution_report: null };
+                    return { ...row, project: req.params.project, metrics: {}, sat_report: sat_report, fat_execution_report: fat_execution_report };
                 }
             });
             res.json({ message: "success", data: archives });
@@ -1660,7 +1744,6 @@ app.get("/api/releases/:project/selectable", async (req, res) => {
         db.all(activeSql, [projectId], (err, activeRows) => {
             if (err) return res.status(500).json({ error: "DB error fetching selectable releases." });
             
-            // We no longer fetch or return archived releases here.
             const selectableReleases = activeRows.map(r => ({ ...r, type: 'active' }));
             res.json({ message: "success", data: selectableReleases });
         });
@@ -1734,7 +1817,6 @@ app.get("/api/fat/:project", async (req, res) => {
 });
 
 app.post("/api/fat/:project", async (req, res) => {
-    // Changed from selected_releases to release_id
     const { start_date, release_id } = req.body; 
     if (!start_date || !release_id) {
         return res.status(400).json({ error: "Start date and a selected release are required." });
@@ -1749,7 +1831,6 @@ app.post("/api/fat/:project", async (req, res) => {
 
             const startDateWithTime = `${start_date} 09:00:00`;
 
-            // Get the name of the selected release to store it
             db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
                 if (nameErr || !release) {
                     return res.status(404).json({ error: "Selected release not found." });
@@ -1766,7 +1847,6 @@ app.post("/api/fat/:project", async (req, res) => {
                         const fatPeriodId = this.lastID;
                         const insertReleaseSql = `INSERT INTO fat_selected_releases (fat_period_id, release_id, archived_release_id, release_name, release_type) VALUES (?, ?, ?, ?, ?)`;
                         
-                        // Insert only the single selected release
                         db.run(insertReleaseSql, [fatPeriodId, release_id, null, release.name, 'active'], (insertErr) => {
                             if (insertErr) {
                                 db.run("ROLLBACK");
@@ -1873,6 +1953,107 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
             });
         });
     });
+});
+
+app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+
+    try {
+        const fatPeriod = await new Promise((resolve, reject) => {
+            db.get("SELECT * FROM fat_periods WHERE id = ?", [fatPeriodId], (err, row) => err ? reject(err) : resolve(row));
+        });
+
+        if (!fatPeriod) {
+            return res.status(404).json({ error: "FAT Period not found." });
+        }
+
+        // Force the start date to be parsed as UTC
+        const fatStartDate = new Date(fatPeriod.start_date.replace(' ', 'T') + 'Z');
+
+        const fatDefects = await new Promise((resolve, reject) => {
+            // Fetch created_at which has the full timestamp
+            const sql = "SELECT id, status, created_at FROM defects WHERE project_id = ? AND is_fat_defect = 1";
+            db.all(sql, [fatPeriod.project_id], (err, rows) => err ? reject(err) : resolve(rows));
+        });
+
+        if (fatDefects.length === 0) {
+            return res.json({
+                data: { dre: "0.00", mttd: "0.00", mttr: "0.00" },
+                message: "No FAT defects found to calculate KPIs."
+            });
+        }
+        
+        const defectIds = fatDefects.map(d => d.id);
+        const historyRecords = await new Promise((resolve, reject) => {
+            const sql = `SELECT * FROM defect_history WHERE defect_id IN (${defectIds.join(',')}) ORDER BY changed_at ASC`;
+            db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
+        });
+
+        const historyMap = new Map();
+        historyRecords.forEach(rec => {
+            if (!historyMap.has(rec.defect_id)) {
+                historyMap.set(rec.defect_id, []);
+            }
+            historyMap.get(rec.defect_id).push(rec);
+        });
+
+        // 1. DRE Calculation
+        const totalFatDefects = fatDefects.length;
+        const fixedFatDefectsCount = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed').length;
+        const dre = totalFatDefects > 0 ? (fixedFatDefectsCount / totalFatDefects) * 100 : 0;
+
+        // 2. MTTD Calculation
+        let totalDetectionHours = 0;
+        fatDefects.forEach(defect => {
+            // CRITICAL FIX: Use the precise created_at timestamp
+            const defectCreatedAt = new Date(defect.created_at);
+            totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
+        });
+        const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
+
+        // 3. MTTR Calculation
+        let totalRepairHours = 0;
+        let fixedForMttrCount = 0;
+        const doneFatDefects = fatDefects.filter(d => d.status === 'Done');
+
+        doneFatDefects.forEach(defect => {
+            const defectHistory = historyMap.get(defect.id) || [];
+            let lastDoneDate = null;
+
+            for (let i = defectHistory.length - 1; i >= 0; i--) {
+                const historyItem = defectHistory[i];
+                if (historyItem.changes_summary) {
+                    try {
+                        const changes = JSON.parse(historyItem.changes_summary);
+                        if (changes.status && changes.status.new === 'Done') {
+                            lastDoneDate = new Date(historyItem.changed_at);
+                            break;
+                        }
+                    } catch (e) { /* ignore parse errors */ }
+                }
+            }
+            
+            if (lastDoneDate) {
+                // CRITICAL FIX: Use the precise created_at timestamp
+                const defectCreatedAt = new Date(defect.created_at);
+                totalRepairHours += calculateBusinessHours(defectCreatedAt, lastDoneDate);
+                fixedForMttrCount++;
+            }
+        });
+        const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
+
+        res.json({
+            message: "success",
+            data: {
+                dre: dre.toFixed(2),
+                mttd: mttdInDays.toFixed(2),
+                mttr: mttrInDays.toFixed(2)
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: "Failed to calculate KPIs: " + error.message });
+    }
 });
 
 app.post("/api/fat/:fat_period_id/report", async (req, res) => {
@@ -2103,15 +2284,21 @@ app.post("/api/defects", async (req, res) => {
     try {
         const projectId = await getProjectId(project.trim());
         title = title.trim(); area = area.trim(); status = status.trim();
-        created_date = new Date(created_date).toISOString().split('T')[0];
-        link = link ? link.trim() : null; description = description ? description.trim() : null;
+        
+        // Create a full ISO string from the user-provided date.
+        // This is the correct creation timestamp.
+        const now = new Date().toISOString();
+        const createdAtTimestamp = new Date(created_date).toISOString();
+
+        link = link ? link.trim() : null; 
+        description = description ? description.trim() : null;
         comment = comment ? comment.trim() : null;
         const isFatDefect = is_fat_defect ? 1 : 0;
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date, is_fat_defect) VALUES (?,?,?,?,?,?,?,?)`;
-            const defectParams = [projectId, title, description, area, status, link, created_date, isFatDefect];
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`;
+            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp];
             
             db.run(insertDefectSql, defectParams, function(err) {
                 if (err) {
@@ -2141,7 +2328,7 @@ app.post("/api/defects", async (req, res) => {
                 db.run("COMMIT", (commitErr) => {
                     if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
                     scheduleQdrantSync();
-                    res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_date } });
+                    res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_at: createdAtTimestamp } });
                 });
             });
         });
@@ -2178,8 +2365,13 @@ app.put("/api/defects/:id", (req, res) => {
         addChange("status", status, currentDefect.status);
         addChange("link", link, currentDefect.link);
 
-        const formattedNewDate = created_date ? new Date(created_date).toISOString().split('T')[0] : currentDefect.created_date;
-        addChange("created_date", formattedNewDate, currentDefect.created_date);
+        // Handle the "Logged Date" which is our created_at field
+        const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
+        if (newCreatedAt !== currentDefect.created_at) {
+            updates.push(`created_at = ?`);
+            updateParamsList.push(newCreatedAt);
+            changedFieldsForSummary['created_at'] = { old: currentDefect.created_at, new: newCreatedAt };
+        }
 
         if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
             updates.push(`is_fat_defect = ?`);
@@ -2230,7 +2422,8 @@ app.put("/api/defects/:id", (req, res) => {
                 }
 
                 if (hasFieldChanges) {
-                    updates.push("updated_at = CURRENT_TIMESTAMP");
+                    updates.push("updated_at = ?");
+                    updateParamsList.push(new Date().toISOString());
                     const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
                     updateParamsList.push(defectId);
                     db.run(sqlUpdate, updateParamsList);

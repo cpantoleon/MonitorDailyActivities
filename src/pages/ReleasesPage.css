@@ -135,7 +135,7 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 200px;
+    max-height: 250px;
     overflow-y: auto;
 }
 
@@ -423,7 +423,7 @@
 .defect-charts { width: 150px; height: 250px; flex-shrink: 0; }
 .defect-list { flex-grow: 1; display: flex; flex-direction: column; align-self: stretch; }
 .defect-list h4 { margin-top: 0; margin-bottom: 5px; }
-.defect-list ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; max-height: 280px; }
+.defect-list ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; max-height: 250px; }
 
 .countdown-timer { display: flex; align-items: center; padding: 8px 16px; border-radius: 4px; font-weight: bold; color: #fff; background-color: #17a2b8; }
 .countdown-timer.overdue { background-color: #dc3545; }
@@ -508,12 +508,11 @@
 }
 
 .legend-wrapper {
-    min-height: 40px; /* Maintain a minimum height for visual consistency */
+    min-height: 40px;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 5px 0; /* Add some vertical padding */
-    /* The fixed height and overflow properties have been removed to allow the content to grow */
+    padding: 5px 0;
 }
 
 .modal-button-reset {
@@ -622,9 +621,39 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 180px;
+    max-height: 250px;
     overflow-y: auto;
     font-size: 0.9em;
+}
+
+.archived-details-view .requirement-list,
+.archived-details-view .defect-list ul,
+.archived-details-view .sat-bugs-list {
+    max-height: none;
+}
+
+.archived-details-view .height-250 {
+    max-height: 250px;
+}
+
+.archived-details-view .height-450 {
+    max-height: 450px;
+}
+
+.archived-details-view .height-750 {
+    max-height: 750px;
+}
+
+.height-250 {
+    max-height: 250px;
+}
+
+.height-450 {
+    max-height: 450px;
+}
+
+.height-750 {
+    max-height: 750px;
 }
 
 .sat-bugs-list li {
@@ -987,19 +1016,94 @@
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 8px;
-    margin-left: 10px; /* This adds the space after the title */
-    flex-shrink: 0; /* Prevents the tag from shrinking */
+    margin-left: 10px;
+    flex-shrink: 0;
 }
 
 .defect-details-card-footer {
     margin-top: auto;
     padding-top: 15px;
     display: flex;
-    justify-content: flex-start; /* Aligns button to the left */
+    justify-content: flex-start;
 }
 .defect-details-card .defect-list ul li {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     row-gap: 5px; 
+}
+
+.fat-kpi-modal-content {
+    padding: 10px 20px;
+    min-height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+    width: 100%;
+}
+
+.kpi-item {
+    background-color: #FAF0E6;
+    border: 1px solid #D2B48C;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.kpi-title-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.kpi-title {
+    margin: 0;
+    font-size: 1.1em;
+    color: #5C4033;
+}
+
+.kpi-info-icon {
+    font-size: 0.9em;
+    border: 1px solid #A0522D;
+    color: #A0522D;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.kpi-value-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kpi-value {
+    font-size: 2em;
+    font-weight: 300;
+    color: #8B4513;
+}
+
+.kpi-copy-button {
+    padding: 6px 12px;
+    border: 1px solid #DEB887;
+    background-color: #F5DEB3;
+    color: #5C4033;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.kpi-copy-button:hover {
+    background-color: #DEB887;
 }

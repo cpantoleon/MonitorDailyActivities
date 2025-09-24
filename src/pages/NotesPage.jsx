@@ -70,11 +70,15 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   // State to hold the editor instance for adding event listeners
   const [editorInstance, setEditorInstance] = useState(null);
+  const [isGeneralMode, setIsGeneralMode] = useState(false);
 
   useEffect(() => {
     const savedProject = sessionStorage.getItem('notesPageSelectedProject');
     if (savedProject) {
         setSelectedProject(savedProject);
+        if (savedProject === 'General') {
+            setIsGeneralMode(true);
+        }
     }
   }, []);
 
@@ -101,12 +105,19 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     return `${year}-${month}-${day}`;
   };
 
+  const formatMonthKey = (date) => {
+    if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
   const handleSaveNote = useCallback(async (textToSave) => {
     if (!selectedProject) {
       if (showMessage) showMessage('Please select a project.', 'error');
       return;
     }
-    const dateKey = formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
     if (!dateKey) {
       if (showMessage) showMessage('Invalid date selected for note.', 'error');
       return;
@@ -131,20 +142,24 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           delete newMap[dateKey];
           return newMap;
         });
-        setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
+        if (!isGeneralMode) {
+          setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
+        }
         if (showMessage) showMessage(result.action === "deleted" ? "Note deleted successfully!" : "Note cleared!", 'success');
       } else if (result.action === "saved") {
         setProjectNotesMap(prev => ({ ...prev, [dateKey]: result.data.noteText }));
-        setDatesToHighlight(prev => {
-          const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
-          const newHighlight = { date: selectedDate, type: newNoteType };
-          if (existingIndex > -1) {
-            const updated = [...prev];
-            updated[existingIndex] = newHighlight;
-            return updated;
-          }
-          return [...prev, newHighlight];
-        });
+        if (!isGeneralMode) {
+          setDatesToHighlight(prev => {
+            const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
+            const newHighlight = { date: selectedDate, type: newNoteType };
+            if (existingIndex > -1) {
+              const updated = [...prev];
+              updated[existingIndex] = newHighlight;
+              return updated;
+            }
+            return [...prev, newHighlight];
+          });
+        }
         if (showMessage) showMessage('Note saved successfully!', 'success');
       } else {
         if (showMessage) showMessage(result.message || 'Note processed.', 'success');
@@ -155,7 +170,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     } finally {
       setIsLoadingNotes(false);
     }
-  }, [selectedProject, selectedDate, apiBaseUrl, showMessage]);
+  }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode]);
   
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -191,18 +206,22 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       const result = await response.json();
       const notesData = result.data || {};
       setProjectNotesMap(notesData);
-      const highlights = Object.entries(notesData)
-        .map(([dateKey, text]) => {
-          const noteType = getNoteType(text);
-          if (noteType) {
-            const [year, month, day] = dateKey.split('-').map(Number);
-            return { date: new Date(year, month - 1, day), type: noteType };
-          }
-          return null;
-        })
-        .filter(item => item !== null);
-      setDatesToHighlight(highlights);
-      const currentDataDateKey = formatDateKey(selectedDate);
+
+      if (!isGeneralMode) {
+        const highlights = Object.entries(notesData)
+          .map(([dateKey, text]) => {
+            const noteType = getNoteType(text);
+            if (noteType) {
+              const [year, month, day] = dateKey.split('-').map(Number);
+              return { date: new Date(year, month - 1, day), type: noteType };
+            }
+            return null;
+          })
+          .filter(item => item !== null);
+        setDatesToHighlight(highlights);
+      }
+
+      const currentDataDateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
       setNoteText(notesData[currentDataDateKey] || '');
     } catch (error) {
       console.error("Error fetching notes:", error);
@@ -212,24 +231,24 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     } finally {
       setIsLoadingNotes(false);
     }
-  }, [apiBaseUrl, selectedDate, showMessage]);
+  }, [apiBaseUrl, selectedDate, showMessage, isGeneralMode]);
 
   useEffect(() => {
     fetchNotesForProject(selectedProject);
   }, [selectedProject, fetchNotesForProject]);
 
   useEffect(() => {
-    const dateKey = formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
     if (selectedProject) {
         setNoteText(projectNotesMap[dateKey] || '');
     } else {
         setNoteText('');
     }
-  }, [selectedDate, projectNotesMap, selectedProject]);
+  }, [selectedDate, projectNotesMap, selectedProject, isGeneralMode]);
 
 
   const handleClearRequest = () => {
-    const dateKey = formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
     if (projectNotesMap[dateKey] && projectNotesMap[dateKey].trim()) {
       setIsConfirmClearOpen(true);
     }
@@ -245,6 +264,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   };
 
   const renderDayContents = (dayOfMonth, date) => {
+    if (isGeneralMode) return dayOfMonth;
     const noteInfo = datesToHighlight.find(
       (d) =>
         d.date.getFullYear() === date.getFullYear() &&
@@ -267,17 +287,19 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const toggleLegend = () => setIsLegendOpen(!isLegendOpen);
 
-  const hasSavedNoteForSelectedDate = !!(projectNotesMap[formatDateKey(selectedDate)] && projectNotesMap[formatDateKey(selectedDate)].trim());
+  const hasSavedNoteForSelectedDate = !!(projectNotesMap[isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)] && projectNotesMap[isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)].trim());
 
   const editorConfiguration = {
     extraPlugins: [MyUploadAdapterPlugin],
   };
 
   const handleProjectChange = (e) => {
-    setSelectedProject(e.target.value);
+    const project = e.target.value;
+    setSelectedProject(project);
+    setIsGeneralMode(project === 'General');
   };
 
-  const projectOptions = projects.map(p => ({ value: p, label: p }));
+  const projectOptions = [{ value: 'General', label: 'General' }, ...projects.map(p => ({ value: p, label: p }))];
 
   return (
     <div className="notes-page-container with-sidebar">
@@ -323,29 +345,32 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               onChange={handleProjectChange}
               options={projectOptions}
               placeholder="-- Select Project --"
-              disabled={!projects || projects.length === 0}
+              disabled={projectOptions.length === 0}
             />
           </div>
           <div>
-            <label htmlFor="note-date">Date:</label>
+            <label htmlFor="note-date">{isGeneralMode ? 'Month:' : 'Date:'}</label>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <DatePicker
                 id="note-date"
                 name="noteDate"
                 selected={selectedDate}
                 onChange={(date) => setSelectedDate(date)}
-                dateFormat="MM/dd/yyyy"
+                dateFormat={isGeneralMode ? "MM/yyyy" : "MM/dd/yyyy"}
+                showMonthYearPicker={isGeneralMode}
                 className="notes-datepicker"
                 renderDayContents={renderDayContents}
               />
-              <button 
-                onClick={() => setSelectedDate(new Date())} 
-                disabled={isToday(selectedDate)}
-                className="today-button"
-                style={{ position: 'absolute', right: '-85px', top: '50%', transform: 'translateY(-50%)' }}
-              >
-                Today
-              </button>
+              {!isGeneralMode && (
+                <button 
+                  onClick={() => setSelectedDate(new Date())} 
+                  disabled={isToday(selectedDate)}
+                  className="today-button"
+                  style={{ position: 'absolute', right: '-85px', top: '50%', transform: 'translateY(-50%)' }}
+                >
+                  Today
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -374,7 +399,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
         {selectedProject ? (
           <div className="notes-editor-area">
-            <h3 id="notes-editor-label">Notes for {selectedProject} on {selectedDate.toLocaleDateString()}</h3>
+            <h3 id="notes-editor-label">
+              Notes for {selectedProject} on {isGeneralMode ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()}
+            </h3>
             <div className="editor-wrapper">
               <CKEditor
                   editor={ ClassicEditor }
@@ -428,7 +455,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         onClose={handleCancelClear}
         onConfirm={handleConfirmClear}
         title="Confirm Clear Note"
-        message={`Are you sure you want to permanently delete the note for ${selectedDate.toLocaleDateString()}? This action cannot be undone.`}
+        message={`Are you sure you want to permanently delete the note for ${isGeneralMode ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
       />
     </div>
   );
