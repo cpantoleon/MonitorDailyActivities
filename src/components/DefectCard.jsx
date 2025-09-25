@@ -3,7 +3,13 @@ import React from 'react';
 const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed }) => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString + 'T00:00:00').toLocaleDateString();
+    // The backend now sends a full ISO string, so we can parse it directly.
+    const date = new Date(dateString);
+    // Add a check for validity before formatting.
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return date.toLocaleDateString();
   };
 
   const isDraggable = defect.status !== 'Closed';

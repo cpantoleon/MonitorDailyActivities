@@ -163,7 +163,7 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Start New FAT Period for ${project}`}>
             <div className="form-group">
-                <label htmlFor="fat-start-date">Start Date (Time will be set to 9:00 AM)</label>
+                <label htmlFor="fat-start-date">Start Date (Time will be set to 9:00 AM local time)</label>
                 <input
                     type="date"
                     id="fat-start-date"

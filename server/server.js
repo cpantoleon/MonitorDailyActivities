@@ -1829,7 +1829,11 @@ app.post("/api/fat/:project", async (req, res) => {
             if (err) return res.status(500).json({ error: "DB error checking for active FAT periods." });
             if (activeFat) return res.status(409).json({ error: "An active FAT period already exists for this project. Please complete it before starting a new one." });
 
-            const startDateWithTime = `${start_date} 09:00:00`;
+            // --- THIS IS THE CRITICAL FIX ---
+            // Create a date object representing 9 AM in Greece time (EEST = UTC+3)
+            // Then convert it to a standard UTC ISO string for storage.
+            // This will be stored in the DB as '...T06:00:00.000Z'
+            const startDateUTC = new Date(`${start_date}T09:00:00+03:00`).toISOString();
 
             db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
                 if (nameErr || !release) {
@@ -1839,7 +1843,8 @@ app.post("/api/fat/:project", async (req, res) => {
                 db.serialize(() => {
                     db.run("BEGIN TRANSACTION");
                     const insertPeriodSql = `INSERT INTO fat_periods (project_id, start_date) VALUES (?, ?)`;
-                    db.run(insertPeriodSql, [projectId, startDateWithTime], function(err) {
+                    // Use the new UTC string for the database insert
+                    db.run(insertPeriodSql, [projectId, startDateUTC], function(err) {
                         if (err) {
                             db.run("ROLLBACK");
                             return res.status(500).json({ error: "Failed to create FAT period." });
@@ -1958,6 +1963,17 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
 app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
     const fatPeriodId = req.params.fat_period_id;
 
+    // Helper function to handle both old and new timestamp formats
+    const normalizeToUTCDate = (dateString) => {
+        if (!dateString) return null;
+        const s = String(dateString);
+        if (s.includes('T') && s.includes('Z')) {
+            return new Date(s);
+        }
+        // Assume old format is Greece Time (UTC+3)
+        return new Date(s.replace(' ', 'T') + '+03:00');
+    };
+
     try {
         const fatPeriod = await new Promise((resolve, reject) => {
             db.get("SELECT * FROM fat_periods WHERE id = ?", [fatPeriodId], (err, row) => err ? reject(err) : resolve(row));
@@ -1967,11 +1983,9 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
             return res.status(404).json({ error: "FAT Period not found." });
         }
 
-        // Force the start date to be parsed as UTC
-        const fatStartDate = new Date(fatPeriod.start_date.replace(' ', 'T') + 'Z');
+        const fatStartDate = normalizeToUTCDate(fatPeriod.start_date);
 
         const fatDefects = await new Promise((resolve, reject) => {
-            // Fetch created_at which has the full timestamp
             const sql = "SELECT id, status, created_at FROM defects WHERE project_id = ? AND is_fat_defect = 1";
             db.all(sql, [fatPeriod.project_id], (err, rows) => err ? reject(err) : resolve(rows));
         });
@@ -1997,50 +2011,59 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
             historyMap.get(rec.defect_id).push(rec);
         });
 
-        // 1. DRE Calculation
+        // DRE Calculation
         const totalFatDefects = fatDefects.length;
         const fixedFatDefectsCount = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed').length;
         const dre = totalFatDefects > 0 ? (fixedFatDefectsCount / totalFatDefects) * 100 : 0;
 
-        // 2. MTTD Calculation
+        // MTTD Calculation
         let totalDetectionHours = 0;
         fatDefects.forEach(defect => {
-            // CRITICAL FIX: Use the precise created_at timestamp
-            const defectCreatedAt = new Date(defect.created_at);
-            totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
+            const defectCreatedAt = normalizeToUTCDate(defect.created_at);
+            if (defectCreatedAt) {
+                totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
+            }
         });
         const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
 
-        // 3. MTTR Calculation
+        // --- ADJUSTED MTTR CALCULATION STARTS HERE ---
         let totalRepairHours = 0;
         let fixedForMttrCount = 0;
-        const doneFatDefects = fatDefects.filter(d => d.status === 'Done');
 
-        doneFatDefects.forEach(defect => {
+        // Step 1: Include defects that are currently 'Done' OR 'Closed'.
+        const fixedDefectsForMttr = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed');
+
+        fixedDefectsForMttr.forEach(defect => {
             const defectHistory = historyMap.get(defect.id) || [];
             let lastDoneDate = null;
 
+            // Step 2: Find the most recent history entry where the status became "Done".
+            // We iterate backwards through the history to find the last one first.
             for (let i = defectHistory.length - 1; i >= 0; i--) {
                 const historyItem = defectHistory[i];
                 if (historyItem.changes_summary) {
                     try {
                         const changes = JSON.parse(historyItem.changes_summary);
+                        // We are specifically looking for the "Done" event, as requested.
                         if (changes.status && changes.status.new === 'Done') {
-                            lastDoneDate = new Date(historyItem.changed_at);
-                            break;
+                            lastDoneDate = normalizeToUTCDate(historyItem.changed_at);
+                            break; // Stop after finding the most recent "Done" event.
                         }
                     } catch (e) { /* ignore parse errors */ }
                 }
             }
             
+            // Step 3: If we found a "Done" date, calculate the duration.
             if (lastDoneDate) {
-                // CRITICAL FIX: Use the precise created_at timestamp
-                const defectCreatedAt = new Date(defect.created_at);
-                totalRepairHours += calculateBusinessHours(defectCreatedAt, lastDoneDate);
-                fixedForMttrCount++;
+                const defectCreatedAt = normalizeToUTCDate(defect.created_at);
+                if (defectCreatedAt) {
+                    totalRepairHours += calculateBusinessHours(defectCreatedAt, lastDoneDate);
+                    fixedForMttrCount++;
+                }
             }
         });
         const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
+        // --- MTTR CALCULATION ENDS HERE ---
 
         res.json({
             message: "success",
@@ -2285,9 +2308,6 @@ app.post("/api/defects", async (req, res) => {
         const projectId = await getProjectId(project.trim());
         title = title.trim(); area = area.trim(); status = status.trim();
         
-        // Create a full ISO string from the user-provided date.
-        // This is the correct creation timestamp.
-        const now = new Date().toISOString();
         const createdAtTimestamp = new Date(created_date).toISOString();
 
         link = link ? link.trim() : null; 
@@ -2297,8 +2317,13 @@ app.post("/api/defects", async (req, res) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`;
-            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp];
+            
+            // --- THIS IS THE FIX ---
+            // Add BOTH created_date and created_at to the INSERT statement.
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`;
+            
+            // Add the timestamp for both columns in the parameters array.
+            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp];
             
             db.run(insertDefectSql, defectParams, function(err) {
                 if (err) {
@@ -2320,15 +2345,15 @@ app.post("/api/defects", async (req, res) => {
                 const creationSummary = JSON.stringify({
                     status: { old: null, new: status }, title: { old: null, new: title }, area: { old: null, new: area }
                 });
-                const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
-                db.run(insertHistorySql, [defectId, creationSummary, initialCommentForHistory], (histErr) => {
+                const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
+                db.run(insertHistorySql, [defectId, creationSummary, initialCommentForHistory, createdAtTimestamp], (histErr) => {
                     if (histErr) console.error("Error inserting initial defect history:", histErr.message);
                 });
 
                 db.run("COMMIT", (commitErr) => {
                     if (commitErr) return res.status(500).json({ "error": "Failed to commit transaction: " + commitErr.message });
                     scheduleQdrantSync();
-                    res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_at: createdAtTimestamp } });
+                    res.json({ message: "Defect created successfully", data: { id: defectId, project, title, status, created_date: createdAtTimestamp } });
                 });
             });
         });
@@ -2365,7 +2390,6 @@ app.put("/api/defects/:id", (req, res) => {
         addChange("status", status, currentDefect.status);
         addChange("link", link, currentDefect.link);
 
-        // Handle the "Logged Date" which is our created_at field
         const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
         if (newCreatedAt !== currentDefect.created_at) {
             updates.push(`created_at = ?`);
@@ -2381,59 +2405,93 @@ app.put("/api/defects/:id", (req, res) => {
 
         const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
         const hasComment = comment && comment.trim() !== "";
+        
+        // Check if linked requirements have changed
+        const currentLinks = currentDefect.linkedRequirementGroupIds || [];
+        const newLinks = linkedRequirementGroupIds || [];
+        const linksChanged = linkedRequirementGroupIds !== undefined && (currentLinks.length !== newLinks.length || !currentLinks.every(id => newLinks.includes(id)));
+
+        // --- FIX 1: Early exit if no changes are detected ---
+        if (!hasFieldChanges && !hasComment && !linksChanged) {
+            return res.json({ message: "No changes detected.", defectId: defectId });
+        }
 
         db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
+            db.run("BEGIN TRANSACTION", (beginErr) => {
+                if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
 
-            const handleLinks = (callback) => {
-                if (linkedRequirementGroupIds !== undefined) {
-                    db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
-                        if (deleteErr) return callback(deleteErr);
-                        if (linkedRequirementGroupIds.length > 0) {
-                            const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                            let completed = 0;
-                            linkedRequirementGroupIds.forEach(reqId => {
-                                db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
-                                    if(insertErr) console.error("Error inserting link:", insertErr.message);
-                                    completed++;
-                                    if (completed === linkedRequirementGroupIds.length) callback(null);
+                const handleLinks = (callback) => {
+                    if (linksChanged) {
+                        db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
+                            if (deleteErr) return callback(deleteErr);
+                            if (newLinks.length > 0) {
+                                const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
+                                let completed = 0;
+                                newLinks.forEach(reqId => {
+                                    db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
+                                        if(insertErr) console.error("Error inserting link:", insertErr.message); // Log but don't halt transaction
+                                        completed++;
+                                        if (completed === newLinks.length) callback(null);
+                                    });
                                 });
-                            });
-                        } else {
-                            callback(null);
-                        }
-                    });
-                } else {
-                    callback(null);
-                }
-            };
+                            } else {
+                                callback(null);
+                            }
+                        });
+                    } else {
+                        callback(null);
+                    }
+                };
 
-            handleLinks((linkErr) => {
-                if (linkErr) {
-                    db.run("ROLLBACK");
-                    return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
-                }
+                // --- FIX 2: Chain the database calls using callbacks ---
+                handleLinks((linkErr) => {
+                    if (linkErr) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
+                    }
 
-                const historyComment = comment ? comment.trim() : null;
-                if (hasFieldChanges || historyComment) {
-                    const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
-                    const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
-                    db.run(historySql, [defectId, changesSummaryString, historyComment]);
-                }
-
-                if (hasFieldChanges) {
-                    updates.push("updated_at = ?");
-                    updateParamsList.push(new Date().toISOString());
-                    const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
-                    updateParamsList.push(defectId);
-                    db.run(sqlUpdate, updateParamsList);
-                }
-                
-                db.run("COMMIT", (commitErr) => {
-                    if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
-                    scheduleQdrantSync();
-                    res.json({ message: "Defect updated successfully.", defectId: defectId });
+                    const historyComment = comment ? comment.trim() : null;
+                    if (hasFieldChanges || historyComment) {
+                        const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
+                        const nowUTC = new Date().toISOString();
+                        const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
+                        db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
+                            if (historyErr) {
+                                db.run("ROLLBACK");
+                                return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
+                            }
+                            executeUpdate();
+                        });
+                    } else {
+                        executeUpdate();
+                    }
                 });
+
+                const executeUpdate = () => {
+                    if (hasFieldChanges) {
+                        updates.push("updated_at = ?");
+                        updateParamsList.push(new Date().toISOString());
+                        const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
+                        updateParamsList.push(defectId);
+                        db.run(sqlUpdate, updateParamsList, (updateErr) => {
+                            if (updateErr) {
+                                db.run("ROLLBACK");
+                                return res.status(500).json({ error: "Failed to update defect: " + updateErr.message });
+                            }
+                            commitTransaction();
+                        });
+                    } else {
+                        commitTransaction();
+                    }
+                };
+
+                const commitTransaction = () => {
+                    db.run("COMMIT", (commitErr) => {
+                        if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
+                        scheduleQdrantSync();
+                        res.json({ message: "Defect updated successfully.", defectId: defectId });
+                    });
+                };
             });
         });
     });

@@ -54,7 +54,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           area: defect.area || '',
           status: defect.status || DEFECT_STATUSES[0],
           link: defect.link || '',
-          created_date: defect.created_date ? new Date(defect.created_date + 'T00:00:00') : new Date(),
+          created_date: defect.created_date ? new Date(defect.created_date) : new Date(),
           comment: '',
           linkedRequirementGroupIds: defect.linkedRequirements ? defect.linkedRequirements.map(r => r.groupId) : [],
           is_fat_defect: defect.is_fat_defect || false,
