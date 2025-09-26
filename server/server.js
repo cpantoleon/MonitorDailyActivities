@@ -109,54 +109,50 @@ const getProjectId = (projectName) => {
     });
 };
 
-// Helper function to calculate duration in business hours, excluding weekends.
+// Helper function to calculate duration based on special business rules.
 const calculateBusinessHours = (start, end) => {
     let startDate = new Date(start);
     let endDate = new Date(end);
 
     if (endDate <= startDate) return 0;
 
+    const endDayOfWeek = endDate.getUTCDay(); // Sunday = 0, Saturday = 6
+    const isEndOnWeekend = (endDayOfWeek === 0 || endDayOfWeek === 6);
+
+    // RULE 1: If the ticket is closed on a weekend, count all calendar days.
+    if (isEndOnWeekend) {
+        // Simple difference in hours between the two dates.
+        const diffInMs = endDate.getTime() - startDate.getTime();
+        return diffInMs / (1000 * 60 * 60);
+    }
+
+    // RULE 2: If the ticket is closed on a weekday, skip weekends.
     let totalHours = 0;
     let current = new Date(startDate);
 
-    // Handle the first partial day
-    const firstDayEnd = new Date(current);
-    firstDayEnd.setUTCHours(23, 59, 59, 999);
-    if (firstDayEnd > endDate) { // If start and end are on the same day
-        const day = current.getUTCDay();
-        if (day !== 0 && day !== 6) { // Not a weekend
-            return (endDate - startDate) / (1000 * 60 * 60);
+    // Loop day by day from the start until we pass the end date
+    while (current < endDate) {
+        const dayOfWeek = current.getUTCDay();
+
+        // Only perform calculations for weekdays
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            let startOfDay = new Date(current);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+
+            let endOfDay = new Date(startOfDay);
+            endOfDay.setUTCDate(startOfDay.getUTCDate() + 1);
+
+            let effectiveStart = (startDate > startOfDay) ? startDate : startOfDay;
+            let effectiveEnd = (endDate < endOfDay) ? endDate : endOfDay;
+
+            if (effectiveEnd > effectiveStart) {
+                totalHours += (effectiveEnd - effectiveStart) / (1000 * 60 * 60);
+            }
         }
-        return 0;
-    } else {
-        const day = current.getUTCDay();
-        if (day !== 0 && day !== 6) {
-            totalHours += (firstDayEnd - current) / (1000 * 60 * 60);
-        }
+        
+        // Move to the start of the next day
         current.setUTCDate(current.getUTCDate() + 1);
         current.setUTCHours(0, 0, 0, 0);
-    }
-
-    // Handle full days in between
-    while (current < endDate) {
-        const day = current.getUTCDay();
-        if (day !== 0 && day !== 6) {
-            totalHours += 24;
-        }
-        if (current.getUTCFullYear() === endDate.getUTCFullYear() &&
-            current.getUTCMonth() === endDate.getUTCMonth() &&
-            current.getUTCDate() === endDate.getUTCDate()) {
-            break;
-        }
-        current.setUTCDate(current.getUTCDate() + 1);
-    }
-
-    // Handle the last partial day
-    const lastDayStart = new Date(endDate);
-    lastDayStart.setUTCHours(0, 0, 0, 0);
-    const day = endDate.getUTCDay();
-    if (day !== 0 && day !== 6) {
-        totalHours += (endDate - lastDayStart) / (1000 * 60 * 60);
     }
 
     return totalHours;
@@ -261,7 +257,9 @@ const processDefectExcelData = (fileBuffer) => {
             }
         }
 
-        results.validRows.push({ title, link });
+        const links = row['Links'] ? String(row['Links']).trim() : null;
+
+        results.validRows.push({ title, link, links });
     });
 
     return results;
@@ -822,8 +820,8 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
 
             db.serialize(() => {
                 db.run("BEGIN TRANSACTION");
-                const insertDefectSql = `INSERT INTO defects (project_id, title, area, status, link, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-                const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment) VALUES (?, ?, ?)`;
+                const insertDefectSql = `INSERT INTO defects (project_id, title, area, status, link, created_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+                const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
                 
                 let completedInserts = 0;
                 let successfulInserts = 0;
@@ -832,7 +830,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                     const defaultArea = 'Imported';
                     const defaultStatus = 'Assigned to Developer';
 
-                    db.run(insertDefectSql, [projectId, item.title, defaultArea, defaultStatus, item.link, now, now], function(err) {
+                    db.run(insertDefectSql, [projectId, item.title, defaultArea, defaultStatus, item.link, now, now, now], function(err) {
                         if (err) {
                             console.error("Error inserting imported defect:", err.message);
                         } else {
@@ -841,7 +839,33 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                             const creationSummary = JSON.stringify({
                                 status: { old: null, new: defaultStatus }, title: { old: null, new: item.title }, area: { old: null, new: defaultArea }
                             });
-                            db.run(insertHistorySql, [defectId, creationSummary, "Defect created via import."]);
+                            db.run(insertHistorySql, [defectId, creationSummary, "Defect created via import.", now]);
+
+                            if (item.links) {
+                                const linkParts = item.links.split(',').map(s => s.trim()).filter(Boolean);
+                                if (linkParts.length > 0) {
+                                    const placeholders = linkParts.map(() => '?').join(',');
+                                    const findReqsSql = `SELECT requirementGroupId FROM activities WHERE isCurrent = 1 AND (${linkParts.map(() => "link LIKE ?").join(' OR ')})`;
+                                    const findReqsParams = linkParts.map(linkPart => `%${linkPart}`);
+
+                                    db.all(findReqsSql, findReqsParams, (err, reqs) => {
+                                        if (err) {
+                                            console.error("Error finding requirements to link:", err.message);
+                                            return;
+                                        }
+                                        const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
+                                        const uniqueReqIds = [...new Set(reqs.map(r => r.requirementGroupId))];
+
+                                        uniqueReqIds.forEach(reqId => {
+                                            db.run(insertLinkSql, [defectId, reqId], (linkErr) => {
+                                                if (linkErr) {
+                                                    console.error(`Error linking defect ${defectId} to requirement ${reqId}:`, linkErr.message);
+                                                }
+                                            });
+                                        });
+                                    });
+                                }
+                            }
                         }
                         completedInserts++;
                         if (completedInserts === itemsToImport.length) {
