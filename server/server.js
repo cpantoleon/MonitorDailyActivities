@@ -1789,9 +1789,10 @@ app.delete("/api/fat/:fat_period_id", (req, res) => {
 app.get("/api/fat/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
+        // MODIFICATION 1: Add fsr.release_id and fsr.archived_release_id to the SELECT statement
         const sql = `
             SELECT fp.id, fp.project_id, fp.start_date, fp.completion_date, fp.status,
-                   fsr.release_name, fsr.release_type,
+                   fsr.release_id, fsr.archived_release_id, fsr.release_name, fsr.release_type,
                    fr.passed, fr.failed, fr.blocked, fr.caution, fr.not_run
             FROM fat_periods fp
             LEFT JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
@@ -1826,7 +1827,9 @@ app.get("/api/fat/:project", async (req, res) => {
                     });
                 }
                 if (row.release_name) {
+                    // MODIFICATION 2: Add the 'id' to the selected_releases object
                     fatPeriodsMap.get(row.id).selected_releases.push({
+                        id: row.release_type === 'active' ? row.release_id : row.archived_release_id,
                         name: row.release_name,
                         type: row.release_type
                     });

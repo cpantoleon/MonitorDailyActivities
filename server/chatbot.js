@@ -4,6 +4,9 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const cheerio = require('cheerio');
+const { exec } = require('child_process');
+const util = require('util');
+const promisifiedExec = util.promisify(exec);
 
 let genAI, qdrantClient, embeddingModel, generativeModel;
 const QDRANT_COLLECTION_NAME = "requirements_defects";
@@ -386,6 +389,41 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         }
 
         const lowerCaseMessage = message.toLowerCase().trim();
+
+        if (lowerCaseMessage === 'github commit') {
+            try {
+                console.log("Received 'github commit' command. Starting process...");
+                
+                // Step 1: Git Add
+                console.log("Executing 'git add .'");
+                await promisifiedExec('git add .');
+
+                // Step 2: Check for changes before committing to avoid an error
+                const { stdout: statusOutput } = await promisifiedExec('git status --porcelain');
+                if (!statusOutput) {
+                    console.log("No changes to commit.");
+                    return res.json({ reply: "No changes to commit. The working directory is clean." });
+                }
+                
+                // Step 3: Git Commit
+                console.log("Executing 'git commit'");
+                const commitMessage = "db updated"; // The commit message you requested
+                await promisifiedExec(`git commit -m "${commitMessage}"`);
+
+                // Step 4: Git Push
+                console.log("Executing 'git push'");
+                await promisifiedExec('git push');
+
+                console.log("GitHub commit process completed successfully.");
+                return res.json({ reply: "Success! Your changes have been added, committed, and pushed." });
+
+            } catch (error) {
+                console.error("GitHub command process failed:", error);
+                // Provide the specific Git error message to the user for easier debugging
+                const errorMessage = error.stderr || error.stdout || error.message;
+                return res.json({ reply: `The GitHub command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
+            }
+        }
         
         let preDeterminedIntent = null;
         if (['hello', 'hi', 'hey'].includes(lowerCaseMessage)) {

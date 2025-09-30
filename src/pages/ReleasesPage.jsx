@@ -1424,15 +1424,25 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                     <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
                                 </div>
                                 <ul className={`sat-bugs-list ${listHeightClass}`}>
-                                    {satBugs.length > 0 ? satBugs.map(bug => (
-                                        <li key={bug.id}>
-                                            <a href={bug.link} target="_blank" rel="noopener noreferrer" title={bug.title}>{bug.title}</a>
-                                            <div className="bug-actions">
-                                                <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
-                                                <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
-                                            </div>
-                                        </li>
-                                    )) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
+                                    {satBugs.length > 0 ? satBugs.map(bug => {
+                                        const getFullBugTitle = (bug) => {
+                                            if (!bug.link) return bug.title;
+                                            const parts = bug.link.split('/');
+                                            const jiraKey = parts[parts.length - 1];
+                                            return `[${jiraKey}] ${bug.title}`;
+                                        };
+                                        const fullTitle = getFullBugTitle(bug);
+
+                                        return (
+                                            <li key={bug.id}>
+                                                <a href={bug.link} target="_blank" rel="noopener noreferrer" title={fullTitle}>{fullTitle}</a>
+                                                <div className="bug-actions">
+                                                    <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
+                                                    <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
+                                                </div>
+                                            </li>
+                                        );
+                                    }) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
                                 </ul>
                             </div>
                         </div>
@@ -1821,93 +1831,97 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                 </button>
             </div>
             <div className="comparison-container">
-                {detailedArchives.map(archive => {
-                    const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
-                    const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
-                    const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
+                {Array.from({ length: Math.ceil(detailedArchives.length / 3) }).map((_, rowIndex) => (
+                    <div key={rowIndex} className="comparison-row">
+                        {detailedArchives.slice(rowIndex * 3, rowIndex * 3 + 3).map(archive => {
+                            const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+                            const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
+                            const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
 
-                    const metricsLegendItems = [];
-                    if (archive.metrics.doneCount > 0) {
-                        metricsLegendItems.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
-                    }
-                    if (archive.metrics.notDoneCount > 0) {
-                        metricsLegendItems.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
-                    }
+                            const metricsLegendItems = [];
+                            if (archive.metrics.doneCount > 0) {
+                                metricsLegendItems.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
+                            }
+                            if (archive.metrics.notDoneCount > 0) {
+                                metricsLegendItems.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
+                            }
 
-                    return (
-                        <div key={archive.id} className="comparison-column">
-                            <h3>{archive.name}</h3>
-                            <div className="comparison-metrics">
-                                <div className="metric-item">
-                                    <span className="metric-label">Closed Date:</span>
-                                    <span className="metric-value">{new Date(archive.closed_at).toLocaleDateString()}</span>
-                                </div>
-                                <div className="metric-item">
-                                    <span className="metric-label">Total Requirements:</span>
-                                    <span className="metric-value">{totalRequirements}</span>
-                                </div>
-                            </div>
-                            <div className="comparison-charts">
-                                <div className="comparison-chart-wrapper">
-                                    {archive.fat_execution_report ? (
-                                        <>
-                                            <h4>FAT Execution Results</h4>
+                            return (
+                                <div key={archive.id} className="comparison-column">
+                                    <h3>{archive.name}</h3>
+                                    <div className="comparison-metrics">
+                                        <div className="metric-item">
+                                            <span className="metric-label">Closed Date:</span>
+                                            <span className="metric-value">{new Date(archive.closed_at).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="metric-item">
+                                            <span className="metric-label">Total Requirements:</span>
+                                            <span className="metric-value">{totalRequirements}</span>
+                                        </div>
+                                    </div>
+                                    <div className="comparison-charts">
+                                        <div className="comparison-chart-wrapper">
+                                            {archive.fat_execution_report ? (
+                                                <>
+                                                    <h4>FAT Execution Results</h4>
+                                                    <div className="chart-container">
+                                                        <Pie
+                                                            ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
+                                                            data={fatExecutionChartData}
+                                                            options={onScreenChartOptions}
+                                                        />
+                                                    </div>
+                                                    <div className="legend-wrapper">
+                                                        <ChartLegend items={fatExecutionLegendItems} />
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <h4>Our Final Metrics</h4>
+                                                    <div className="chart-container">
+                                                        <Pie
+                                                            ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
+                                                            data={{
+                                                                labels: ['Done', 'Not Done'],
+                                                                datasets: [{
+                                                                    data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
+                                                                    backgroundColor: ['#28a745', '#dc3545'],
+                                                                    borderColor: '#FFFAF0',
+                                                                    borderWidth: 2,
+                                                                }],
+                                                            }}
+                                                            options={onScreenChartOptions}
+                                                        />
+                                                    </div>
+                                                    <div className="legend-wrapper">
+                                                        <ChartLegend items={metricsLegendItems} />
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                        <div className="comparison-chart-wrapper">
+                                            <h4>SAT Report</h4>
                                             <div className="chart-container">
-                                                <Pie
-                                                    ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
-                                                    data={fatExecutionChartData}
-                                                    options={onScreenChartOptions}
-                                                />
+                                                {satChartData ? (
+                                                    <Pie
+                                                        ref={el => (chartRefs.current[`sat-${archive.id}`] = el)}
+                                                        data={satChartData}
+                                                        options={onScreenChartOptions}
+                                                    />
+                                                ) : (
+                                                    <div className="empty-chart-placeholder">No SAT Report</div>
+                                                )}
                                             </div>
                                             <div className="legend-wrapper">
-                                                <ChartLegend items={fatExecutionLegendItems} />
+                                                <ChartLegend items={satLegendItems} />
                                             </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <h4>Our Final Metrics</h4>
-                                            <div className="chart-container">
-                                                <Pie
-                                                    ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
-                                                    data={{
-                                                        labels: ['Done', 'Not Done'],
-                                                        datasets: [{
-                                                            data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
-                                                            backgroundColor: ['#28a745', '#dc3545'],
-                                                            borderColor: '#FFFAF0',
-                                                            borderWidth: 2,
-                                                        }],
-                                                    }}
-                                                    options={onScreenChartOptions}
-                                                />
-                                            </div>
-                                            <div className="legend-wrapper">
-                                                <ChartLegend items={metricsLegendItems} />
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                                <div className="comparison-chart-wrapper">
-                                    <h4>SAT Report</h4>
-                                    <div className="chart-container">
-                                        {satChartData ? (
-                                            <Pie
-                                                ref={el => (chartRefs.current[`sat-${archive.id}`] = el)}
-                                                data={satChartData}
-                                                options={onScreenChartOptions}
-                                            />
-                                        ) : (
-                                            <div className="empty-chart-placeholder">No SAT Report</div>
-                                        )}
-                                    </div>
-                                    <div className="legend-wrapper">
-                                        <ChartLegend items={satLegendItems} />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    );
-                })}
+                            );
+                        })}
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -1929,6 +1943,9 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [archiveForSat, setArchiveForSat] = useState(null);
     const [comparisonList, setComparisonList] = useState([]);
     const [isComparing, setIsComparing] = useState(false);
+    const [activeFatPeriod, setActiveFatPeriod] = useState(null);
+    const [isFatFinalizeConfirmOpen, setIsFatFinalizeConfirmOpen] = useState(false);
+    const [finalizeAction, setFinalizeAction] = useState(null);
 
     const handleCompleteRelease = async (archive) => {
         try {
@@ -1944,6 +1961,92 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             setSelectedArchive(null);
         } catch (error) {
             showMainMessage(error.message, 'error');
+        }
+    };
+
+
+
+
+    useEffect(() => {
+        const fetchFatData = async () => {
+            if (!selectedProject) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/fat/${selectedProject}`);
+                const data = await response.json();
+                setActiveFatPeriod(data.data.find(p => p.status === 'active') || null);
+            } catch (err) {
+                console.error('Failed to load FAT data for release finalization check.', err);
+            }
+        };
+        fetchFatData();
+    }, [selectedProject]);
+
+
+
+
+    const handleOpenFinalizeModal = (release) => {
+        setReleaseToFinalize(release);
+        setIsFinalizeModalOpen(true);
+    };
+
+    const handleConfirmFinalize = async (closeAction) => {
+        if (!releaseToFinalize) return;
+
+        // NEW LOGIC: Check if the specific release is part of an active FAT
+        const isReleaseInActiveFat = activeFatPeriod &&
+            activeFatPeriod.selected_releases &&
+            activeFatPeriod.selected_releases.some(
+                (r) => r.type === 'active' && r.id === releaseToFinalize.id
+            );
+
+        if (isReleaseInActiveFat) {
+            // If it is, show the confirmation warning
+            setFinalizeAction(closeAction);
+            setIsFatFinalizeConfirmOpen(true);
+            setIsFinalizeModalOpen(false);
+        } else {
+            // Otherwise, proceed directly with finalizing the release
+            await proceedWithFinalize(closeAction);
+        }
+    };
+
+    const handleFatFinalizeConfirm = async () => {
+        if (activeFatPeriod) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, { method: 'PUT' });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
+                showMainMessage('Active FAT period has been automatically completed.', 'success');
+            } catch (error) {
+                showMainMessage(`Error completing FAT period: ${error.message}`, 'error');
+                // Decide if you should stop the release finalization or not. For now, we'll stop.
+                setIsFatFinalizeConfirmOpen(false);
+                return;
+            }
+        }
+        await proceedWithFinalize(finalizeAction);
+        setIsFatFinalizeConfirmOpen(false);
+    };
+
+    const proceedWithFinalize = async (closeAction) => {
+        if (!releaseToFinalize) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/releases/${releaseToFinalize.id}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ closeAction })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
+            showMainMessage(result.message, 'success');
+            fetchData(); 
+            fetchActiveReleases();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        } finally {
+            setIsFinalizeModalOpen(false);
+            setReleaseToFinalize(null);
+            setFinalizeAction(null);
         }
     };
 
@@ -2040,31 +2143,7 @@ const releasesPageTooltipContent = (
         }
     }, [view, selectedProject, fetchActiveReleases, fetchArchivedReleases]);
 
-    const handleOpenFinalizeModal = (release) => {
-        setReleaseToFinalize(release);
-        setIsFinalizeModalOpen(true);
-    };
 
-    const handleConfirmFinalize = async (closeAction) => {
-        if (!releaseToFinalize) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/releases/${releaseToFinalize.id}/close`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ closeAction })
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
-            showMainMessage(result.message, 'success');
-            fetchData();
-            fetchActiveReleases();
-        } catch (error) {
-            showMainMessage(error.message, 'error');
-        } finally {
-            setIsFinalizeModalOpen(false);
-            setReleaseToFinalize(null);
-        }
-    };
 
     const handleOpenEditModal = (release) => {
         setReleaseToEdit(release);
@@ -3099,6 +3178,14 @@ const releasesPageTooltipContent = (
                 onConfirm={handleConfirmDelete}
                 title="Confirm Delete Release"
                 message={`Are you sure you want to delete the release "${releaseToEdit?.name}"? This action is permanent.`}
+            />
+
+            <ConfirmationModal
+                isOpen={isFatFinalizeConfirmOpen}
+                onClose={() => setIsFatFinalizeConfirmOpen(false)}
+                onConfirm={handleFatFinalizeConfirm}
+                title="Active FAT Period Warning"
+                message="There is an active FAT period for this project. Finalizing this release will also complete the active FAT. Do you want to proceed?"
             />
         </div>
     );

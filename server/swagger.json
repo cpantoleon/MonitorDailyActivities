@@ -632,6 +632,41 @@
         }
       }
     },
+    "/archives/{id}/complete": {
+      "post": {
+        "summary": "Complete an 'archive_only' release",
+        "description": "Moves all requirements from an 'archive_only' release to a 'Done' state, effectively changing its status to 'archive_and_complete'. This is for releases that were archived without completing the items first.",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ItemIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived release has been successfully completed."
+          },
+          "400": {
+            "description": "The release was not of type 'archive_only'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/fat/{project}": {
       "get": {
         "summary": "Get all FAT periods for a project",
@@ -771,6 +806,84 @@
         "responses": {
           "200": {
             "description": "FAT period completed successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/report": {
+      "post": {
+        "summary": "Add or update a FAT execution report",
+        "description": "Saves the execution results for a FAT period. The sum of all fields must equal the total number of requirements in scope. Submitting all zeros will clear the report.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FatReportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FAT report saved successfully."
+          },
+          "200": {
+            "description": "FAT report cleared successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/kpis": {
+      "get": {
+        "summary": "Get KPIs for a FAT period",
+        "description": "Calculates and retrieves key performance indicators (DRE, MTTD, MTTR) for a specific completed FAT period based on its associated defects.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully calculated KPIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FatKpis"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -2139,6 +2252,11 @@
             "nullable": true,
             "description": "The SAT (System Acceptance Testing) report associated with this archive, if available."
           },
+          "fat_execution_report": {
+            "$ref": "#/components/schemas/FatExecutionReport",
+            "nullable": true,
+            "description": "The FAT execution report associated with this archive at the time of completion, if available."
+          },
           "close_action": {
             "type": "string",
             "enum": [
@@ -2444,6 +2562,43 @@
           }
         }
       },
+      "FatExecutionReport": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "caution": {
+            "type": "integer"
+          },
+          "not_run": {
+            "type": "integer"
+          }
+        }
+      },
+      "FatKpis": {
+        "type": "object",
+        "properties": {
+          "dre": {
+            "type": "string",
+            "description": "Defect Removal Efficiency, as a percentage string (e.g., '95.50')."
+          },
+          "mttd": {
+            "type": "string",
+            "description": "Mean Time To Detect, in days (e.g., '1.25')."
+          },
+          "mttr": {
+            "type": "string",
+            "description": "Mean Time To Repair, in days (e.g., '3.50')."
+          }
+        }
+      },
       "FatPeriod": {
         "type": "object",
         "properties": {
@@ -2503,6 +2658,26 @@
           }
         }
       },
+      "FatReportInput": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "caution": {
+            "type": "integer"
+          },
+          "not_run": {
+            "type": "integer"
+          }
+        }
+      },
       "LinkedDefect": {
         "type": "object",
         "properties": {
@@ -2510,6 +2685,17 @@
             "type": "integer"
           },
           "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "project": {
             "type": "string"
           },
           "is_fat_defect": {
@@ -2612,6 +2798,11 @@
             "format": "date-time",
             "nullable": true,
             "description": "Timestamp when the release was closed, if applicable."
+          },
+          "fat_execution_report": {
+            "$ref": "#/components/schemas/FatExecutionReport",
+            "nullable": true,
+            "description": "The execution report from the latest completed FAT period this release was a part of, if available."
           }
         }
       },
@@ -2773,6 +2964,10 @@
           "description": {
             "type": "string"
           },
+          "details": {
+            "type": "string",
+            "description": "Additional details or context for the item."
+          },
           "item_date": {
             "type": "string",
             "format": "date"
@@ -2793,6 +2988,7 @@
           "project",
           "column_type",
           "description",
+          "details",
           "item_date"
         ],
         "properties": {
@@ -2809,6 +3005,10 @@
           },
           "description": {
             "type": "string"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional details or context for the item."
           },
           "item_date": {
             "type": "string",
@@ -2832,6 +3032,11 @@
             "type": "string",
             "nullable": true
           },
+          "details": {
+            "type": "string",
+            "nullable": true,
+            "description": "Additional details or context for the item."
+          },
           "item_date": {
             "type": "string",
             "format": "date",
@@ -2852,6 +3057,16 @@
           "link": {
             "type": "string",
             "format": "uri"
+          },
+          "estimation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The estimated effort in hours."
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "An optional label for categorization."
           }
         }
       },
@@ -2870,6 +3085,25 @@
             "type": "string",
             "format": "uri",
             "description": "A URL link to the bug tracking system (e.g., Jira)."
+          },
+          "estimation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The estimated effort for the bug."
+          },
+          "estimation_unit": {
+            "type": "string",
+            "enum": [
+              "h",
+              "d"
+            ],
+            "nullable": true,
+            "description": "The unit for the estimation ('h' for hours, 'd' for days)."
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "An optional label for categorization."
           }
         }
       },
