@@ -808,8 +808,13 @@ body {
   display: inline-block;
   position: relative;
   margin-right: 8px;
-  vertical-align: middle;
+  flex-shrink: 0;
 }
+
+.legend-item .note-dot {
+  top: 6px;
+}
+
 .react-datepicker__day div > .note-dot {
   position: absolute;
   bottom: 2px;
@@ -857,7 +862,7 @@ body {
 }
 .legend-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 6px;
   color: #704214;
 }

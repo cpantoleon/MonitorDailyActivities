@@ -307,6 +307,8 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         <style>{`
           .ck-editor__editable_inline {
               min-height: 250px;
+              max-height: 350px; /* Added max-height */
+              overflow-y: auto;   /* Added for scroll functionality */
           }
           .ck-content .image {
               max-width: 200px;

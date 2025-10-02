@@ -1977,13 +1977,119 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                         return res.status(404).json({ error: "Active FAT period not found or already completed." });
                     }
                     
-                    db.run("COMMIT", (commitErr) => {
-                        if (commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
-                        res.json({ message: "FAT period completed successfully." });
+                    // --- START: Calculate and Store KPIs ---
+                    db.get("SELECT project_id, start_date FROM fat_periods WHERE id = ?", [fatPeriodId], (err, fatPeriod) => {
+                        if (err || !fatPeriod) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: "Could not retrieve FAT period info for KPI calculation." });
+                        }
+
+                        const normalizeToUTCDate = (dateString) => {
+                            if (!dateString) return null;
+                            const s = String(dateString);
+                            return (s.includes('T') && s.includes('Z')) ? new Date(s) : new Date(s.replace(' ', 'T') + '+03:00');
+                        };
+                        const fatStartDate = normalizeToUTCDate(fatPeriod.start_date);
+
+                        db.all("SELECT id, status, created_at FROM defects WHERE project_id = ? AND is_fat_defect = 1", [fatPeriod.project_id], (err, fatDefects) => {
+                            if (err) {
+                                db.run("ROLLBACK");
+                                return res.status(500).json({ error: "DB error fetching FAT defects for KPI calculation." });
+                            }
+
+                            if (fatDefects.length === 0) {
+                                const insertKpiSql = `INSERT INTO fat_kpis (fat_period_id, dre, mttd, mttr) VALUES (?, 0, 0, 0)`;
+                                db.run(insertKpiSql, [fatPeriodId], (kpiErr) => {
+                                    if (kpiErr) { db.run("ROLLBACK"); return res.status(500).json({ error: "DB error storing zero-value KPIs." }); }
+                                    db.run("COMMIT", (commitErr) => {
+                                        if (commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                                        res.json({ message: "FAT period completed successfully." });
+                                    });
+                                });
+                                return;
+                            }
+
+                            const defectIds = fatDefects.map(d => d.id);
+                            db.all(`SELECT * FROM defect_history WHERE defect_id IN (${defectIds.join(',')}) ORDER BY changed_at ASC`, [], (err, historyRecords) => {
+                                if (err) { db.run("ROLLBACK"); return res.status(500).json({ error: "DB error fetching defect history for KPIs." }); }
+
+                                const historyMap = new Map();
+                                historyRecords.forEach(rec => {
+                                    if (!historyMap.has(rec.defect_id)) historyMap.set(rec.defect_id, []);
+                                    historyMap.get(rec.defect_id).push(rec);
+                                });
+
+                                const totalFatDefects = fatDefects.length;
+                                const fixedFatDefectsCount = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed').length;
+                                const dre = totalFatDefects > 0 ? (fixedFatDefectsCount / totalFatDefects) * 100 : 0;
+
+                                let totalDetectionHours = 0;
+                                fatDefects.forEach(defect => {
+                                    const defectCreatedAt = normalizeToUTCDate(defect.created_at);
+                                    if (defectCreatedAt) totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
+                                });
+                                const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
+
+                                let totalRepairHours = 0;
+                                let fixedForMttrCount = 0;
+                                const fixedDefectsForMttr = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed');
+                                fixedDefectsForMttr.forEach(defect => {
+                                    const defectHistory = historyMap.get(defect.id) || [];
+                                    let lastDoneDate = null;
+                                    for (let i = defectHistory.length - 1; i >= 0; i--) {
+                                        const historyItem = defectHistory[i];
+                                        if (historyItem.changes_summary) {
+                                            try {
+                                                const changes = JSON.parse(historyItem.changes_summary);
+                                                if (changes.status && changes.status.new === 'Done') {
+                                                    lastDoneDate = normalizeToUTCDate(historyItem.changed_at);
+                                                    break;
+                                                }
+                                            } catch (e) {}
+                                        }
+                                    }
+                                    if (lastDoneDate) {
+                                        const defectCreatedAt = normalizeToUTCDate(defect.created_at);
+                                        if (defectCreatedAt) {
+                                            totalRepairHours += calculateBusinessHours(defectCreatedAt, lastDoneDate);
+                                            fixedForMttrCount++;
+                                        }
+                                    }
+                                });
+                                const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
+
+                                const insertKpiSql = `INSERT INTO fat_kpis (fat_period_id, dre, mttd, mttr) VALUES (?, ?, ?, ?)`;
+                                db.run(insertKpiSql, [fatPeriodId, dre.toFixed(2), mttdInDays.toFixed(2), mttrInDays.toFixed(2)], (kpiErr) => {
+                                    if (kpiErr) {
+                                        db.run("ROLLBACK");
+                                        return res.status(500).json({ error: "DB error storing calculated KPIs." });
+                                    }
+                                    db.run("COMMIT", (commitErr) => {
+                                        if (commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                                        res.json({ message: "FAT period completed successfully." });
+                                    });
+                                });
+                            });
+                        });
                     });
+                    // --- END: Calculate and Store KPIs ---
                 });
             });
         });
+    });
+});
+
+app.get("/api/fat/:fat_period_id/stored-kpis", (req, res) => {
+    const fatPeriodId = req.params.fat_period_id;
+    const sql = "SELECT dre, mttd, mttr FROM fat_kpis WHERE fat_period_id = ?";
+    db.get(sql, [fatPeriodId], (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: "Database error fetching stored KPIs." });
+        }
+        if (!row) {
+            return res.status(404).json({ error: "No stored KPIs found for this FAT period." });
+        }
+        res.json({ message: "success", data: row });
     });
 });
 

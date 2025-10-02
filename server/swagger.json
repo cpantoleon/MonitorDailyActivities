@@ -856,8 +856,8 @@
     },
     "/fat/{fat_period_id}/kpis": {
       "get": {
-        "summary": "Get KPIs for a FAT period",
-        "description": "Calculates and retrieves key performance indicators (DRE, MTTD, MTTR) for a specific completed FAT period based on its associated defects.",
+        "summary": "Calculate KPIs for a FAT period",
+        "description": "Calculates key performance indicators (DRE, MTTD, MTTR) for a specific FAT period based on its associated defects. This is a real-time calculation.",
         "tags": [
           "FAT"
         ],
@@ -869,6 +869,46 @@
         "responses": {
           "200": {
             "description": "Successfully calculated KPIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FatKpis"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/stored-kpis": {
+      "get": {
+        "summary": "Get stored KPIs for a completed FAT period",
+        "description": "Retrieves the KPIs (DRE, MTTD, MTTR) that were calculated and stored when the FAT period was completed.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved stored KPIs.",
             "content": {
               "application/json": {
                 "schema": {

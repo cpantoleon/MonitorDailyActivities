@@ -223,6 +223,19 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating fat_reports table", err.message);
             });
 
+            
+            db.run(`CREATE TABLE IF NOT EXISTS fat_kpis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fat_period_id INTEGER NOT NULL UNIQUE,
+                dre REAL NOT NULL,
+                mttd REAL NOT NULL,
+                mttr REAL NOT NULL,
+                calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (fat_period_id) REFERENCES fat_periods(id) ON DELETE CASCADE
+            )`, (err) => {
+                if (err) console.error("Error creating fat_kpis table", err.message);
+            });
+
             db.all("PRAGMA table_info(retrospective_items)", (err, columns) => {
                 if (err) {
                     console.error("Error fetching retrospective_items table info:", err.message);

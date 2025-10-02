@@ -18,7 +18,7 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
-const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage }) => {
+const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isViewingStored }) => {
     const [kpis, setKpis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -26,7 +26,11 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage }) => {
         if (isOpen && fatPeriod?.id) {
             setIsLoading(true);
             setKpis(null);
-            fetch(`${API_BASE_URL}/fat/${fatPeriod.id}/kpis`)
+            const endpoint = isViewingStored
+                ? `${API_BASE_URL}/fat/${fatPeriod.id}/stored-kpis`
+                : `${API_BASE_URL}/fat/${fatPeriod.id}/kpis`;
+
+            fetch(endpoint)
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) throw new Error(data.error);
@@ -35,10 +39,10 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage }) => {
                         showMainMessage(data.message, 'info');
                     }
                 })
-                .catch(err => showMainMessage(`Failed to calculate KPIs: ${err.message}`, 'error'))
+                .catch(err => showMainMessage(`Failed to load KPIs: ${err.message}`, 'error'))
                 .finally(() => setIsLoading(false));
         }
-    }, [isOpen, fatPeriod, showMainMessage]);
+    }, [isOpen, fatPeriod, showMainMessage, isViewingStored]);
 
     const KpiDisplay = ({ title, value, unit, tooltipContent }) => {
         const [copyText, setCopyText] = useState('Copy');
@@ -458,6 +462,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                 fatPeriod={fatPeriod}
                 project={project}
                 showMainMessage={showMainMessage}
+                isViewingStored={false}
             />
 
             <AddFatReportModal
@@ -482,6 +487,8 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
     const [isLoading, setIsLoading] = useState(true);
     const [isStartModalOpen, setIsStartModalOpen] = useState(false);
     const [fatPeriodToDelete, setFatPeriodToDelete] = useState(null);
+    const [isKpiModalOpen, setIsKpiModalOpen] = useState(false);
+    const [selectedFatPeriodForKpi, setSelectedFatPeriodForKpi] = useState(null);
 
     const fetchFatData = useCallback(() => {
         if (!project) return;
@@ -500,6 +507,11 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
     useEffect(() => {
         fetchFatData();
     }, [fetchFatData]);
+
+    const handleShowStoredKpis = (period) => {
+        setSelectedFatPeriodForKpi(period);
+        setIsKpiModalOpen(true);
+    };
 
     const handleStartPeriod = async (startDate, releaseId) => {
         try {
@@ -596,7 +608,10 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
                                     <span><strong>Started:</strong> {new Date(period.start_date).toLocaleString()}</span>
                                     <span><strong>Completed:</strong> {new Date(period.completion_date).toLocaleString()}</span>
                                 </div>
-                                <button onClick={() => handleDeleteRequest(period)} className="button-delete-fat">Delete</button>
+                                <div className="fat-completed-actions">
+                                    <button onClick={() => handleShowStoredKpis(period)} className="button-edit">Show KPIs</button>
+                                    <button onClick={() => handleDeleteRequest(period)} className="button-delete-fat">Delete</button>
+                                </div>
                             </div>
                             <div className="fat-completed-card-body">
                                 <strong>Releases Tested:</strong>
@@ -623,6 +638,15 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
                 onConfirm={handleConfirmDelete}
                 title={`Confirm ${fatPeriodToDelete?.status === 'active' ? 'Cancel' : 'Delete'} FAT Period`}
                 message={`Are you sure you want to permanently ${fatPeriodToDelete?.status === 'active' ? 'cancel this active' : 'delete this completed'} FAT period? This action cannot be undone.`}
+            />
+            
+            <KpiModal
+                isOpen={isKpiModalOpen}
+                onClose={() => setIsKpiModalOpen(false)}
+                fatPeriod={selectedFatPeriodForKpi}
+                project={project}
+                showMainMessage={showMainMessage}
+                isViewingStored={true}
             />
         </div>
     );
@@ -1964,9 +1988,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     };
 
-
-
-
     useEffect(() => {
         const fetchFatData = async () => {
             if (!selectedProject) return;
@@ -1981,9 +2002,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         fetchFatData();
     }, [selectedProject]);
 
-
-
-
     const handleOpenFinalizeModal = (release) => {
         setReleaseToFinalize(release);
         setIsFinalizeModalOpen(true);
@@ -1992,7 +2010,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const handleConfirmFinalize = async (closeAction) => {
         if (!releaseToFinalize) return;
 
-        // NEW LOGIC: Check if the specific release is part of an active FAT
         const isReleaseInActiveFat = activeFatPeriod &&
             activeFatPeriod.selected_releases &&
             activeFatPeriod.selected_releases.some(
@@ -2000,12 +2017,10 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             );
 
         if (isReleaseInActiveFat) {
-            // If it is, show the confirmation warning
             setFinalizeAction(closeAction);
             setIsFatFinalizeConfirmOpen(true);
             setIsFinalizeModalOpen(false);
         } else {
-            // Otherwise, proceed directly with finalizing the release
             await proceedWithFinalize(closeAction);
         }
     };
@@ -2019,7 +2034,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 showMainMessage('Active FAT period has been automatically completed.', 'success');
             } catch (error) {
                 showMainMessage(`Error completing FAT period: ${error.message}`, 'error');
-                // Decide if you should stop the release finalization or not. For now, we'll stop.
                 setIsFatFinalizeConfirmOpen(false);
                 return;
             }
@@ -2142,8 +2156,6 @@ const releasesPageTooltipContent = (
             }
         }
     }, [view, selectedProject, fetchActiveReleases, fetchArchivedReleases]);
-
-
 
     const handleOpenEditModal = (release) => {
         setReleaseToEdit(release);

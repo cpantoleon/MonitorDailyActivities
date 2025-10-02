@@ -1108,3 +1108,8 @@
 .kpi-copy-button:hover {
     background-color: #DEB887;
 }
+
+.fat-completed-actions {
+    display: flex;
+    gap: 10px;
+}
