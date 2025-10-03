@@ -1,13 +1,20 @@
 import React from 'react';
 import './ToggleSwitch.css';
 
-const ToggleSwitch = ({ name, checked, onChange, label }) => {
+const ToggleSwitch = ({ id, checked, onChange, option1, option2, title }) => {
   return (
-    <div className="form-group new-project-toggle">
-      <label className="checkbox-label optional-label"><strong>{label}</strong></label>
-      <label className="toggle-switch">
-        <input type="checkbox" name={name} checked={checked} onChange={onChange} />
-        <span className="slider"></span>
+    <div className="toggle-switch">
+      <input
+        id={id}
+        type="checkbox"
+        className="toggle-switch-checkbox"
+        checked={checked}
+        onChange={onChange}
+        title={title}
+      />
+      <label className="toggle-switch-label" htmlFor={id}>
+        <span className="toggle-switch-inner" data-option1={option1} data-option2={option2} />
+        <span className="toggle-switch-switch" />
       </label>
     </div>
   );

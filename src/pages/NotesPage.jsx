@@ -8,6 +8,7 @@ import DailyInfoWidget from '../components/DailyInfoWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import '../components/DailyInfoWidget.css';
 import CustomDropdown from '../components/CustomDropdown';
+import ToggleSwitch from '../components/ToggleSwitch';
 
 const KEYWORD_CONFIG = [
   { keyword: 'release date', type: 'release', label: 'Release Date' },
@@ -68,9 +69,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [datesToHighlight, setDatesToHighlight] = useState([]);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
-  // State to hold the editor instance for adding event listeners
   const [editorInstance, setEditorInstance] = useState(null);
   const [isGeneralMode, setIsGeneralMode] = useState(false);
+  const [dateSelectionMode, setDateSelectionMode] = useState('month');
 
   useEffect(() => {
     const savedProject = sessionStorage.getItem('notesPageSelectedProject');
@@ -117,7 +118,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       if (showMessage) showMessage('Please select a project.', 'error');
       return;
     }
-    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
     if (!dateKey) {
       if (showMessage) showMessage('Invalid date selected for note.', 'error');
       return;
@@ -170,7 +171,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     } finally {
       setIsLoadingNotes(false);
     }
-  }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode]);
+  }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode, dateSelectionMode]);
   
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -221,7 +222,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         setDatesToHighlight(highlights);
       }
 
-      const currentDataDateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
+      const currentDataDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
       setNoteText(notesData[currentDataDateKey] || '');
     } catch (error) {
       console.error("Error fetching notes:", error);
@@ -231,24 +232,24 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     } finally {
       setIsLoadingNotes(false);
     }
-  }, [apiBaseUrl, selectedDate, showMessage, isGeneralMode]);
+  }, [apiBaseUrl, selectedDate, showMessage, isGeneralMode, dateSelectionMode]);
 
   useEffect(() => {
     fetchNotesForProject(selectedProject);
   }, [selectedProject, fetchNotesForProject]);
 
   useEffect(() => {
-    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
     if (selectedProject) {
         setNoteText(projectNotesMap[dateKey] || '');
     } else {
         setNoteText('');
     }
-  }, [selectedDate, projectNotesMap, selectedProject, isGeneralMode]);
+  }, [selectedDate, projectNotesMap, selectedProject, isGeneralMode, dateSelectionMode]);
 
 
   const handleClearRequest = () => {
-    const dateKey = isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate);
+    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
     if (projectNotesMap[dateKey] && projectNotesMap[dateKey].trim()) {
       setIsConfirmClearOpen(true);
     }
@@ -287,7 +288,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const toggleLegend = () => setIsLegendOpen(!isLegendOpen);
 
-  const hasSavedNoteForSelectedDate = !!(projectNotesMap[isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)] && projectNotesMap[isGeneralMode ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)].trim());
+  const hasSavedNoteForSelectedDate = !!(projectNotesMap[isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate)] && projectNotesMap[isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate)].trim());
 
   const editorConfiguration = {
     extraPlugins: [MyUploadAdapterPlugin],
@@ -351,19 +352,40 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             />
           </div>
           <div>
-            <label htmlFor="note-date">{isGeneralMode ? 'Month:' : 'Date:'}</label>
+          <label htmlFor="note-date">{isGeneralMode ? (dateSelectionMode === 'month' ? 'Month:' : 'Date:') : 'Date:'}</label>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <DatePicker
                 id="note-date"
                 name="noteDate"
                 selected={selectedDate}
                 onChange={(date) => setSelectedDate(date)}
-                dateFormat={isGeneralMode ? "MM/yyyy" : "MM/dd/yyyy"}
-                showMonthYearPicker={isGeneralMode}
+                dateFormat={isGeneralMode ? (dateSelectionMode === 'month' ? "MM/yyyy" : "MM/dd/yyyy") : "MM/dd/yyyy"}
+                showMonthYearPicker={isGeneralMode && dateSelectionMode === 'month'}
                 className="notes-datepicker"
                 renderDayContents={renderDayContents}
               />
-              {!isGeneralMode && (
+              {isGeneralMode ? (
+                <div style={{ position: 'absolute', left: '100%', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+                  <ToggleSwitch
+                    id="date-selection-mode"
+                    checked={dateSelectionMode === 'month'}
+                    onChange={(e) => setDateSelectionMode(e.target.checked ? 'month' : 'date')}
+                    option1="Month"
+                    option2="Date"
+                    title="Toggle between month and date selection"
+                  />
+                  {dateSelectionMode === 'date' && (
+                    <button 
+                      onClick={() => setSelectedDate(new Date())} 
+                      disabled={isToday(selectedDate)}
+                      className="today-button"
+                      style={{ marginLeft: '10px' }}
+                    >
+                      Today
+                    </button>
+                  )}
+                </div>
+              ) : (
                 <button 
                   onClick={() => setSelectedDate(new Date())} 
                   disabled={isToday(selectedDate)}
@@ -397,12 +419,10 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           )}
         </div>
 
-        {/* {isLoadingNotes && selectedProject && <p style={{textAlign: 'center', marginBottom: '10px'}}>Loading/Saving notes for {selectedProject}...</p>} */}
-
         {selectedProject ? (
           <div className="notes-editor-area">
             <h3 id="notes-editor-label">
-              Notes for {selectedProject} on {isGeneralMode ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()}
+              Notes for {selectedProject} on {isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}
             </h3>
             <div className="editor-wrapper">
               <CKEditor
@@ -410,13 +430,26 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   data={noteText}
                   config={editorConfiguration}
                   onReady={editor => {
-                    // Save the editor instance to state
                     setEditorInstance(editor);
                     
                     const editableElement = editor.ui.getEditableElement();
                     if (editableElement && editableElement.parentElement) {
                         editableElement.parentElement.setAttribute('aria-labelledby', 'notes-editor-label');
                     }
+
+                    const fileUploadButton = editor.ui.view.toolbar.element.querySelector('.ck-file-dialog-button');
+                    if (fileUploadButton) {
+                      fileUploadButton.setAttribute('aria-label', 'Upload file');
+                    }
+                    
+                    // Fix for accessibility: Add a title to the hidden file input.
+                    // This input is created by CKEditor, and we add a delay to ensure it exists.
+                    setTimeout(() => {
+                        const fileInput = document.querySelector('input.ck-hidden[type="file"]');
+                        if (fileInput && !fileInput.hasAttribute('title')) {
+                            fileInput.setAttribute('title', 'Upload image file');
+                        }
+                    }, 500);
                   }}
                   onChange={ ( event, editor ) => {
                       const data = editor.getData();
@@ -457,7 +490,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         onClose={handleCancelClear}
         onConfirm={handleConfirmClear}
         title="Confirm Clear Note"
-        message={`Are you sure you want to permanently delete the note for ${isGeneralMode ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
+        message={`Are you sure you want to permanently delete the note for ${isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
       />
     </div>
   );

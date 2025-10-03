@@ -1,52 +1,75 @@
 .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 60px;
-  height: 34px;
+  width: 90px; /* Made smaller */
+  height: 30px; /* Made smaller */
 }
 
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.toggle-switch-checkbox {
+  display: none;
 }
 
-.slider {
-  position: absolute;
+.toggle-switch-label {
+  display: block;
+  overflow: hidden;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  border: 1px solid #ccc; /* Thinner border */
+  border-radius: 15px; /* Adjusted for new height */
+}
+
+.toggle-switch-inner {
+  display: block;
+  width: 200%;
+  margin-left: -100%;
+  transition: margin 0.3s ease-in 0s;
+}
+
+.toggle-switch-inner:before, .toggle-switch-inner:after {
+  display: block;
+  float: left;
+  width: 50%;
+  height: 28px; /* Adjusted for new height and border */
+  padding: 0;
+  line-height: 28px; /* Adjusted for new height */
+  font-size: 12px; /* Smaller font */
+  color: white;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+.toggle-switch-inner:before {
+  content: attr(data-option1);
+  padding-left: 10px;
+  background-color: #007bff;
+  color: #fff;
+}
+
+.toggle-switch-inner:after {
+  content: attr(data-option2);
+  padding-right: 10px;
   background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
-  border-radius: 34px;
+  color: #333;
+  text-align: right; 
 }
 
-.slider:before {
+.toggle-switch-switch {
+  display: block;
+  width: 22px; /* Made smaller */
+  margin: 3px; /* Reduced margin */
+  background: #fff;
   position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
-  border-radius: 50%;
+  top: 0;
+  bottom: 0;
+  right: 62px; /* Adjusted position for new size */
+  border: 1px solid #ccc; /* Thinner border */
+  border-radius: 15px; /* Adjusted for new height */
+  transition: all 0.3s ease-in 0s;
 }
 
-input:checked + .slider {
-  background-color: #ffc107;
+.toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-inner {
+  margin-left: 0;
 }
 
-input:focus + .slider {
-  box-shadow: 0 0 1px #ffc107;
-}
-
-input:checked + .slider:before {
-  -webkit-transform: translateX(26px);
-  -ms-transform: translateX(26px);
-  transform: translateX(26px);
+.toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-switch {
+  right: 3px; /* Adjusted position for new size */
 }
