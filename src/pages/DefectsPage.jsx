@@ -94,6 +94,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const [highlightedDefectId, setHighlightedDefectId] = useState(null);
   const [isMoveToClosedConfirmModalOpen, setIsMoveToClosedConfirmModalOpen] = useState(false);
   const [defectToMove, setDefectToMove] = useState(null);
+  const [isChartTruncated, setIsChartTruncated] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -215,115 +216,115 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   const updateChartData = useCallback(async () => {
     if (!selectedProject) {
-      setAreaChartData(null);
-      setReturnToDevChartData(null);
-      setDoneNotDoneChartData(null);
-      return;
+        setAreaChartData(null);
+        setReturnToDevChartData(null);
+        setDoneNotDoneChartData(null);
+        setIsChartTruncated(false);
+        return;
     }
 
     if (!showClosedView && activeDefects.length > 0) {
-      let doneCount = 0;
-      let notDoneCount = 0;
-      activeDefects.forEach(defect => {
-        if (defect.status === 'Done') {
-          doneCount++;
-        } else {
-          notDoneCount++;
-        }
-      });
-
-      if (doneCount > 0 || notDoneCount > 0) {
-        setDoneNotDoneChartData({
-          labels: ['Done', 'Not Done'],
-          datasets: [{
-            label: 'Defect Status',
-            data: [doneCount, notDoneCount],
-            backgroundColor: ['#151078', '#b84459'],
-            borderColor: ['#ffffff', '#ffffff'],
-            borderWidth: 1,
-          }],
+        let doneCount = 0, notDoneCount = 0;
+        activeDefects.forEach(defect => {
+            if (defect.status === 'Done') doneCount++;
+            else notDoneCount++;
         });
-      } else {
-        setDoneNotDoneChartData(null);
-      }
+        if (doneCount > 0 || notDoneCount > 0) {
+            setDoneNotDoneChartData({
+                labels: ['Done', 'Not Done'],
+                datasets: [{
+                    label: 'Defect Status',
+                    data: [doneCount, notDoneCount],
+                    backgroundColor: ['#151078', '#b84459'],
+                    borderColor: ['#ffffff', '#ffffff'],
+                    borderWidth: 1,
+                }],
+            });
+        } else {
+            setDoneNotDoneChartData(null);
+        }
     } else {
-      setDoneNotDoneChartData(null);
+        setDoneNotDoneChartData(null);
     }
 
     const defectsForChart = showClosedView ? closedDefects : activeDefects;
     const defectsForAreaChart = defectsForChart.filter(defect => defect.area !== 'Imported');
-
     if (defectsForAreaChart.length > 0) {
-      const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
-        acc[defect.area] = (acc[defect.area] || 0) + 1;
-        return acc;
-      }, {});
-      setAreaChartData({
-        labels: Object.keys(areaCounts),
-        datasets: [{
-          label: '# of Defects', data: Object.values(areaCounts),
-          backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)','rgba(153, 102, 255, 0.7)','rgba(255, 159, 64, 0.7)','rgba(199, 199, 199, 0.7)','rgba(83, 102, 255, 0.7)','rgba(102, 255, 83, 0.7)','rgba(143, 255, 193, 0.7)','rgba(255, 173, 191, 0.7)','rgba(221, 171, 255, 0.7)','rgba(255, 206, 86, 0.7)','rgba(43, 63, 63, 0.7)','rgba(65, 5, 23, 0.7)','rgba(224, 255, 51, 0.7)','rgba(70, 145, 114, 0.36)','rgba(35, 47, 134, 0.7)','rgba(102, 20, 98, 0.7)','rgba(90, 45, 15, 0.7)'],
-          borderColor: ['rgba(255,99,132,1)','rgba(54,162,235,1)','rgba(255,206,86,1)','rgba(75,192,192,1)','rgba(153,102,255,1)','rgba(255,159,64,1)','rgba(199,199,199,1)','rgba(83,102,255,1)','rgba(102,255,83,1)','rgba(143, 255, 193, 1)','rgba(255, 173, 191, 1)','rgba(221, 171, 255, 1)','rgba(255, 206, 86, 1)','rgba(43, 63, 63, 1)','rgba(65, 5, 23, 1)','rgba(224, 255, 51, 1)','rgba(70, 145, 114, 1)','rgba(35, 47, 134, 1)','rgba(102, 20, 98, 1)','rgba(90, 45, 15, 1)'],
-          borderWidth: 1,
-        }],
-      });
+        const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
+            acc[defect.area] = (acc[defect.area] || 0) + 1;
+            return acc;
+        }, {});
+        setAreaChartData({
+            labels: Object.keys(areaCounts),
+            datasets: [{
+                label: '# of Defects',
+                data: Object.values(areaCounts),
+                backgroundColor: ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(199, 199, 199, 0.7)', 'rgba(83, 102, 255, 0.7)', 'rgba(102, 255, 83, 0.7)', 'rgba(143, 255, 193, 0.7)', 'rgba(255, 173, 191, 0.7)', 'rgba(221, 171, 255, 0.7)', 'rgba(43, 63, 63, 0.7)', 'rgba(65, 5, 23, 0.7)', 'rgba(224, 255, 51, 0.7)'],
+                borderColor: ['rgba(255,99,132,1)', 'rgba(54,162,235,1)', 'rgba(255,206,86,1)', 'rgba(75,192,192,1)', 'rgba(153,102,255,1)', 'rgba(255,159,64,1)', 'rgba(199,199,199,1)', 'rgba(83,102,255,1)', 'rgba(102,255,83,1)', 'rgba(143, 255, 193, 1)', 'rgba(255, 173, 191, 1)', 'rgba(221, 171, 255, 1)', 'rgba(43, 63, 63, 1)', 'rgba(65, 5, 23, 1)', 'rgba(224, 255, 51, 1)'],
+                borderWidth: 1,
+            }],
+        });
     } else {
-      setAreaChartData(null);
+        setAreaChartData(null);
     }
 
     if (selectedProject) {
-      try {
-        const statusType = showClosedView ? 'closed' : 'active';
-        const response = await fetch(`${API_BASE_URL}/defects/${selectedProject}/return-counts?statusType=${statusType}`);
-        if (!response.ok) throw new Error('Failed to fetch return to developer counts');
-        const result = await response.json();
-        if (result.data && result.data.length > 0) {
-          const filteredData = result.data.filter(d => d.return_count >= 2);
-          if (filteredData.length > 0) {
-            const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
-                const words = label.split(' ');
-                const lines = [];
-                let currentLine = '';
-                for (const word of words) {
-                    if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
-                        lines.push(currentLine);
-                        currentLine = word;
-                    } else {
-                        currentLine = currentLine ? currentLine + ' ' + word : word;
-                    }
+        try {
+            const statusType = showClosedView ? 'closed' : 'active';
+            const response = await fetch(`${API_BASE_URL}/defects/${selectedProject}/return-counts?statusType=${statusType}`);
+            if (!response.ok) throw new Error('Failed to fetch return to developer counts');
+            const result = await response.json();
+            if (result.data && result.data.length > 0) {
+                let filteredData = result.data.filter(d => d.return_count >= 2);
+                if (filteredData.length > 5) {
+                    setIsChartTruncated(true);
+                    filteredData = filteredData.slice(-5);
+                } else {
+                    setIsChartTruncated(false);
                 }
-                if (currentLine) {
-                    lines.push(currentLine);
+
+                if (filteredData.length > 0) {
+                    const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
+                        const words = label.split(' ');
+                        let lines = [], currentLine = '';
+                        for (const word of words) {
+                            if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+                                lines.push(currentLine);
+                                currentLine = word;
+                            } else {
+                                currentLine = currentLine ? `${currentLine} ${word}` : word;
+                            }
+                        }
+                        if (currentLine) lines.push(currentLine);
+                        return lines;
+                    };
+                    const fullLabels = filteredData.map(d => d.title);
+                    const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
+                    setReturnToDevChartData({
+                        labels: multilineLabels,
+                        datasets: [{
+                            label: 'Times Returned to Developer',
+                            data: filteredData.map(d => d.return_count),
+                            backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1,
+                            fullLabels: fullLabels,
+                        }]
+                    });
+                } else {
+                    setReturnToDevChartData(null);
                 }
-                return lines;
-            };
-            const fullLabels = filteredData.map(d => d.title);
-            const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
-            setReturnToDevChartData({
-              labels: multilineLabels,
-              datasets: [{
-                label: 'Times Returned to Developer',
-                data: filteredData.map(d => d.return_count),
-                backgroundColor: 'rgba(255, 159, 64, 0.7)',
-                borderColor: 'rgba(255, 159, 64, 1)',
-                borderWidth: 1,
-                fullLabels: fullLabels,
-              }]
-            });
-          } else {
+            } else {
+                setReturnToDevChartData(null);
+            }
+        } catch (error) {
+            showMessage(`Could not load return counts chart: ${error.message}`, 'error');
             setReturnToDevChartData(null);
-          }
-        } else {
-          setReturnToDevChartData(null);
         }
-      } catch (error) {
-        showMessage(`Could not load return counts chart: ${error.message}`, 'error');
-        setReturnToDevChartData(null);
-      }
     } else {
-      setReturnToDevChartData(null);
+        setReturnToDevChartData(null);
     }
-  }, [selectedProject, showClosedView, activeDefects, closedDefects, showMessage]);
+}, [selectedProject, showClosedView, activeDefects, closedDefects, showMessage]);
 
   useEffect(() => {
     if (showAreaChart) {
@@ -630,7 +631,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         legend: { display: false },
         title: { 
             ...baseChartOptions.plugins.title,
-            text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}`
+            text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}${isChartTruncated ? ' (Last 5 items)' : ''}`
         },
         tooltip: {
             callbacks: {
@@ -648,9 +649,20 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
                         label += context.parsed.x; 
                     } 
                     return label; 
-                } 
-            } 
-        } 
+                },
+                afterBody: function() {
+                    if (isChartTruncated) {
+                        return [
+                            '',
+                            'Note: Displaying only the last 5 items based on return count.',
+                            'For the complete history and details, please visit the',
+                            'release page and download the detailed Excel report.'
+                        ];
+                    }
+                    return [];
+                }
+            }
+        }
     },
     scales: { 
         x: { 
