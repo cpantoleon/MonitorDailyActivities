@@ -143,24 +143,24 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           delete newMap[dateKey];
           return newMap;
         });
-        if (!isGeneralMode) {
-          setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
-        }
+        // This logic now works for General project too, so no `!isGeneralMode` check needed
+        setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
         if (showMessage) showMessage(result.action === "deleted" ? "Note deleted successfully!" : "Note cleared!", 'success');
       } else if (result.action === "saved") {
         setProjectNotesMap(prev => ({ ...prev, [dateKey]: result.data.noteText }));
-        if (!isGeneralMode) {
-          setDatesToHighlight(prev => {
-            const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
-            const newHighlight = { date: selectedDate, type: newNoteType };
-            if (existingIndex > -1) {
-              const updated = [...prev];
-              updated[existingIndex] = newHighlight;
-              return updated;
-            }
-            return [...prev, newHighlight];
-          });
-        }
+        // This logic now works for General project too, so no `!isGeneralMode` check needed
+        setDatesToHighlight(prev => {
+          const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
+          // For General project, the type will be 'default'
+          const highlightType = isGeneralMode ? DEFAULT_NOTE_TYPE : newNoteType;
+          const newHighlight = { date: selectedDate, type: highlightType };
+          if (existingIndex > -1) {
+            const updated = [...prev];
+            updated[existingIndex] = newHighlight;
+            return updated;
+          }
+          return [...prev, newHighlight];
+        });
         if (showMessage) showMessage('Note saved successfully!', 'success');
       } else {
         if (showMessage) showMessage(result.message || 'Note processed.', 'success');
@@ -208,19 +208,27 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       const notesData = result.data || {};
       setProjectNotesMap(notesData);
 
-      if (!isGeneralMode) {
-        const highlights = Object.entries(notesData)
-          .map(([dateKey, text]) => {
-            const noteType = getNoteType(text);
-            if (noteType) {
-              const [year, month, day] = dateKey.split('-').map(Number);
-              return { date: new Date(year, month - 1, day), type: noteType };
-            }
+      // CHANGE 1: Modified this block to handle both General and specific projects.
+      // It now populates `datesToHighlight` for any project.
+      const highlights = Object.entries(notesData)
+        .map(([dateKey, text]) => {
+          // Only process valid YYYY-MM-DD keys for highlighting in the calendar view
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
             return null;
-          })
-          .filter(item => item !== null);
-        setDatesToHighlight(highlights);
-      }
+          }
+
+          // For General project, any non-empty note gets a default dot.
+          // For other projects, use the keyword-based type.
+          const noteType = isGeneralMode ? (text.trim() ? DEFAULT_NOTE_TYPE : null) : getNoteType(text);
+          
+          if (noteType) {
+            const [year, month, day] = dateKey.split('-').map(Number);
+            return { date: new Date(year, month - 1, day), type: noteType };
+          }
+          return null;
+        })
+        .filter(item => item !== null);
+      setDatesToHighlight(highlights);
 
       const currentDataDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
       setNoteText(notesData[currentDataDateKey] || '');
@@ -264,8 +272,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     await handleSaveNote('');
   };
 
+  // CHANGE 2: Removed the `if (isGeneralMode)` check. This function will now
+  // render dots for the General project as well, using the data from `datesToHighlight`.
   const renderDayContents = (dayOfMonth, date) => {
-    if (isGeneralMode) return dayOfMonth;
     const noteInfo = datesToHighlight.find(
       (d) =>
         d.date.getFullYear() === date.getFullYear() &&
@@ -274,6 +283,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     );
     let dotClassName = "note-dot";
     if (noteInfo) {
+      // This logic correctly handles the 'default' type by not adding a modifier class.
       if (noteInfo.type && noteInfo.type !== DEFAULT_NOTE_TYPE) {
         dotClassName += ` note-dot-${noteInfo.type}`;
       }
@@ -442,8 +452,6 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                       fileUploadButton.setAttribute('aria-label', 'Upload file');
                     }
                     
-                    // Fix for accessibility: Add a title to the hidden file input.
-                    // This input is created by CKEditor, and we add a delay to ensure it exists.
                     setTimeout(() => {
                         const fileInput = document.querySelector('input.ck-hidden[type="file"]');
                         if (fileInput && !fileInput.hasAttribute('title')) {

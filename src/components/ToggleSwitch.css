@@ -73,3 +73,54 @@
 .toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-switch {
   right: 3px; /* Adjusted position for new size */
 }
+
+.simple-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  top: 4px;
+}
+
+.simple-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.simple-toggle-switch-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 26px;
+}
+
+.simple-toggle-switch-switch {
+  position: absolute;
+  content: '';
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 1.2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.simple-toggle-switch-checkbox:checked + .simple-toggle-switch-label {
+  background-color: #007bff; /* Blue color when checked */
+}
+
+.simple-toggle-switch-checkbox:checked + .simple-toggle-switch-label .simple-toggle-switch-switch {
+  transform: translateX(24px);
+}
+
+.simple-toggle-switch-label::before,
+.simple-toggle-switch-label::after {
+  content: none !important;
+}

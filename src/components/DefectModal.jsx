@@ -219,8 +219,23 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '800px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
             <h2 style={{ marginRight: 'auto' }}>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
-            <div style={{ marginLeft: '20px' }}>
-              <ToggleSwitch name="is_fat_defect" checked={formData.is_fat_defect} onChange={handleChange} label="FAT Defect" />
+
+            {/* This container now correctly aligns all three items vertically */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* 1. Changed <label> to <div> to stop the global CSS rule from adding an asterisk here */}
+              {/* 2. Manually added the asterisk so it's still clear the field is required */}
+              <div style={{ fontWeight: 'bold' }}>FAT Defect: </div>
+
+              {/* 3. Switched to the 'simple' variant and removed old options */}
+              <ToggleSwitch
+                id="fat-defect-toggle"
+                name="is_fat_defect"
+                checked={formData.is_fat_defect}
+                onChange={handleChange}
+                variant="simple"
+                title="Toggle FAT Defect Status"
+              />
+              {/* 4. Added the 'Yes'/'No' text right next to the toggle */}
             </div>
           </div>
           <form onSubmit={handleSubmit}>

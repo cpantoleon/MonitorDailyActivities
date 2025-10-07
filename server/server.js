@@ -1923,12 +1923,28 @@ app.get("/api/fat/details/:fat_period_id", (req, res) => {
                 const archivedReqsSql = `SELECT requirement_group_id as id, requirement_title as title, 'archived' as source FROM archived_release_items WHERE archive_id IN (${archivedReleaseIds.join(',')})`;
                 reqsPromises.push(new Promise((resolve, reject) => db.all(archivedReqsSql, [], (err, rows) => err ? reject(err) : resolve(rows))));
             }
-            
-            const defectsSql = `SELECT id, title, link FROM defects WHERE project_id = ? AND is_fat_defect = 1 AND status != 'Closed'`;
-            const defectsPromise = new Promise((resolve, reject) => db.all(defectsSql, [fatPeriod.project_id], (err, rows) => err ? reject(err) : resolve(rows)));
-
-            const [reqsResults, defects] = await Promise.all([Promise.all(reqsPromises), defectsPromise]);
+            const [reqsResults] = await Promise.all([Promise.all(reqsPromises)]);
             const requirements = reqsResults.flat();
+            const requirementGroupIds = requirements.map(r => r.id);
+
+            let defects = [];
+            if (requirementGroupIds.length > 0) {
+                const defectLinksSql = `
+                    SELECT DISTINCT defect_id FROM defect_requirement_links 
+                    WHERE requirement_group_id IN (${requirementGroupIds.join(',')})
+                `;
+                const defectLinks = await new Promise((resolve, reject) => db.all(defectLinksSql, [], (err, rows) => err ? reject(err) : resolve(rows)));
+                const defectIds = defectLinks.map(l => l.defect_id);
+
+                if (defectIds.length > 0) {
+                    const defectsSql = `
+                        SELECT id, title, link, is_fat_defect 
+                        FROM defects 
+                        WHERE id IN (${defectIds.join(',')}) AND is_fat_defect = 1 AND status != 'Closed'
+                    `;
+                    defects = await new Promise((resolve, reject) => db.all(defectsSql, [], (err, rows) => err ? reject(err) : resolve(rows)));
+                }
+            }
 
             res.json({ message: "success", data: { requirements, defects } });
         } catch (error) {
