@@ -46,7 +46,7 @@
     },
     {
       "name": "Retrospective",
-      "description": "Operations for sprint retrospective items"
+      "description": "Operations for the key findings items"
     },
     {
       "name": "Defects",

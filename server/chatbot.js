@@ -390,10 +390,10 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
         const lowerCaseMessage = message.toLowerCase().trim();
 
-        if (lowerCaseMessage === 'github commit') {
+        if (lowerCaseMessage === 'github') {
             try {
-                console.log("Received 'github commit' command. Starting process...");
-                
+                console.log("Received 'github' command. Starting process...");
+
                 // Step 1: Git Add
                 console.log("Executing 'git add .'");
                 await promisifiedExec('git add .');

@@ -170,7 +170,7 @@ Manage your project's complete release lifecycle, from active development and te
     -   Cancel an active period or delete a completed one as needed.
 
 
-#### 4. Sprint Analysis
+#### 4. Key Findings
 -   Log sprint retrospective items (What Went Well, What Went Wrong, What Can We Improve).
 -   **Drag and drop** retrospective items between columns to re-categorize them.
 -   Organize and view feedback on a per-project basis.

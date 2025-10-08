@@ -15,7 +15,7 @@ const AppNavigationBar = () => {
         Releases
       </NavLink>
       <NavLink to="/sprint-analysis" className={({ isActive }) => isActive ? "nav-tab active" : "nav-tab"}>
-        Sprint Analysis
+        Key Findings
       </NavLink>
       <NavLink to="/notes" className={({ isActive }) => isActive ? "nav-tab active" : "nav-tab"}>
         Notes
