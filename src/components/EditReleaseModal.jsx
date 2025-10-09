@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -33,7 +33,6 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
         setSelectedModalProject(currentProject);
       }
     } else {
-      // Reset state on close
       setSelectedModalProject('');
       setSelectedReleaseId('');
       setFormData(null);
@@ -62,7 +61,6 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
     setSelectedReleaseId(releaseId);
 
     if (releaseId) {
-      // FIX: Ensure we compare numbers with numbers.
       const release = releases.find(r => r.id === Number(releaseId));
       if (release) {
         const data = {
@@ -126,10 +124,10 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
   if (!isOpen) return null;
 
   return (
-    <div className="add-new-modal-overlay">
-      <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '500px' }}>
-        <h2>Edit/Delete Release</h2>
-        <div className="form-group">
+    <div id="edit-release-modal-wrapper-id" className="add-new-modal-overlay">
+      <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+        <h2 id="edit-release-modal-title-id">Edit/Delete Release</h2>
+        <div id="form-group-project-select-id" className="form-group">
           <label id="project-select-in-modal-label" htmlFor="project-select-in-modal-button">Select Project:</label>
           <CustomDropdown
             id="project-select-in-modal"
@@ -140,7 +138,7 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
             placeholder="-- Select a Project --"
           />
         </div>
-        <div className="form-group">
+        <div id="form-group-release-select-id" className="form-group">
           <label id="release-select-label" htmlFor="release-select-button">Select Release to Edit:</label>
           <CustomDropdown
             id="release-select"
@@ -154,28 +152,28 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
         </div>
         
         {formData ? (
-          <form onSubmit={handleSave}>
-            <div className="form-group">
+          <form id="edit-release-form-id" onSubmit={handleSave}>
+            <div id="form-group-release-name-id" className="form-group">
               <label htmlFor="edit-release-name">Release Name:</label>
               <input type="text" id="edit-release-name" name="name" value={formData.name} onChange={handleChange} required />
             </div>
-            <div className="form-group">
+            <div id="form-group-release-date-id" className="form-group">
               <label htmlFor="edit-release-date">Release Date:</label>
               <DatePicker id="edit-release-date" name="release_date" selected={formData.release_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" popperPlacement="top-start" />
             </div>
-            <div className="form-group new-project-toggle">
+            <div id="form-group-is-current-toggle-id" className="form-group new-project-toggle">
               <input type="checkbox" id="edit-release-is-current" name="is_current" checked={formData.is_current} onChange={handleChange} />
               <label htmlFor="edit-release-is-current" className="checkbox-label optional-label">Set as Current Release</label>
             </div>
-            <div className="modal-actions">
-              <button type="submit" className="modal-button-save">Save Changes</button>
-              <button type="button" onClick={handleDelete} className="modal-button-delete" title={`Delete release: ${formData.name}`}>Delete</button>
-              <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <div id="modal-actions-form-id" className="modal-actions">
+              <button id="modal-button-save-id" type="submit" className="modal-button-save">Save Changes</button>
+              <button id="modal-button-delete-id" type="button" onClick={handleDelete} className="modal-button-delete" title={`Delete release: ${formData.name}`}>Delete</button>
+              <button id="modal-button-cancel-form-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
           </form>
         ) : (
-          <div className="modal-actions">
-            <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+          <div id="modal-actions-no-form-id" className="modal-actions">
+            <button id="modal-button-cancel-no-form-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         )}
       </div>

@@ -29,11 +29,11 @@ const FilterSidebar = ({
   }
 
   return (
-    <div className="filter-sidebar" ref={sidebarRef}>
-      <h3>Filter by Type</h3>
-      <div className="filter-options">
+    <div id="filter-sidebar-id" className="filter-sidebar" ref={sidebarRef}>
+      <h3 id="filter-by-type-heading-id">Filter by Type</h3>
+      <div id="filter-options-type-id" className="filter-options">
         {types.map((type) => (
-          <div key={type} className="filter-option">
+          <div key={type} id={`filter-option-type-${type.replace(/\s+/g, '-')}-id`} className="filter-option">
             <input
               type="checkbox"
               id={`type-${type}`}
@@ -47,9 +47,9 @@ const FilterSidebar = ({
         ))}
       </div>
 
-      <h3>Linked Defects</h3>
-      <div className="filter-options">
-        <div className="filter-option">
+      <h3 id="linked-defects-heading-id">Linked Defects</h3>
+      <div id="filter-options-defects-id" className="filter-options">
+        <div id="filter-option-defects-yes-id" className="filter-option">
           <input
             type="checkbox"
             id="defects-yes"
@@ -59,7 +59,7 @@ const FilterSidebar = ({
           />
           <label htmlFor="defects-yes">Yes</label>
         </div>
-        <div className="filter-option">
+        <div id="filter-option-defects-no-id" className="filter-option">
           <input
             type="checkbox"
             id="defects-no"
@@ -72,11 +72,11 @@ const FilterSidebar = ({
       </div>
 
       {releases && releases.length > 0 && (
-        <>
-          <h3>Releases</h3>
-          <div className="filter-options">
+        <div id="releases-filter-section-id">
+          <h3 id="releases-heading-id">Releases</h3>
+          <div id="filter-options-releases-id" className="filter-options">
             {releases.map((release) => (
-              <div key={release.id} className="filter-option">
+              <div key={release.id} id={`filter-option-release-${release.id}-id`} className="filter-option">
                 <input
                   type="checkbox"
                   id={`release-${release.id}`}
@@ -94,12 +94,12 @@ const FilterSidebar = ({
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
 
-      <h3>Filter by Last Updated Date</h3>
-      <div className="filter-options">
-        <div className="filter-option">
+      <h3 id="filter-by-date-heading-id">Filter by Last Updated Date</h3>
+      <div id="filter-options-date-id" className="filter-options">
+        <div id="filter-option-date-from-id" className="filter-option">
           <label htmlFor="date-from">From</label>
           <input
             type="date"
@@ -108,7 +108,7 @@ const FilterSidebar = ({
             onChange={(e) => onDateFromChange(e.target.value)}
           />
         </div>
-        <div className="filter-option">
+        <div id="filter-option-date-to-id" className="filter-option">
           <label htmlFor="date-to">To</label>
           <input
             type="date"
@@ -119,10 +119,10 @@ const FilterSidebar = ({
         </div>
       </div>
 
-      <button onClick={onClearFilters} className="clear-filters-button">
+      <button id="clear-filters-button-id" onClick={onClearFilters} className="clear-filters-button">
         Clear Filters
       </button>
-      <div style={{ height: '40px' }}></div>
+      <div id="filter-sidebar-spacer-id" style={{ height: '40px' }}></div>
     </div>
   );
 };

@@ -8,15 +8,17 @@ const GifPlayerModal = ({ isOpen, onClose, gifSrc }) => {
 
   return (
     <div
+      id="gif-modal-overlay-id"
       className="gif-modal-overlay"
       onClick={onClose}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
+        id="gif-modal-content-id"
         className="gif-modal-content"
         onClick={(e) => e.stopPropagation()}
       >
-        {isOpen && <img src={`${gifSrc}?${new Date().getTime()}`} alt="How to export from JIRA" />}
+        {isOpen && <img id="gif-player-image-id" src={`${gifSrc}?${new Date().getTime()}`} alt="How to export from JIRA" />}
       </div>
     </div>
   );

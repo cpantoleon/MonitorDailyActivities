@@ -39,8 +39,8 @@ const SearchComponent = ({ query, onQueryChange, onSearch, onClear, onSuggestion
   });
 
   return (
-    <div className="search-container" ref={searchRef}>
-      <div className="search-input-group">
+    <div id="search-container-id" className="search-container" ref={searchRef}>
+      <div id="search-input-group-id" className="search-input-group">
         <input
           type="text"
           id="main-search-input"
@@ -55,23 +55,25 @@ const SearchComponent = ({ query, onQueryChange, onSearch, onClear, onSuggestion
         />
         <button 
           type="button" 
+          id="search-button-id"
           onClick={handleSearchClick} 
           className="search-button" 
           disabled={!query || query.trim() === ''}
         >
           Search
         </button>
-        <button type="button" onClick={handleClearClick} className="search-clear-button">Clear</button>
+        <button id="search-clear-button-id" type="button" onClick={handleClearClick} className="search-clear-button">Clear</button>
       </div>
       {showSuggestions && suggestions && suggestions.length > 0 && (
-        <ul className="suggestions-list">
+        <ul id="suggestions-list-id" className="suggestions-list">
           {suggestions.map((suggestion, index) => (
             <li
               key={suggestion.id || index}
+              id={`suggestion-item-${suggestion.id || index}`}
               onClick={() => handleSuggestionClick(suggestion)}
               className="suggestion-item"
             >
-              {suggestion.name} <span className="suggestion-context">({suggestion.context})</span>
+              {suggestion.name} <span id={`suggestion-context-${suggestion.id || index}`} className="suggestion-context">({suggestion.context})</span>
             </li>
           ))}
         </ul>

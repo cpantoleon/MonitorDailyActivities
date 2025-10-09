@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -84,12 +84,12 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{maxWidth: '600px'}}>
-          <h2>{item ? 'Edit Retrospective Item' : 'Add Retrospective Item'}</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
+    <div id="retrospective-item-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{maxWidth: '600px'}}>
+          <h2 id="retrospective-item-modal-title-id">{item ? 'Edit Retrospective Item' : 'Add Retrospective Item'}</h2>
+          <form id="retrospective-item-form-id" onSubmit={handleSubmit}>
+            <div id="form-group-column-type-id" className="form-group">
               <label id="retro-column-type-label" htmlFor="retro-column-type-button">Column:</label>
               <CustomDropdown
                 id="retro-column-type"
@@ -99,21 +99,21 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
                 options={columnTypes}
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="retro-description">Description:</label>
+            <div id="form-group-description-id" className="form-group">
+              <label id="retro-description-label-id" htmlFor="retro-description">Description:</label>
               <textarea id="retro-description" name="description" value={formData.description} onChange={handleChange} rows="4" placeholder="What happened? What did you observe?" required />
             </div>
-            <div className="form-group">
-              <label htmlFor="retro-details">Details:</label>
+            <div id="form-group-details-id" className="form-group">
+              <label id="retro-details-label-id" htmlFor="retro-details">Details:</label>
               <textarea id="retro-details" name="details" value={formData.details} onChange={handleChange} rows="4" placeholder="Provide more details." required />
             </div>
-            <div className="form-group">
-              <label htmlFor="retro-item-date">Date:</label>
+            <div id="form-group-date-id" className="form-group">
+              <label id="retro-item-date-label-id" htmlFor="retro-item-date">Date:</label>
               <DatePicker id="retro-item-date" name="item_date" selected={formData.item_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" placeholderText="Select a date" popperPlacement="top-start" />
             </div>
-            <div className="modal-actions">
-              <button type="submit" className="modal-button-save">{item ? 'Save Changes' : 'Add Item'}</button>
-              <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <div id="modal-actions-id" className="modal-actions">
+              <button id="modal-button-save-id" type="submit" className="modal-button-save">{item ? 'Save Changes' : 'Add Item'}</button>
+              <button id="modal-button-cancel-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
           </form>
         </div>
@@ -128,7 +128,7 @@ const RetrospectiveItemModal = ({ isOpen, onClose, onSubmit, item, columnTypes }
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

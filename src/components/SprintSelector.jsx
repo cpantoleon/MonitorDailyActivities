@@ -1,8 +1,7 @@
 import React from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 
 const SprintSelector = ({ sprints, selectedSprint, onSelectSprint, disabled }) => {
-  // Convert the simple array of strings into the format our dropdown needs
   const sprintOptions = sprints.map(s => ({ value: s, label: s }));
 
   const handleChange = (e) => {
@@ -10,7 +9,7 @@ const SprintSelector = ({ sprints, selectedSprint, onSelectSprint, disabled }) =
   };
 
   return (
-    <div className="selection-group">
+    <div id="sprint-selector-selection-group-id" className="selection-group">
       <label id="sprint-selector-label" htmlFor="sprint-selector-button" className="dropdown-label">Sprint Selection</label>
       <CustomDropdown
         id="sprint-selector"

@@ -46,6 +46,7 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
 
     const KpiDisplay = ({ title, value, unit, tooltipContent }) => {
         const [copyText, setCopyText] = useState('Copy');
+        const safeTitleId = title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
         const handleCopy = () => {
             navigator.clipboard.writeText(`${value}${unit}`);
@@ -54,23 +55,23 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
         };
 
         return (
-            <div className="kpi-item">
-                <div className="kpi-title-container">
-                    <h4 className="kpi-title">{title}</h4>
+            <div id={`kpi-item-${safeTitleId}-id`} className="kpi-item">
+                <div id={`kpi-title-container-${safeTitleId}-id`} className="kpi-title-container">
+                    <h4 id={`kpi-title-${safeTitleId}-id`} className="kpi-title">{title}</h4>
                     <Tooltip content={tooltipContent}>
-                        <span className="kpi-info-icon">ⓘ</span>
+                        <span id={`kpi-info-icon-${safeTitleId}-id`} className="kpi-info-icon">ⓘ</span>
                     </Tooltip>
                 </div>
-                <div className="kpi-value-container">
-                    <span className="kpi-value">{value} {unit}</span>
-                    <button onClick={handleCopy} className="kpi-copy-button">{copyText}</button>
+                <div id={`kpi-value-container-${safeTitleId}-id`} className="kpi-value-container">
+                    <span id={`kpi-value-${safeTitleId}-id`} className="kpi-value">{value} {unit}</span>
+                    <button id={`kpi-copy-button-${safeTitleId}-id`} onClick={handleCopy} className="kpi-copy-button">{copyText}</button>
                 </div>
             </div>
         );
     };
 
     const dreTooltip = (
-        <div>
+        <div id="dre-tooltip-content-id">
             <strong>Defect Removal Efficiency (DRE)</strong>
             <p>Measures the percentage of defects found and fixed by the test team out of all defects found for this FAT period.</p>
             <p><em>Formula: (FAT Defects in 'Done' or 'Closed' Status / Total FAT Defects) * 100</em></p>
@@ -78,7 +79,7 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
     );
 
     const mttdTooltip = (
-        <div>
+        <div id="mttd-tooltip-content-id">
             <strong>Mean Time to Detect (MTTD)</strong>
             <p>The average time it takes to detect a defect after the FAT period begins. Time is measured in business days (weekends excluded).</p>
             <p><em>Formula: Average of (Defect Created Date - FAT Start Date) for all FAT defects.</em></p>
@@ -86,7 +87,7 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
     );
 
     const mttrTooltip = (
-        <div>
+        <div id="mttr-tooltip-content-id">
             <strong>Mean Time to Repair (MTTR)</strong>
             <p>The average time it takes to fix a defect after it's created. Time is measured in business days (weekends excluded).</p>
             <p><em>Formula: Average of (Last 'Done' Date - Defect Created Date) for all FAT defects with status 'Done'.</em></p>
@@ -95,18 +96,18 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`FAT KPIs for ${project}`}>
-            <div className="fat-kpi-modal-content">
+            <div id="fat-kpi-modal-content-id" className="fat-kpi-modal-content">
                 {isLoading ? <LoadingSpinner /> : (
                     kpis ? (
-                        <div className="kpi-grid">
+                        <div id="kpi-grid-id" className="kpi-grid">
                             <KpiDisplay title="Defect Removal Efficiency (DRE)" value={kpis.dre} unit="%" tooltipContent={dreTooltip} />
                             <KpiDisplay title="Mean Time to Detect (MTTD)" value={kpis.mttd} unit=" days" tooltipContent={mttdTooltip} />
                             <KpiDisplay title="Mean Time to Repair (MTTR)" value={kpis.mttr} unit=" days" tooltipContent={mttrTooltip} />
                         </div>
-                    ) : <p>Could not load KPI data.</p>
+                    ) : <p id="kpi-load-error-message-id">Could not load KPI data.</p>
                 )}
             </div>
-            <div className="modal-actions">
+            <div id="kpi-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Close</button>
             </div>
         </Modal>
@@ -117,9 +118,9 @@ const DefectFilter = ({ selectedFilter, onChange }) => {
     const filters = ['All', 'FAT', 'Not FAT'];
 
     return (
-        <div className="sprint-filter-options-container">
+        <div id="defect-filter-options-container-id" className="sprint-filter-options-container">
             {filters.map(filter => (
-                <label key={filter} className="sprint-filter-label">
+                <label key={filter} id={`defect-filter-label-${filter.toLowerCase()}-id`} className="sprint-filter-label">
                     <input
                         type="radio"
                         name="defect-filter"
@@ -166,7 +167,7 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Start New FAT Period for ${project}`}>
-            <div className="form-group">
+            <div id="form-group-fat-start-date-id" className="form-group">
                 <label htmlFor="fat-start-date">Start Date (Time will be set to 9:00 AM local time)</label>
                 <input
                     type="date"
@@ -175,12 +176,12 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
                     onChange={(e) => setStartDate(e.target.value)}
                 />
             </div>
-            <div className="form-group">
+            <div id="form-group-fat-release-select-id" className="form-group">
                 <label>Select a Release to Include:</label>
                 {isLoading ? <LoadingSpinner /> : (
-                    <div className="fat-release-selection-list">
+                    <div id="fat-release-selection-list-id" className="fat-release-selection-list">
                         {selectableReleases.length > 0 ? selectableReleases.map(release => (
-                            <label key={`${release.type}-${release.id}`} className="fat-release-selection-item">
+                            <label key={`${release.type}-${release.id}`} id={`fat-release-selection-item-${release.id}-id`} className="fat-release-selection-item">
                                 <input
                                     type="radio"
                                     name="fat-release-selection"
@@ -190,11 +191,11 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
                                 <span className="fat-release-name">{release.name}</span>
                                 <span className={`fat-release-type-badge type-${release.type}`}>{release.type}</span>
                             </label>
-                        )) : <p>No active releases found for this project.</p>}
+                        )) : <p id="no-selectable-releases-message-id">No active releases found for this project.</p>}
                     </div>
                 )}
             </div>
-            <div className="modal-actions">
+            <div id="start-fat-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
                 <button type="button" onClick={handleStart} className="modal-button-save" disabled={isLoading || !selectedReleaseId}>Start Period</button>
             </div>
@@ -260,9 +261,9 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequiremen
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`FAT Results for ${fatPeriod?.project}`}>
-            <div className="sat-modal-grid">
+            <div id="fat-report-modal-grid-id" className="sat-modal-grid">
                 {fields.map(field => (
-                    <div className="form-group" key={field}>
+                    <div className="form-group" key={field} id={`fat-report-form-group-${field}-id`}>
                         <label htmlFor={`fat-${field}`}>{field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')}</label>
                         <input
                             type="number"
@@ -276,11 +277,11 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequiremen
                     </div>
                 ))}
             </div>
-            <div className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
+            <div id="fat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
                 Total: {total} / {totalRequirements}
-                {!isTotalValid && <div style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be {totalRequirements} to save, or 0 to clear.</div>}
+                {!isTotalValid && <div id="fat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be {totalRequirements} to save, or 0 to clear.</div>}
             </div>
-            <div className="modal-actions">
+            <div id="fat-report-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
                 <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
                 <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
@@ -374,10 +375,10 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
     };
 
     return (
-        <div className="fat-details-view">
-            <div className="fat-details-header">
-                <h2>FAT Period for {project}</h2>
-                <div className="fat-details-actions">
+        <div id="fat-details-view-id" className="fat-details-view">
+            <div id="fat-details-header-id" className="fat-details-header">
+                <h2 id={`fat-details-title-${project}-id`}>FAT Period for {project}</h2>
+                <div id="fat-details-actions-id" className="fat-details-actions">
                     <button onClick={() => onCancel(fatPeriod)} className="button-cancel-fat">Cancel FAT</button>
                     <button onClick={() => setIsKpiModalOpen(true)} className="button-edit">Calculate KPIs</button>
                     <button onClick={onComplete} className="button-complete">
@@ -385,20 +386,20 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                     </button>
                 </div>
             </div>
-            <div className="fat-details-card">
-                <div className="fat-details-meta">
+            <div id="fat-details-card-id" className="fat-details-card">
+                <div id="fat-details-meta-id" className="fat-details-meta">
                     <span><strong>Status:</strong> <span className="fat-status-active">Active</span></span>
                     <span><strong>Started:</strong> {new Date(fatPeriod.start_date).toLocaleString()}</span>
                 </div>
 
-                <div style={{ padding: '20px 0', borderBottom: '1px solid #E3C9A6', borderTop: '1px solid #E3C9A6', margin: '20px 0' }}>
+                <div id="fat-report-button-container-id" style={{ padding: '20px 0', borderBottom: '1px solid #E3C9A6', borderTop: '1px solid #E3C9A6', margin: '20px 0' }}>
                     <button onClick={() => setIsFatReportModalOpen(true)} className="button-edit" disabled={isLoading}>
                         {fatPeriod.fat_report ? 'Update FAT Results' : 'Add FAT Results'}
                     </button>
                 </div>
 
                 {isDefectFilterVisible && (
-                    <div className="fat-filter-container">
+                    <div id="fat-filter-container-id" className="fat-filter-container">
                         <DefectFilter
                             selectedFilter={selectedDefectFilter}
                             onChange={setSelectedDefectFilter}
@@ -406,8 +407,8 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                     </div>
                 )}
 
-                <div className="fat-details-body">
-                    <div className="fat-details-column">
+                <div id="fat-details-body-id" className="fat-details-body">
+                    <div id="fat-details-column-releases-id" className="fat-details-column">
                         <h4>Releases in Scope ({fatPeriod.selected_releases.length})</h4>
                         <ul className="fat-scoped-release-list">
                             {fatPeriod.selected_releases.map(r => (
@@ -419,16 +420,16 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                         </ul>
 
                         {fatPeriod.fat_report && totalReported > 0 && (
-                            <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                            <div id="fat-execution-chart-container-id" style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                                 <h4>FAT Execution Results</h4>
-                                <div style={{ width: '200px', height: '200px' }}>
+                                <div id="fat-execution-pie-container-id" style={{ width: '200px', height: '200px' }}>
                                     <Pie data={fatChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
                                 </div>
                                 <ChartLegend items={fatLegendItems} />
                             </div>
                         )}
                     </div>
-                    <div className="fat-details-column">
+                    <div id="fat-details-column-requirements-id" className="fat-details-column">
                         <h4>Requirements to Test ({totalRequirements})</h4>
                         {isLoading ? <LoadingSpinner /> : (
                             <ul className="fat-item-list">
@@ -440,7 +441,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                             </ul>
                         )}
                     </div>
-                    <div className="fat-details-column">
+                    <div id="fat-details-column-defects-id" className="fat-details-column">
                         <h4>Defects ({filteredDefects.length})</h4>
                         {isLoading ? <LoadingSpinner /> : (
                             <ul className="fat-item-list">
@@ -575,7 +576,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
     if (isLoading) return <LoadingSpinner />;
 
     return (
-        <div className="fat-page-container">
+        <div id="fat-page-container-id" className="fat-page-container">
             {activeFatPeriod ? (
                 <FatPeriodDetails
                     fatPeriod={activeFatPeriod}
@@ -589,7 +590,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
                     showMainMessage={showMainMessage}
                 />
             ) : (
-                <div className="fat-no-active-view">
+                <div id="fat-no-active-view-id" className="fat-no-active-view">
                     <h2>FAT Dashboard for {project}</h2>
                     <p>There is no active FAT period for this project.</p>
                     <button className="fat-start-button" onClick={() => setIsStartModalOpen(true)}>
@@ -599,21 +600,21 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
             )}
 
             {completedFatPeriods.length > 0 && (
-                <div className="fat-completed-list">
+                <div id="fat-completed-list-id" className="fat-completed-list">
                     <h3>Completed FAT Periods</h3>
                     {completedFatPeriods.map(period => (
-                        <div key={period.id} className="fat-completed-card">
-                            <div className="fat-completed-card-header">
-                                <div className="fat-completed-dates">
+                        <div key={period.id} id={`fat-completed-card-${period.id}`} className="fat-completed-card">
+                            <div id={`fat-completed-card-header-${period.id}`} className="fat-completed-card-header">
+                                <div id={`fat-completed-dates-${period.id}`} className="fat-completed-dates">
                                     <span><strong>Started:</strong> {new Date(period.start_date).toLocaleString()}</span>
                                     <span><strong>Completed:</strong> {new Date(period.completion_date).toLocaleString()}</span>
                                 </div>
-                                <div className="fat-completed-actions">
+                                <div id={`fat-completed-actions-${period.id}`} className="fat-completed-actions">
                                     <button onClick={() => handleShowStoredKpis(period)} className="button-edit">Show KPIs</button>
                                     <button onClick={() => handleDeleteRequest(period)} className="button-delete-fat">Delete</button>
                                 </div>
                             </div>
-                            <div className="fat-completed-card-body">
+                            <div id={`fat-completed-card-body-${period.id}`} className="fat-completed-card-body">
                                 <strong>Releases Tested:</strong>
                                 <ul>
                                     {period.selected_releases.map(r => <li key={r.name}>{r.name}</li>)}
@@ -722,10 +723,10 @@ const getFatExecutionChartConfig = (fat_report) => {
 const ChartLegend = ({ items }) => {
     if (!items || items.length === 0) return null;
     return (
-        <ul className="chart-legend">
+        <ul id="chart-legend-id" className="chart-legend">
             {items.map(item => (
-                <li key={item.text} className="legend-item">
-                    <span className="legend-color-box" style={{ backgroundColor: item.color }}></span>
+                <li key={item.text} id={`legend-item-${item.text.replace(/\s+/g, '-')}-id`} className="legend-item">
+                    <span id={`legend-color-box-${item.text.replace(/\s+/g, '-')}-id`} className="legend-color-box" style={{ backgroundColor: item.color }}></span>
                     {item.text}
                 </li>
             ))}
@@ -758,9 +759,9 @@ const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
     }
 
     return (
-        <div className="sprint-filter-options-container">
+        <div id="sprint-filter-options-container-id" className="sprint-filter-options-container">
             {availableSprints.map(sprint => (
-                <label key={sprint} className="sprint-filter-label">
+                <label key={sprint} id={`sprint-filter-label-${sprint.replace(/\s+/g, '-')}-id`} className="sprint-filter-label">
                     <input
                         type="checkbox"
                         checked={selectedSprints.includes(sprint)}
@@ -937,13 +938,13 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     ) : null;
 
     return (
-        <>
+        <div id={`active-release-card-wrapper-${release.id}`}>
             {releaseCard}
             {defectDetailsCard}
-            <div style={{ position: 'absolute', left: '-9999px', width: '300px', height: '300px' }}>
+            <div id={`hidden-defect-chart-container-${release.id}`} style={{ position: 'absolute', left: '-9999px', width: '300px', height: '300px' }}>
                 {defectChartData && <Pie ref={defectChartRef} data={defectChartData} options={{ animation: false, plugins: { legend: { display: false } } }} />}
             </div>
-        </>
+        </div>
     );
 };
 
@@ -969,15 +970,15 @@ const ReleaseCountdown = ({ activeReleases }) => {
     const daysLeft = calculateDaysLeft();
 
     if (daysLeft < 0) {
-        return <span className="countdown-timer overdue">Current release overdue by {-daysLeft} days</span>;
+        return <span id="release-countdown-timer-overdue-id" className="countdown-timer overdue">Current release overdue by {-daysLeft} days</span>;
     } else if (daysLeft === 0) {
-        return <span className="countdown-timer">Current release is due today</span>;
+        return <span id="release-countdown-timer-today-id" className="countdown-timer">Current release is due today</span>;
     } else {
-        return <span className="countdown-timer">{daysLeft} days until current release</span>;
+        return <span id="release-countdown-timer-id" className="countdown-timer">{daysLeft} days until current release</span>;
     }
 };
 
-const LoadingSpinner = () => <div className="loading-spinner"></div>;
+const LoadingSpinner = () => <div id="loading-spinner-id" className="loading-spinner"></div>;
 
 const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, onToggleFilter, isFilterVisible, selectedDefectFilter, onFilterChange }) => {
     const chartOptions = {
@@ -1011,14 +1012,14 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
     }, [defects]);
 
     return (
-        <div className="defect-details-card">
-            <div className="defect-details-card-header">
+        <div id={`defect-details-card-${release.id}`} className="defect-details-card">
+            <div id={`defect-details-card-header-${release.id}`} className="defect-details-card-header">
                 <h3>Defects for {release.name}</h3>
                 <button type="button" onClick={onClose} className="close-button">X</button>
             </div>
             
             {isFilterVisible && (
-                <div className="fat-filter-container">
+                <div id={`defect-details-filter-container-${release.id}`} className="fat-filter-container">
                     <DefectFilter
                         selectedFilter={selectedDefectFilter}
                         onChange={onFilterChange}
@@ -1026,20 +1027,20 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
                 </div>
             )}
 
-            <div className="defect-details-card-body">
-                <div className="defect-charts">
+            <div id={`defect-details-card-body-${release.id}`} className="defect-details-card-body">
+                <div id={`defect-charts-container-${release.id}`} className="defect-charts">
                     {chartData ? (
-                        <>
-                            <div className="release-pie-chart-container">
+                        <div id={`defect-chart-content-wrapper-${release.id}`}>
+                            <div id={`defect-pie-chart-container-${release.id}`} className="release-pie-chart-container">
                                 <Pie data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
                             </div>
                             <ChartLegend items={defectLegendItems} />
-                        </>
+                        </div>
                     ) : (
-                        <div className="empty-chart-placeholder">No defects to display</div>
+                        <div id={`defect-empty-chart-placeholder-${release.id}`} className="empty-chart-placeholder">No defects to display</div>
                     )}
                 </div>
-                <div className="defect-list">
+                <div id={`defect-list-container-${release.id}`} className="defect-list">
                     <h4>Defects ({defects.length})</h4>
                     <ul>
                         {defects.length > 0 ? defects.map(defect => (
@@ -1054,7 +1055,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
                 </div>
             </div>
 
-            <div className="defect-details-card-footer">
+            <div id={`defect-details-card-footer-${release.id}`} className="defect-details-card-footer">
                 <button type="button" onClick={onToggleFilter} className="button-filter">Filter Defects</button>
             </div>
         </div>
@@ -1086,10 +1087,10 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
     };
 
     return (
-        <div className="release-card">
-            <div className="release-card-header">
+        <div id={`release-card-${release.id}`} className="release-card">
+            <div id={`release-card-header-${release.id}`} className="release-card-header">
                 <h3>{release.name}{release.is_current ? <span className="current-tag">Current</span> : ''}</h3>
-                <div className="release-card-header-details">
+                <div id={`release-card-header-details-${release.id}`} className="release-card-header-details">
                     <span className="due-date">Due: {new Date(release.release_date).toLocaleDateString()}</span>
                     <button type="button" onClick={onDefectClick} className="defect-count-button">
                         Defects: {defectCount}
@@ -1097,20 +1098,20 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                 </div>
             </div>
             
-            <div className="release-card-body">
-                <div className="release-charts">
+            <div id={`release-card-body-${release.id}`} className="release-card-body">
+                <div id={`release-charts-container-${release.id}`} className="release-charts">
                     {chartData ? (
-                        <>
-                            <div className="release-pie-chart-container">
+                        <div id={`release-chart-content-wrapper-${release.id}`}>
+                            <div id={`release-pie-chart-container-${release.id}`} className="release-pie-chart-container">
                                 <Pie ref={chartRef} data={chartData} options={chartOptions} aria-label={chartAriaLabel} />
                             </div>
                             <ChartLegend items={legendItems} />
-                        </>
+                        </div>
                     ) : (
-                        <div className="empty-chart-placeholder">No requirements assigned</div>
+                        <div id={`release-empty-chart-placeholder-${release.id}`} className="empty-chart-placeholder">No requirements assigned</div>
                     )}
                 </div>
-                <div className="release-requirements">
+                <div id={`release-requirements-container-${release.id}`} className="release-requirements">
                     <h4>Requirements ({requirements.length})</h4>
                     <ul className="requirement-list">
                         {requirements.length > 0 ? requirements.map(req => (
@@ -1124,23 +1125,23 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                 </div>
             </div>
             
-            <div className="release-card-footer">
+            <div id={`release-card-footer-${release.id}`} className="release-card-footer">
                 {sprintFilter && (
-                    <div className="sprint-filter-controls">
+                    <div id={`sprint-filter-controls-${release.id}`} className="sprint-filter-controls">
                         {sprintFilter}
                     </div>
                 )}
                 
-                <div className="release-card-actions">
+                <div id={`release-card-actions-${release.id}`} className="release-card-actions">
                     {showFilterToggle && (
                         <button type="button" onClick={onToggleFilter} className="button-filter">Filter Sprints</button>
                     )}
-                    <div className="export-button-container" ref={exportContainerRef}>
+                    <div id={`export-button-container-${release.id}`} className="export-button-container" ref={exportContainerRef}>
                         <button type="button" onClick={() => setIsExportMenuOpen(prev => !prev)} className="button-export">
                             Export
                         </button>
                         {isExportMenuOpen && (
-                            <div className="export-dropdown-menu">
+                            <div id={`export-dropdown-menu-${release.id}`} className="export-dropdown-menu">
                                 <button type="button" onClick={() => { onExportExcel(); setIsExportMenuOpen(false); }}>as Excel</button>
                                 <button type="button" onClick={() => { onExportPdf(); setIsExportMenuOpen(false); }} disabled={isPdfExporting}>
                                     {isPdfExporting ? 'Exporting...' : 'as PDF'}
@@ -1158,7 +1159,7 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
 
 const ArchivedDefectList = ({ defects, onNavigate, listHeightClass }) => {
     return (
-        <div className="defect-list">
+        <div id="archived-defect-list-id" className="defect-list">
             <h4>Defects ({defects.length})</h4>
             <ul className={`requirement-list ${listHeightClass}`}>
                 {defects.length > 0 ? defects.map(defect => (
@@ -1385,31 +1386,31 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     }, [satChartData, bugLabelsChartData]);
 
     return (
-        <div className="archived-details-view">
+        <div id={`archived-details-view-${archive.id}`} className="archived-details-view">
             {isPdfExporting && (
-                <div className="pdf-export-overlay">
-                    <div className="loading-spinner"></div>
+                <div id="pdf-export-overlay-id" className="pdf-export-overlay">
+                    <div id="pdf-loading-spinner-id" className="loading-spinner"></div>
                     <p>Generating PDF, please wait...</p>
                 </div>
             )}
-            <div className="details-header">
+            <div id={`archived-details-header-${archive.id}`} className="details-header">
                 <button type="button" onClick={onBack} className="back-button">Back to Archives</button>
                 <h2>Archived Release Details</h2>
             </div>
-            <div className="release-card">
-                <div className="release-card-header">
+            <div id={`archived-release-card-${archive.id}`} className="release-card">
+                <div id={`archived-release-card-header-${archive.id}`} className="release-card-header">
                     <h3>{archive.name}</h3>
-                    <div className="release-card-header-details">
+                    <div id={`archived-release-card-header-details-${archive.id}`} className="release-card-header-details">
                         <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleString()}</span>
                     </div>
                 </div>
 
-                <div className="release-card-body archived-details-body">
+                <div id={`archived-release-card-body-${archive.id}`} className="release-card-body archived-details-body">
                     
-                    <div className="archived-details-column archived-charts-column">
-                        <div className="archived-details-chart-wrapper">
+                    <div id="archived-charts-column-id" className="archived-details-column archived-charts-column">
+                        <div id={`metrics-chart-wrapper-${archive.id}`} className="archived-details-chart-wrapper">
                             <h4>{primaryChartTitle}</h4>
-                            <div className="archived-details-chart">
+                            <div id={`metrics-chart-container-${archive.id}`} className="archived-details-chart">
                                 {primaryChartData ? (
                                     <Pie data={primaryChartData} options={chartOptions} ref={metricsChartRef} />
                                 ) : (
@@ -1420,9 +1421,9 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         </div>
 
                         {satChartData && (
-                            <div className="archived-details-chart-wrapper">
+                            <div id={`sat-chart-wrapper-${archive.id}`} className="archived-details-chart-wrapper">
                                 <h4>SAT Report</h4>
-                                <div className="archived-details-chart">
+                                <div id={`sat-chart-container-${archive.id}`} className="archived-details-chart">
                                     <Pie data={satChartData} options={chartOptions} ref={satChartRef} />
                                 </div>
                                 <ChartLegend items={satLegendItems} />
@@ -1430,9 +1431,9 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         )}
 
                         {bugLabelsChartData && (
-                            <div className="archived-details-chart-wrapper">
+                            <div id={`bug-labels-chart-wrapper-${archive.id}`} className="archived-details-chart-wrapper">
                                 <h4>SAT Bug Labels</h4>
-                                <div className="archived-details-chart">
+                                <div id={`bug-labels-chart-container-${archive.id}`} className="archived-details-chart">
                                     <Pie data={bugLabelsChartData} options={chartOptions} ref={bugLabelsChartRef} />
                                 </div>
                                 <ChartLegend items={bugLabelsLegendItems} />
@@ -1441,9 +1442,9 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     </div>
 
                     {archive.sat_report && (
-                        <div className="archived-details-column sat-bugs-column">
-                            <div className="sat-bugs-container">
-                                <div className="sat-bugs-header">
+                        <div id="sat-bugs-column-id" className="archived-details-column sat-bugs-column">
+                            <div id="sat-bugs-container-id" className="sat-bugs-container">
+                                <div id="sat-bugs-header-id" className="sat-bugs-header">
                                     <h4>SAT Bugs ({satBugs.length})</h4>
                                     <button onClick={() => handleOpenSatBugModal(null)} className="add-sat-bug-button">+</button>
                                 </div>
@@ -1460,7 +1461,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                         return (
                                             <li key={bug.id}>
                                                 <a href={bug.link} target="_blank" rel="noopener noreferrer" title={fullTitle}>{fullTitle}</a>
-                                                <div className="bug-actions">
+                                                <div id={`bug-actions-${bug.id}`} className="bug-actions">
                                                     <button onClick={() => handleOpenSatBugModal(bug)} className="bug-edit-btn">Edit</button>
                                                     <button onClick={() => handleDeleteSatBugRequest(bug)} className="bug-delete-btn">X</button>
                                                 </div>
@@ -1472,10 +1473,10 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         </div>
                     )}
 
-                    <div className="archived-details-column requirements-column">
-                        <div className="release-requirements">
+                    <div id="requirements-column-id" className="archived-details-column requirements-column">
+                        <div id="archived-requirements-container-id" className="release-requirements">
                              <h4>Requirements ({items.length})</h4>
-                            <div className="requirements-list-wrapper">
+                            <div id="archived-requirements-list-wrapper-id" className="requirements-list-wrapper">
                                 {isLoading ? <LoadingSpinner /> : (
                                     <ul className={`requirement-list frozen ${listHeightClass}`}>
                                         {items.length > 0 ? items.map(item => (
@@ -1492,13 +1493,13 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         </div>
                     </div>
 
-                    <div className="archived-details-column defects-column">
+                    <div id="defects-column-id" className="archived-details-column defects-column">
                         <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} listHeightClass={listHeightClass} />
                     </div>
 
                 </div>
-                <div className="release-card-footer">
-                    <div className="release-card-actions">
+                <div id={`archived-release-card-footer-${archive.id}`} className="release-card-footer">
+                    <div id={`archived-release-card-actions-${archive.id}`} className="release-card-actions">
                         {archive.close_action === 'archive_only' && (
                             <button type="button" onClick={() => onCompleteRelease(archive)} className="button-complete">Complete Release</button>
                         )}
@@ -1584,9 +1585,9 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`SAT Results for ${archive?.name}`}>
-            <div className="sat-modal-grid">
+            <div id="sat-report-modal-grid-id" className="sat-modal-grid">
                 {fields.map(field => (
-                    <div className="form-group" key={field}>
+                    <div className="form-group" key={field} id={`sat-report-form-group-${field}-id`}>
                         <label htmlFor={field}>{field.charAt(0).toUpperCase() + field.slice(1)} (%)</label>
                         <input
                             type="number"
@@ -1601,11 +1602,11 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
                     </div>
                 ))}
             </div>
-            <div className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
+            <div id="sat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
                 Total: {total}%
-                {!isTotalValid && <div style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
+                {!isTotalValid && <div id="sat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
             </div>
-            <div className="modal-actions">
+            <div id="sat-report-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
                 <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
                 <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
@@ -1839,24 +1840,24 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
     if (isLoading) return <LoadingSpinner />;
 
     return (
-        <div className="comparison-view">
+        <div id="comparison-view-id" className="comparison-view">
             {isPdfExporting && (
-                <div className="pdf-export-overlay">
-                    <div className="loading-spinner"></div>
+                <div id="comparison-pdf-export-overlay-id" className="pdf-export-overlay">
+                    <div id="comparison-pdf-loading-spinner-id" className="loading-spinner"></div>
                     <p>Generating PDF, please wait...</p>
                 </div>
             )}
 
-            <div className="comparison-header">
+            <div id="comparison-header-id" className="comparison-header">
                 <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
                 <h2>Compare Archived Releases</h2>
                 <button type="button" onClick={handleExportToPdf} className="button-export" disabled={isPdfExporting}>
                     {isPdfExporting ? 'Exporting...' : 'Export to PDF'}
                 </button>
             </div>
-            <div className="comparison-container">
+            <div id="comparison-container-id" className="comparison-container">
                 {Array.from({ length: Math.ceil(detailedArchives.length / 3) }).map((_, rowIndex) => (
-                    <div key={rowIndex} className="comparison-row">
+                    <div key={rowIndex} id={`comparison-row-${rowIndex}-id`} className="comparison-row">
                         {detailedArchives.slice(rowIndex * 3, rowIndex * 3 + 3).map(archive => {
                             const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
                             const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
@@ -1871,38 +1872,38 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                             }
 
                             return (
-                                <div key={archive.id} className="comparison-column">
+                                <div key={archive.id} id={`comparison-column-${archive.id}`} className="comparison-column">
                                     <h3>{archive.name}</h3>
-                                    <div className="comparison-metrics">
-                                        <div className="metric-item">
+                                    <div id={`comparison-metrics-${archive.id}`} className="comparison-metrics">
+                                        <div id={`metric-item-closed-date-${archive.id}`} className="metric-item">
                                             <span className="metric-label">Closed Date:</span>
                                             <span className="metric-value">{new Date(archive.closed_at).toLocaleDateString()}</span>
                                         </div>
-                                        <div className="metric-item">
+                                        <div id={`metric-item-total-reqs-${archive.id}`} className="metric-item">
                                             <span className="metric-label">Total Requirements:</span>
                                             <span className="metric-value">{totalRequirements}</span>
                                         </div>
                                     </div>
-                                    <div className="comparison-charts">
-                                        <div className="comparison-chart-wrapper">
+                                    <div id={`comparison-charts-${archive.id}`} className="comparison-charts">
+                                        <div id={`comparison-chart-wrapper-metrics-${archive.id}`} className="comparison-chart-wrapper">
                                             {archive.fat_execution_report ? (
-                                                <>
+                                                <div id={`fat-execution-chart-content-${archive.id}`}>
                                                     <h4>FAT Execution Results</h4>
-                                                    <div className="chart-container">
+                                                    <div id={`comparison-chart-container-metrics-${archive.id}`} className="chart-container">
                                                         <Pie
                                                             ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
                                                             data={fatExecutionChartData}
                                                             options={onScreenChartOptions}
                                                         />
                                                     </div>
-                                                    <div className="legend-wrapper">
+                                                    <div id={`legend-wrapper-metrics-${archive.id}`} className="legend-wrapper">
                                                         <ChartLegend items={fatExecutionLegendItems} />
                                                     </div>
-                                                </>
+                                                </div>
                                             ) : (
-                                                <>
+                                                <div id={`our-metrics-chart-content-${archive.id}`}>
                                                     <h4>Our Final Metrics</h4>
-                                                    <div className="chart-container">
+                                                    <div id={`comparison-chart-container-our-metrics-${archive.id}`} className="chart-container">
                                                         <Pie
                                                             ref={el => (chartRefs.current[`metrics-${archive.id}`] = el)}
                                                             data={{
@@ -1917,15 +1918,15 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                                                             options={onScreenChartOptions}
                                                         />
                                                     </div>
-                                                    <div className="legend-wrapper">
+                                                    <div id={`legend-wrapper-our-metrics-${archive.id}`} className="legend-wrapper">
                                                         <ChartLegend items={metricsLegendItems} />
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="comparison-chart-wrapper">
+                                        <div id={`comparison-chart-wrapper-sat-${archive.id}`} className="comparison-chart-wrapper">
                                             <h4>SAT Report</h4>
-                                            <div className="chart-container">
+                                            <div id={`comparison-chart-container-sat-${archive.id}`} className="chart-container">
                                                 {satChartData ? (
                                                     <Pie
                                                         ref={el => (chartRefs.current[`sat-${archive.id}`] = el)}
@@ -1936,7 +1937,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                                                     <div className="empty-chart-placeholder">No SAT Report</div>
                                                 )}
                                             </div>
-                                            <div className="legend-wrapper">
+                                            <div id={`legend-wrapper-sat-${archive.id}`} className="legend-wrapper">
                                                 <ChartLegend items={satLegendItems} />
                                             </div>
                                         </div>
@@ -2065,7 +2066,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     };
 
 const releasesPageTooltipContent = (
-    <>
+    <div id="releases-page-tooltip-content-id">
         <strong>Release Dashboard Guide</strong>
         <p>Manage your project's release lifecycle. Switch between Active, Archived, and FAT views.</p>
         
@@ -2087,7 +2088,7 @@ const releasesPageTooltipContent = (
             <li>Select requirements from any combination of active and archived releases.</li>
             <li>Automatically includes defects marked with the 'FAT Defect' flag.</li>
         </ul>
-    </>
+    </div>
 );
 
     useEffect(() => {
@@ -3030,10 +3031,10 @@ const releasesPageTooltipContent = (
 
     const renderActiveView = () => {
         if (isLoading) return <LoadingSpinner />;
-        if (activeReleases.length === 0) return <div className="empty-column-message">No active releases found for this project.</div>;
+        if (activeReleases.length === 0) return <div id="no-active-releases-message-id" className="empty-column-message">No active releases found for this project.</div>;
 
         return (
-            <div className="releases-container">
+            <div id="active-releases-container-id" className="releases-container">
                 {activeReleases.map(release => (
                     <ActiveReleaseCardWrapper
                         key={release.id}
@@ -3079,19 +3080,19 @@ const releasesPageTooltipContent = (
         }
 
         if (isLoading) return <LoadingSpinner />;
-        if (archivedReleases.length === 0) return <div className="empty-column-message">No archived releases found for this project.</div>;
+        if (archivedReleases.length === 0) return <div id="no-archived-releases-message-id" className="empty-column-message">No archived releases found for this project.</div>;
 
         return (
-            <>
-                <div className="archive-controls">
+            <div id="archived-view-wrapper-id">
+                <div id="archive-controls-id" className="archive-controls">
                     <button type="button" onClick={() => setIsComparing(true)} disabled={comparisonList.length < 2}>
                         Compare Selected ({comparisonList.length})
                     </button>
                 </div>
-                <div className="releases-container archived">
+                <div id="archived-releases-container-id" className="releases-container archived">
                     {archivedReleases.map(archive => (
-                        <div key={archive.id} className="release-card archived-card">
-                            <div className="release-card-header archived-card-header">
+                        <div key={archive.id} id={`archived-card-${archive.id}`} className="release-card archived-card">
+                            <div id={`archived-card-header-${archive.id}`} className="release-card-header archived-card-header">
                                 <input 
                                     type="checkbox" 
                                     checked={comparisonList.includes(archive.id)} 
@@ -3101,21 +3102,21 @@ const releasesPageTooltipContent = (
                                 <h3>{archive.name}</h3>
                                 <span className="due-date">Closed: {new Date(archive.closed_at).toLocaleDateString()}</span>
                             </div>
-                            <div className="archived-card-body">
+                            <div id={`archived-card-body-${archive.id}`} className="archived-card-body">
                                 <h4>Final Metrics</h4>
-                                <div className="archived-metrics">
+                                <div id={`archived-metrics-${archive.id}`} className="archived-metrics">
                                     <span className="metric-item done">Done: {archive.metrics.doneCount}</span>
                                     <span className="metric-item not-done">Not Done: {archive.metrics.notDoneCount}</span>
                                 </div>
                             </div>
-                            <div className="release-card-actions">
+                            <div id={`archived-card-actions-${archive.id}`} className="release-card-actions">
                                 <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
                                 <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">Delete</button>
                             </div>
                         </div>
                     ))}
                 </div>
-            </>
+            </div>
         );
     };
 
@@ -3134,16 +3135,16 @@ const releasesPageTooltipContent = (
                     allProcessedRequirements={allProcessedRequirements}
                 />;
             default:
-                return <div className="empty-column-message">Please select a view.</div>;
+                return <div id="select-view-message-id" className="empty-column-message">Please select a view.</div>;
         }
     };
 
     return (
-        <div className="main-content-area">
-            <div className="selection-controls">
+        <div id="releases-page-main-content-area-id" className="main-content-area">
+            <div id="releases-page-selection-controls-id" className="selection-controls">
                 <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
                 {selectedProject && (
-                    <div className="view-toggle-buttons">
+                    <div id="releases-page-view-toggle-buttons-id" className="view-toggle-buttons">
                         <Tooltip content={releasesPageTooltipContent} position="bottom" />
                         <ReleaseCountdown activeReleases={activeReleases} />
                         <button type="button" onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
@@ -3153,7 +3154,7 @@ const releasesPageTooltipContent = (
                 )}
             </div>
             {selectedProject ? renderContent() : (
-                <div className="empty-column-message">Please select a project to view releases.</div>
+                <div id="select-project-prompt-releases-id" className="empty-column-message">Please select a project to view releases.</div>
             )}
 
             <FinalizeReleaseModal 

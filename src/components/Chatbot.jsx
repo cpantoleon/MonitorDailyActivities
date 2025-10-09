@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
 const TtsEnabledIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg id="tts-enabled-icon-svg-id" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
         <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -11,7 +11,7 @@ const TtsEnabledIcon = () => (
 );
 
 const TtsDisabledIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg id="tts-disabled-icon-svg-id" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="1" y1="1" x2="23" y2="23"></line>
         <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
         <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v-2"></path>
@@ -163,70 +163,71 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
     };
 
     return (
-        <div className={`chatbot-container ${className || ''}`}>
-            <div className={`chatbot-window ${isOpen ? 'open' : ''}`}>
-                    <div className="chatbot-header">
-                        <h3>Project Assistant</h3>
-                        <div className="chatbot-header-controls">
+        <div id="chatbot-container-id" className={`chatbot-container ${className || ''}`}>
+            <div id="chatbot-window-id" className={`chatbot-window ${isOpen ? 'open' : ''}`}>
+                    <div id="chatbot-header-id" className="chatbot-header">
+                        <h3 id="project-assistant-h3-id">Project Assistant</h3>
+                        <div id="chatbot-header-controls-id" className="chatbot-header-controls">
                             <button 
+                                id="chatbot-tts-toggle-id"
                                 onClick={() => setIsTtsEnabled(!isTtsEnabled)} 
                                 className="chatbot-tts-toggle"
                                 title={isTtsEnabled ? "Disable Text-to-Speech" : "Enable Text-to-Speech"}
                             >
                                 {isTtsEnabled ? <TtsEnabledIcon /> : <TtsDisabledIcon />}
                             </button>
-                            <button onClick={handleClearChat} className="chatbot-clear-btn" title="Clear chat">
+                            <button id="chatbot-clear-btn-id" onClick={handleClearChat} className="chatbot-clear-btn" title="Clear chat">
                                Clear
                             </button>
-                            <button onClick={() => setIsOpen(false)} className="chatbot-close-btn">×</button>
+                            <button id="chatbot-close-btn-id" onClick={() => setIsOpen(false)} className="chatbot-close-btn">×</button>
                         </div>
                     </div>
-                    <div className="chatbot-messages">
+                    <div id="chatbot-messages-id" className="chatbot-messages">
                         {messages.map((msg, index) => (
-                            <div key={index} className={`message ${msg.from} ${msg.from === 'bot' && !isTtsEnabled ? 'bot-tts-disabled' : ''}`}>
-                                <p dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }} />
+                            <div id={`message-${index}-id`} key={index} className={`message ${msg.from} ${msg.from === 'bot' && !isTtsEnabled ? 'bot-tts-disabled' : ''}`}>
+                                <p id={`message-text-${index}-id`} dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }} />
                                 {isTtsEnabled && msg.from === 'bot' && msg.text !== 'Hello! How can I help you with your project today?' && (
                                     <button 
+                                        id={`speak-btn-${index}-id`}
                                         onClick={() => handleSpeak(msg.text.replace(/<[^>]+>/g, ''))} 
                                         className="speak-btn"
                                         aria-label="Speak message"
                                     >
                                         {isSpeaking && utteranceRef.current?.text === msg.text.replace(/<[^>]+>/g, '') 
-                                            ? <img src="/stop-icon.svg" alt="Stop" className="speak-icon" />
-                                            : <img src="/play-icon.svg" alt="Play" className="speak-icon" />
+                                            ? <img id={`stop-icon-${index}-id`} src="/stop-icon.svg" alt="Stop" className="speak-icon" />
+                                            : <img id={`play-icon-${index}-id`} src="/play-icon.svg" alt="Play" className="speak-icon" />
                                         }
                                     </button>
                                 )}
                             </div>
                         ))}
                         {isLoading && (
-                            <div className="message bot">
-                                <p className="typing-indicator"><span>.</span><span>.</span><span>.</span></p>
+                            <div id="loading-message-bot-id" className="message bot">
+                                <p id="typing-indicator-id" className="typing-indicator"><span id="typing-dot-1-id">.</span><span id="typing-dot-2-id">.</span><span id="typing-dot-3-id">.</span></p>
                             </div>
                         )}
                         
-                        {/* --- MOVED SUGGESTIONS HERE --- */}
                         {messages.length === 1 && !isLoading && (
-                            <div className="chatbot-suggestions">
-                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me a joke')}>
+                            <div id="chatbot-suggestions-id" className="chatbot-suggestions">
+                                <button id="suggestion-chip-joke-id" className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me a joke')}>
                                     Tell me a joke
                                 </button>
                                 {firstProjectName && (
-                                    <button className="suggestion-chip" onClick={() => handleSuggestionClick(`Tell me the defects for ${firstProjectName}`)}>
+                                    <button id="suggestion-chip-defects-id" className="suggestion-chip" onClick={() => handleSuggestionClick(`Tell me the defects for ${firstProjectName}`)}>
                                         Defects for {firstProjectName}
                                     </button>
                                 )}
-                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me the weather')}>
+                                <button id="suggestion-chip-weather-id" className="suggestion-chip" onClick={() => handleSuggestionClick('Tell me the weather')}>
                                     Tell me the weather
                                 </button>
-                                <button className="suggestion-chip" onClick={() => handleSuggestionClick('eortologio today')}>
+                                <button id="suggestion-chip-eortologio-id" className="suggestion-chip" onClick={() => handleSuggestionClick('eortologio today')}>
                                     Eortologio Today
                                 </button>
                             </div>
                         )}
-                        <div ref={messagesEndRef} />
+                        <div id="messages-end-ref-id" ref={messagesEndRef} />
                     </div>
-                    <form className="chatbot-input-form" onSubmit={handleSendMessage}>
+                    <form id="chatbot-input-form-id" className="chatbot-input-form" onSubmit={handleSendMessage}>
                         <input
                             ref={inputRef}
                             id="chatbot-input"

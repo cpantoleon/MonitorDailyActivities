@@ -2,16 +2,14 @@ import React from 'react';
 
 const SelectionControls = () => {
   return (
-    <div className="selection-controls">
-      <div className="selection-group">
-        <span className="dropdown-label">drop down selection</span>
-        <span className="main-label">Project Selection</span>
-        {/* In a real app, this would be a <select> or custom dropdown component */}
+    <div id="selection-controls-id" className="selection-controls">
+      <div id="selection-group-project-id" className="selection-group">
+        <span id="dropdown-label-project-id" className="dropdown-label">drop down selection</span>
+        <span id="main-label-project-id" className="main-label">Project Selection</span>
       </div>
-      <div className="selection-group">
-        <span className="dropdown-label">drop down selection</span>
-        <span className="main-label">Sprint</span>
-        {/* In a real app, this would be a <select> or custom dropdown component */}
+      <div id="selection-group-sprint-id" className="selection-group">
+        <span id="dropdown-label-sprint-id" className="dropdown-label">drop down selection</span>
+        <span id="main-label-sprint-id" className="main-label">Sprint</span>
       </div>
     </div>
   );

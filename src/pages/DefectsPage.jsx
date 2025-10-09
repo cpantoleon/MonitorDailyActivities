@@ -46,16 +46,16 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal }) => {
   };
 
   return (
-    <div className="options-menu-container" ref={menuRef}>
+    <div id="defect-options-menu-container-id" className="options-menu-container" ref={menuRef}>
       <button onClick={() => setIsOpen(!isOpen)} className="options-menu-button" title="More options">
         ⋮
       </button>
       {isOpen && (
-        <div className="options-menu-dropdown">
-          <button onClick={handleAddClick} className="options-menu-item">
+        <div id="defect-options-menu-dropdown-id" className="options-menu-dropdown">
+          <button id="add-defect-menu-item-id" onClick={handleAddClick} className="options-menu-item">
             + Add Defect
           </button>
-          <button onClick={handleImportClick} className="options-menu-item">
+          <button id="import-defects-menu-item-id" onClick={handleImportClick} className="options-menu-item">
             + Import Defects
           </button>
         </div>
@@ -124,7 +124,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   }, []);
 
   const defectChartTooltipContent = (
-    <>
+    <div id="defect-chart-tooltip-content-id">
       <strong>Defect Charts</strong>
       <p>These charts provide insights into the defects for the selected project.</p>
       <ul>
@@ -132,7 +132,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         <li><strong>Distribution by Area:</strong> A pie chart showing the breakdown of defects based on their functional or system area.</li>
         <li><strong>"Back to Developer" Count:</strong> A bar chart highlighting defects that have been returned to the developer multiple times (2 or more), which can indicate complex issues or misunderstandings.</li>
       </ul>
-    </>
+    </div>
   );
 
   const fetchAllDefects = useCallback(async () => {
@@ -680,13 +680,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {
       return (
-        <div className="defects-board-container">
+        <div id="defects-board-container-closed-view-id" className="defects-board-container">
           <DefectColumn title="Closed" defects={defectsToDisplay} onEditDefect={handleOpenModal} onShowHistory={handleShowHistory} onDeleteRequest={handleDeleteRequest} onNavigate={handleNavigateToRequirement} />
         </div>
       );
     }
     return (
-      <div className="defects-board-container">
+      <div id="defects-board-container-active-view-id" className="defects-board-container">
         {DEFECT_STATUS_COLUMNS.map(column => (
           <DefectColumn key={column.status} title={column.title} defects={defectsToDisplay.filter(d => d.status === column.status)} onEditDefect={handleOpenModal} onShowHistory={handleShowHistory} onDeleteRequest={handleDeleteRequest} onNavigate={handleNavigateToRequirement} onDragStart={handleDragStart} onDrop={handleDrop} onMoveToClosed={handleMoveToClosed} />
         ))}
@@ -697,10 +697,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const defectsForNormalView = showClosedView ? closedDefects : activeDefects;
 
   return (
-    <div className="main-content-area">
+    <div id="defects-page-main-content-area-id" className="main-content-area">
 
-      <div className="selection-controls">
-        <div className="selection-group-container">
+      <div id="defects-page-selection-controls-id" className="selection-controls">
+        <div id="defects-page-selection-group-container-id" className="selection-group-container">
             <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={onSelectProject} />
             <SearchComponent
               query={defectQuery}
@@ -712,8 +712,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
               placeholder="Search defects by title..."
             />
         </div>
-        <div className="page-actions-group">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div id="defects-page-actions-group-id" className="page-actions-group">
+            <div id="charts-actions-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <Tooltip content={defectChartTooltipContent} position="bottom" />
                 <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
                     {showAreaChart ? 'Hide' : 'Show'} Charts
@@ -729,27 +729,27 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         </div>
       </div>
 
-      {isLoading && <p className="loading-message-defects">Loading defects...</p>}
-      {!isLoading && !isSearching && !selectedProject && <p className="select-project-prompt-defects">Please select a project to view defects, or use the search bar for all projects.</p>}
+      {isLoading && <p id="loading-message-defects-id" className="loading-message-defects">Loading defects...</p>}
+      {!isLoading && !isSearching && !selectedProject && <p id="select-project-prompt-defects-id" className="select-project-prompt-defects">Please select a project to view defects, or use the search bar for all projects.</p>}
       
       {showAreaChart && selectedProject && (
-        <div className="charts-wrapper">
+        <div id="defects-charts-wrapper-id" className="charts-wrapper">
           {doneNotDoneChartData && !showClosedView && (
-            <div className="chart-container">
+            <div id="done-not-done-chart-container-id" className="chart-container">
               <Pie data={doneNotDoneChartData} options={doneNotDonePieChartOptions} />
             </div>
           )}
-          {areaChartData && <div className="chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
-          {returnToDevChartData && <div className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
+          {areaChartData && <div id="area-chart-container-id" className="chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
+          {returnToDevChartData && <div id="return-to-dev-chart-container-id" className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
           {!areaChartData && !returnToDevChartData && (showClosedView || !doneNotDoneChartData) && !isLoading && (
-            <div className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
+            <div id="no-chart-data-container-id" className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
               <p>No chart data available for the selected project.</p>
             </div>
           )}
         </div>
       )}
 
-      {!isLoading && (isSearching ? (searchResults.length > 0 ? renderBoard(searchResults) : <div className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(defectsForNormalView) : null))}
+      {!isLoading && (isSearching ? (searchResults.length > 0 ? renderBoard(searchResults) : <div id="no-search-results-message-id" className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(defectsForNormalView) : null))}
 
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
@@ -758,24 +758,24 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
       {isImportConfirmModalOpen && importConfirmData && (
-          <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
-              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
-                  <h3>Confirm Defect Import</h3>
-                  <p>
+          <div id="import-defect-confirm-overlay-id" className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
+              <div id="import-defect-confirm-content-id" className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+                  <h3 id="import-defect-confirm-title-id">Confirm Defect Import</h3>
+                  <p id="import-defect-confirm-message-id">
                       The file contains {importConfirmData.newCount} new defect(s) and {importConfirmData.duplicateCount} duplicate(s).
                       {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
                   </p>
-                  <p>How would you like to proceed?</p>
-                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
-                      <button onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                  <p id="import-defect-confirm-prompt-id">How would you like to proceed?</p>
+                  <div id="import-defect-confirm-actions-id" className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+                      <button id="import-defect-all-button-id" onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
                           Import All
                       </button>
                       {importConfirmData.newCount > 0 && (
-                          <button onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                          <button id="import-defect-new-only-button-id" onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
                               Import New Only
                           </button>
                       )}
-                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                      <button id="import-defect-cancel-button-id" onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
                           Cancel
                       </button>
                   </div>

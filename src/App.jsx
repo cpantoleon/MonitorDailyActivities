@@ -57,7 +57,7 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
   };
 
   return (
-    <div className="options-menu-container" ref={menuRef}>
+    <div id="options-menu-container-id" className="options-menu-container" ref={menuRef}>
       <button onClick={() => setIsOpen(!isOpen)} className="options-menu-button" title="More options">
         ⋮
       </button>
@@ -121,7 +121,7 @@ const SprintActivitiesPage = ({
   const [showCharts, setShowCharts] = useState(false);
 
   const sprintChartTooltipContent = (
-    <>
+    <div id="sprint-chart-tooltip-content-id">
       <strong>Sprint Activity Charts</strong>
       <p>These charts provide a visual summary of the current sprint and release progress.</p>
       <ul>
@@ -129,7 +129,7 @@ const SprintActivitiesPage = ({
         <li><strong>Active Release:</strong> A pie chart showing the completion status of all requirements assigned to the active release for this project.</li>
         <li><strong>Scope Changes:</strong> A bar chart that highlights requirements within the current sprint that have undergone scope changes, showing how many times each has been modified.</li>
       </ul>
-    </>
+    </div>
   );
 
   const getChartData = (reqs) => {
@@ -265,7 +265,7 @@ const SprintActivitiesPage = ({
   };
 
   return (
-    <div className="main-content-area">
+    <div id="main-content-area-id" className="main-content-area">
       <div className="selection-controls">
         <div className="selection-group-container">
           <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
@@ -1406,11 +1406,11 @@ function App() {
     navigate(targetPath);
   };
 
-  if (isLoading) { return (<div className="app-container"><AppNavigationBar /><div className="loading-message">Loading data...</div></div>); }
-  if (error && !isLoading) { return (<div className="app-container"><AppNavigationBar /><div className="error-message-global full-page-error">{error} <button onClick={fetchData}>Try Again</button></div></div>); }
+  if (isLoading) { return (<div id="app-container-loading-id" className="app-container"><AppNavigationBar /><div className="loading-message">Loading data...</div></div>); }
+  if (error && !isLoading) { return (<div id="app-container-error-id" className="app-container"><AppNavigationBar /><div className="error-message-global full-page-error">{error} <button onClick={fetchData}>Try Again</button></div></div>); }
 
   return (
-    <div className="app-container">
+    <div id="app-container-main-id" className="app-container">
       <AppNavigationBar />
       <Toast key={toastInfo.key} message={toastInfo.message} type={toastInfo.type} onDismiss={handleDismissToast} />
       <Routes>

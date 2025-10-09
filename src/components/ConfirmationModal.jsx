@@ -11,16 +11,17 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirm
 
   return (
     <div
+      id="confirmation-modal-overlay-id"
       className="confirmation-modal-overlay"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={handleOverlayClick}
     >
-      <div className="confirmation-modal-content">
-        <h3>{title || 'Confirm Action'}</h3>
-        <p>{message || 'Are you sure?'}</p>
-        <div className="modal-actions">
-          <button onClick={onConfirm} className="modal-button-confirm">{confirmText}</button>
-          <button onClick={onClose} className="modal-button-cancel">{cancelText}</button>
+      <div id="confirmation-modal-content-id" className="confirmation-modal-content">
+        <h3 id="confirmation-modal-title-id">{title || 'Confirm Action'}</h3>
+        <p id="confirmation-modal-message-id">{message || 'Are you sure?'}</p>
+        <div id="modal-actions-id" className="modal-actions">
+          <button id="modal-button-confirm-id" onClick={onConfirm} className="modal-button-confirm">{confirmText}</button>
+          <button id="modal-button-cancel-id" onClick={onClose} className="modal-button-cancel">{cancelText}</button>
         </div>
       </div>
     </div>

@@ -143,15 +143,12 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           delete newMap[dateKey];
           return newMap;
         });
-        // This logic now works for General project too, so no `!isGeneralMode` check needed
         setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
         if (showMessage) showMessage(result.action === "deleted" ? "Note deleted successfully!" : "Note cleared!", 'success');
       } else if (result.action === "saved") {
         setProjectNotesMap(prev => ({ ...prev, [dateKey]: result.data.noteText }));
-        // This logic now works for General project too, so no `!isGeneralMode` check needed
         setDatesToHighlight(prev => {
           const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
-          // For General project, the type will be 'default'
           const highlightType = isGeneralMode ? DEFAULT_NOTE_TYPE : newNoteType;
           const newHighlight = { date: selectedDate, type: highlightType };
           if (existingIndex > -1) {
@@ -208,17 +205,12 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       const notesData = result.data || {};
       setProjectNotesMap(notesData);
 
-      // CHANGE 1: Modified this block to handle both General and specific projects.
-      // It now populates `datesToHighlight` for any project.
       const highlights = Object.entries(notesData)
         .map(([dateKey, text]) => {
-          // Only process valid YYYY-MM-DD keys for highlighting in the calendar view
           if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
             return null;
           }
 
-          // For General project, any non-empty note gets a default dot.
-          // For other projects, use the keyword-based type.
           const noteType = isGeneralMode ? (text.trim() ? DEFAULT_NOTE_TYPE : null) : getNoteType(text);
           
           if (noteType) {
@@ -272,8 +264,6 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     await handleSaveNote('');
   };
 
-  // CHANGE 2: Removed the `if (isGeneralMode)` check. This function will now
-  // render dots for the General project as well, using the data from `datesToHighlight`.
   const renderDayContents = (dayOfMonth, date) => {
     const noteInfo = datesToHighlight.find(
       (d) =>
@@ -283,15 +273,14 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     );
     let dotClassName = "note-dot";
     if (noteInfo) {
-      // This logic correctly handles the 'default' type by not adding a modifier class.
       if (noteInfo.type && noteInfo.type !== DEFAULT_NOTE_TYPE) {
         dotClassName += ` note-dot-${noteInfo.type}`;
       }
     }
     return (
-      <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div id={`day-content-${formatDateKey(date)}-id`} style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {dayOfMonth}
-        {noteInfo && <span className={dotClassName}></span>}
+        {noteInfo && <span id={`note-dot-${formatDateKey(date)}-id`} className={dotClassName}></span>}
       </div>
     );
   };
@@ -313,13 +302,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const projectOptions = [{ value: 'General', label: 'General' }, ...projects.map(p => ({ value: p, label: p }))];
 
   return (
-    <div className="notes-page-container with-sidebar">
-      <div className="notes-main-column">
+    <div id="notes-page-container-id" className="notes-page-container with-sidebar">
+      <div id="notes-main-column-id" className="notes-main-column">
         <style>{`
           .ck-editor__editable_inline {
               min-height: 250px;
-              max-height: 350px; /* Added max-height */
-              overflow-y: auto;   /* Added for scroll functionality */
+              max-height: 350px;
+              overflow-y: auto;
           }
           .ck-content .image {
               max-width: 200px;
@@ -347,9 +336,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             opacity: 0.7;
           }
         `}</style>
-        <h2>Daily Notes</h2>
-        <div className="notes-controls">
-          <div>
+        <h2 id="daily-notes-title-id">Daily Notes</h2>
+        <div id="notes-controls-id" className="notes-controls">
+          <div id="notes-project-selector-container-id">
             <label id="note-project-label" htmlFor="note-project-button">Project:</label>
             <CustomDropdown
               id="note-project"
@@ -361,9 +350,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               disabled={projectOptions.length === 0}
             />
           </div>
-          <div>
+          <div id="notes-date-selector-container-id">
           <label htmlFor="note-date">{isGeneralMode ? (dateSelectionMode === 'month' ? 'Month:' : 'Date:') : 'Date:'}</label>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
+            <div id="notes-datepicker-wrapper-id" style={{ position: 'relative', display: 'inline-block' }}>
               <DatePicker
                 id="note-date"
                 name="noteDate"
@@ -375,7 +364,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 renderDayContents={renderDayContents}
               />
               {isGeneralMode ? (
-                <div style={{ position: 'absolute', left: '100%', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+                <div id="general-mode-controls-id" style={{ position: 'absolute', left: '100%', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
                   <ToggleSwitch
                     id="date-selection-mode"
                     checked={dateSelectionMode === 'month'}
@@ -386,6 +375,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   />
                   {dateSelectionMode === 'date' && (
                     <button 
+                      id="today-button-general-mode-id"
                       onClick={() => setSelectedDate(new Date())} 
                       disabled={isToday(selectedDate)}
                       className="today-button"
@@ -397,6 +387,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 </div>
               ) : (
                 <button 
+                  id="today-button-project-mode-id"
                   onClick={() => setSelectedDate(new Date())} 
                   disabled={isToday(selectedDate)}
                   className="today-button"
@@ -409,18 +400,18 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           </div>
         </div>
 
-        <div className="notes-legend">
-          <div className="legend-title clickable" onClick={toggleLegend}>
+        <div id="notes-legend-id" className="notes-legend">
+          <div id="legend-title-id" className="legend-title clickable" onClick={toggleLegend}>
             Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
           </div>
           {isLegendOpen && (
-            <div className="legend-content">
-              <div className="legend-item">
+            <div id="legend-content-id" className="legend-content">
+              <div id="legend-item-default-id" className="legend-item">
                 <span className="note-dot"></span>
                 <span>{DEFAULT_NOTE_LABEL}</span>
               </div>
               {KEYWORD_CONFIG.map(config => (
-                <div key={config.type} className="legend-item">
+                <div key={config.type} id={`legend-item-${config.type}-id`} className="legend-item">
                   <span className={`note-dot note-dot-${config.type}`}></span>
                   <span>{config.label} (note contains "{config.keyword}")</span>
                 </div>
@@ -430,11 +421,11 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         </div>
 
         {selectedProject ? (
-          <div className="notes-editor-area">
+          <div id="notes-editor-area-id" className="notes-editor-area">
             <h3 id="notes-editor-label">
               Notes for {selectedProject} on {isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}
             </h3>
-            <div className="editor-wrapper">
+            <div id="editor-wrapper-id" className="editor-wrapper">
               <CKEditor
                   editor={ ClassicEditor }
                   data={noteText}
@@ -466,8 +457,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   disabled={!selectedProject}
               />
             </div>
-            <div className="notes-actions-container">
+            <div id="notes-actions-container-id" className="notes-actions-container">
               <button
+                id="save-note-button-id"
                 onClick={() => handleSaveNote(noteText)}
                 className="save-note-button"
                 disabled={isLoadingNotes || !selectedProject}
@@ -475,6 +467,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 {isLoadingNotes ? 'Saving...' : 'Save Note'}
               </button>
               <button
+                id="clear-note-button-id"
                 onClick={handleClearRequest}
                 className="clear-note-button"
                 disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
@@ -484,11 +477,11 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             </div>
           </div>
         ) : (
-          <p className="select-project-prompt">Please select a project to view or add notes.</p>
+          <p id="select-project-prompt-id" className="select-project-prompt">Please select a project to view or add notes.</p>
         )}
       </div>
 
-      <div className="notes-sidebar-column">
+      <div id="notes-sidebar-column-id" className="notes-sidebar-column">
         <WeatherWidget showMessage={showMessage} />
         <DailyInfoWidget />
       </div>

@@ -99,34 +99,34 @@ const WeatherWidget = ({ showMessage }) => {
 
     const renderCardContent = () => {
         if (loading && !weather) {
-            return <p className="loading-text">Loading...</p>;
+            return <p id="loading-text-id" className="loading-text">Loading...</p>;
         }
         if (error) {
-            return <p className="error-text">Error: {error}</p>;
+            return <p id="error-text-id" className="error-text">Error: {error}</p>;
         }
         if (!weather) {
-            return <p className="loading-text">Enter a location.</p>;
+            return <p id="enter-location-text-id" className="loading-text">Enter a location.</p>;
         }
         return (
-            <>
-                <h4 className="location-name">{weather.name}, {weather.sys.country}</h4>
-                <p className="temperature">{weather.main.temp.toFixed(1)}°C</p>
-                <p className="feels-like">
+            <div id="weather-card-content-wrapper-id">
+                <h4 id="location-name-id" className="location-name">{weather.name}, {weather.sys.country}</h4>
+                <p id="temperature-id" className="temperature">{weather.main.temp.toFixed(1)}°C</p>
+                <p id="feels-like-id" className="feels-like">
                     Feels Like: <strong>{weather.main.feels_like.toFixed(1)}°C</strong>
                 </p>
-                <h5 className="description">{weather.weather[0].description}</h5>
-            </>
+                <h5 id="description-id" className="description">{weather.weather[0].description}</h5>
+            </div>
         );
     };
 
     return (
-        <div className="weather-widget-container">
-            <div className="weather-card-static-bg" style={{ backgroundImage: bgImage }}>
-                <div className="card-img-overlay-content">
+        <div id="weather-widget-container-id" className="weather-widget-container">
+            <div id="weather-card-static-bg-id" className="weather-card-static-bg" style={{ backgroundImage: bgImage }}>
+                <div id="card-img-overlay-content-id" className="card-img-overlay-content">
                     {renderCardContent()}
                 </div>
             </div>
-            <div className="weather-search">
+            <div id="weather-search-id" className="weather-search">
                 <input
                     id="weather-city-search"
                     name="weatherCitySearch"
@@ -136,7 +136,7 @@ const WeatherWidget = ({ showMessage }) => {
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="Enter city..."
                 />
-                <button type="button" onClick={handleSearch}>Set</button>
+                <button id="weather-set-button-id" type="button" onClick={handleSearch}>Set</button>
             </div>
         </div>
     );

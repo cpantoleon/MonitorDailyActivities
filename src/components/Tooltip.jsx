@@ -14,8 +14,8 @@ const Tooltip = ({ content, className = '', position = 'right' }) => {
     switch (position) {
       case 'bottom':
         newCoords = {
-          top: rect.bottom + 8, // Position below the icon
-          left: rect.left + rect.width / 2, // Center horizontally
+          top: rect.bottom + 8,
+          left: rect.left + rect.width / 2,
         };
         break;
       case 'right':
@@ -36,6 +36,7 @@ const Tooltip = ({ content, className = '', position = 'right' }) => {
 
   const tooltipContent = (
     <div
+      id="tooltip-text-portal-id"
       className={`tooltip-text-portal ${className} tooltip-${position}`}
       style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
     >
@@ -44,9 +45,10 @@ const Tooltip = ({ content, className = '', position = 'right' }) => {
   );
 
   return (
-    <>
+    <div id="tooltip-wrapper-id">
       <span
         ref={iconRef}
+        id="tooltip-icon-id"
         className={`tooltip-icon ${className}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -54,7 +56,7 @@ const Tooltip = ({ content, className = '', position = 'right' }) => {
         ?
       </span>
       {isHovered && ReactDOM.createPortal(tooltipContent, document.body)}
-    </>
+    </div>
   );
 };
 

@@ -1,8 +1,7 @@
 import React from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 
 const ProjectSelector = ({ projects, selectedProject, onSelectProject }) => {
-  // Convert the simple array of strings into the format our dropdown needs
   const projectOptions = projects.map(p => ({ value: p, label: p }));
 
   const handleChange = (e) => {
@@ -10,7 +9,7 @@ const ProjectSelector = ({ projects, selectedProject, onSelectProject }) => {
   };
 
   return (
-    <div className="selection-group">
+    <div id="project-selector-selection-group-id" className="selection-group">
       <label id="project-selector-label" htmlFor="project-selector-button" className="dropdown-label">Project Selection</label>
       <CustomDropdown
         id="project-selector"

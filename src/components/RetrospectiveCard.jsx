@@ -31,18 +31,19 @@ const RetrospectiveCard = ({ item, onEdit, onDelete, onDragStart }) => {
 
   return (
     <div 
+      id={`retrospective-card-${item.id}`}
       className="retrospective-card"
       draggable="true"
       onDragStart={(e) => handleDragStart(e, item)}
       onDragEnd={handleDragEnd}
       style={{ cursor: 'grab' }}
     >
-      <p className="retro-card-description">{item.description}</p>
-      <p className="retro-card-details"><strong>Details:</strong> {item.details}</p>
-      <p className="retro-card-date">Date: {formatDate_MMDDYYYY(item.item_date)}</p>
-      <div className="retro-card-actions">
-        <button onClick={() => onEdit(item)} className="retro-button retro-button-edit" title={`Edit item: ${item.description}`}>Edit</button>
-        <button onClick={() => onDelete(item.id)} className="retro-button retro-button-delete" title={`Delete item: ${item.description}`}>Delete</button>
+      <p id={`retro-card-description-${item.id}`} className="retro-card-description">{item.description}</p>
+      <p id={`retro-card-details-${item.id}`} className="retro-card-details"><strong>Details:</strong> {item.details}</p>
+      <p id={`retro-card-date-${item.id}`} className="retro-card-date">Date: {formatDate_MMDDYYYY(item.item_date)}</p>
+      <div id={`retro-card-actions-${item.id}`} className="retro-card-actions">
+        <button id={`retro-button-edit-${item.id}`} onClick={() => onEdit(item)} className="retro-button retro-button-edit" title={`Edit item: ${item.description}`}>Edit</button>
+        <button id={`retro-button-delete-${item.id}`} onClick={() => onDelete(item.id)} className="retro-button retro-button-delete" title={`Delete item: ${item.description}`}>Delete</button>
       </div>
     </div>
   );

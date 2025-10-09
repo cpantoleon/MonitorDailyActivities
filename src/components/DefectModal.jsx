@@ -214,19 +214,13 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   const statusSelectOptions = statusOptionsList.map(s => ({ value: s, label: s }));
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '800px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
+    <div id="defect-modal-wrapper-id">
+      <div id="defect-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="defect-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '800px' }}>
+          <div id="defect-modal-header-id" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
             <h2 style={{ marginRight: 'auto' }}>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
-
-            {/* This container now correctly aligns all three items vertically */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* 1. Changed <label> to <div> to stop the global CSS rule from adding an asterisk here */}
-              {/* 2. Manually added the asterisk so it's still clear the field is required */}
-              <div style={{ fontWeight: 'bold' }}>FAT Defect: </div>
-
-              {/* 3. Switched to the 'simple' variant and removed old options */}
+            <div id="fat-defect-toggle-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div id="fat-defect-label-id" style={{ fontWeight: 'bold' }}>FAT Defect: </div>
               <ToggleSwitch
                 id="fat-defect-toggle"
                 name="is_fat_defect"
@@ -235,11 +229,10 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 variant="simple"
                 title="Toggle FAT Defect Status"
               />
-              {/* 4. Added the 'Yes'/'No' text right next to the toggle */}
             </div>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
+          <form id="defect-modal-form-id" onSubmit={handleSubmit}>
+            <div id="form-group-project-id" className="form-group">
               <label id="defect-project-label" htmlFor="defect-project-button">Project:</label>
               <CustomDropdown
                 id="defect-project"
@@ -251,15 +244,15 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 disabled={!!defect}
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-title-id" className="form-group">
               <label htmlFor="defect-title">Title:</label>
               <input type="text" id="defect-title" name="title" value={formData.title} onChange={handleChange} required />
             </div>
-            <div className="form-group">
+            <div id="form-group-description-id" className="form-group">
               <label htmlFor="defect-description" className="optional-label">Description:</label>
               <textarea id="defect-description" name="description" value={formData.description} onChange={handleChange} rows="3" />
             </div>
-            <div className="form-group">
+            <div id="form-group-area-id" className="form-group">
               <label id="defect-area-label" htmlFor="defect-area-button">Area:</label>
               {isCustomArea ? (
                 <input type="text" id="defect-area-input" name="area" value={formData.area} onChange={handleChange} placeholder="Enter new area description" required />
@@ -274,11 +267,11 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 />
               )}
             </div>
-            <div className="form-group new-project-toggle">
+            <div id="form-group-custom-area-toggle-id" className="form-group new-project-toggle">
               <input type="checkbox" id="isCustomAreaCheckbox" name="isCustomArea" checked={isCustomArea} onChange={handleCustomAreaToggle} />
               <label htmlFor="isCustomAreaCheckbox" className="checkbox-label optional-label">Add New Area</label>
             </div>
-            <div className="form-group">
+            <div id="form-group-status-id" className="form-group">
               <label id="defect-status-label" htmlFor="defect-status-button">Status:</label>
               <CustomDropdown
                 id="defect-status"
@@ -288,21 +281,22 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 options={statusSelectOptions}
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-link-id" className="form-group">
               <label htmlFor="defect-link" className="optional-label">Link:</label>
               <input type="url" id="defect-link" name="link" value={formData.link} onChange={handleChange} />
             </div>
-            <div className="form-group">
+            <div id="form-group-date-logged-id" className="form-group">
               <label htmlFor="defect-created-date">Date Logged:</label>
               <DatePicker id="defect-created-date" name="created_date" selected={formData.created_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" popperPlacement="top-start" />
             </div>
-            <div className="form-group">
-              <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-                <legend className="optional-label" style={{ padding: 0, marginBottom: '5px' }}>Link to Requirements:</legend>
-                <div className="dual-listbox-container">
-                  <div className="listbox-wrapper">
-                    <label htmlFor="available-requirements-listbox" className="optional-label">Available</label>
+            <div id="form-group-linked-requirements-id" className="form-group">
+              <fieldset id="linked-requirements-fieldset-id" style={{ border: 'none', padding: 0, margin: 0 }}>
+                <legend id="linked-requirements-legend-id" className="optional-label" style={{ padding: 0, marginBottom: '5px' }}>Link to Requirements:</legend>
+                <div id="dual-listbox-container-id" className="dual-listbox-container">
+                  <div id="listbox-wrapper-available-id" className="listbox-wrapper">
+                    <label id="available-requirements-label-id" htmlFor="available-requirements-listbox" className="optional-label">Available</label>
                     <input
+                      id="available-requirements-search-id"
                       type="text"
                       placeholder="Search available..."
                       className="listbox-search-input"
@@ -313,13 +307,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                       {availableRequirements.map(req => <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>{req.requirementUserIdentifier}</option>)}
                     </select>
                   </div>
-                  <div className="listbox-actions">
-                    <button type="button" onClick={handleAdd} disabled={toAdd.length === 0}>{'>>'}</button>
-                    <button type="button" onClick={handleRemove} disabled={toRemove.length === 0}>{'<<'}</button>
+                  <div id="listbox-actions-id" className="listbox-actions">
+                    <button id="listbox-add-button-id" type="button" onClick={handleAdd} disabled={toAdd.length === 0}>{'>>'}</button>
+                    <button id="listbox-remove-button-id" type="button" onClick={handleRemove} disabled={toRemove.length === 0}>{'<<'}</button>
                   </div>
-                  <div className="listbox-wrapper">
-                    <label htmlFor="selected-requirements-listbox" className="optional-label">Selected</label>
+                  <div id="listbox-wrapper-selected-id" className="listbox-wrapper">
+                    <label id="selected-requirements-label-id" htmlFor="selected-requirements-listbox" className="optional-label">Selected</label>
                     <input
+                      id="selected-requirements-search-id"
                       type="text"
                       placeholder="Search selected..."
                       className="listbox-search-input"
@@ -333,13 +328,13 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 </div>
               </fieldset>
             </div>
-            <div className="form-group">
+            <div id="form-group-comment-id" className="form-group">
               <label htmlFor="defect-comment" className="optional-label">Comment:</label>
               <textarea id="defect-comment" name="comment" value={formData.comment} onChange={handleChange} rows="2" />
             </div>
-            <div className="modal-actions">
-              <button type="submit" className="modal-button-save">{defect ? 'Save Changes' : 'Create Defect'}</button>
-              <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <div id="modal-actions-id" className="modal-actions">
+              <button type="submit" id="modal-button-save-id" className="modal-button-save">{defect ? 'Save Changes' : 'Create Defect'}</button>
+              <button type="button" id="modal-button-cancel-id" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
           </form>
         </div>
@@ -354,7 +349,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

@@ -36,15 +36,16 @@ const RetrospectiveColumn = ({ title, columnType, items, onEditItem, onDeleteIte
 
   return (
     <div 
+      id={`retrospective-column-${columnType}-id`}
       className={`retrospective-column ${isDraggedOver ? 'drag-over' : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <h3 className="retrospective-column-title">{title}</h3>
-      <div className="retrospective-cards-container">
-        {items.length === 0 && <p className="empty-column-message">No items yet.</p>}
+      <h3 id={`retrospective-column-title-${columnType}-id`} className="retrospective-column-title">{title}</h3>
+      <div id={`retrospective-cards-container-${columnType}-id`} className="retrospective-cards-container">
+        {items.length === 0 && <p id={`empty-column-message-${columnType}-id`} className="empty-column-message">No items yet.</p>}
         {items.map(item => (
           <RetrospectiveCard
             key={item.id}

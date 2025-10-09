@@ -44,14 +44,14 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, requirement, newStatus, sh
   if (!isOpen || !requirement) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '500px' }}>
-          <h2>Update Status</h2>
-          <p>
+    <div id="update-status-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+          <h2 id="update-status-title-id">Update Status</h2>
+          <p id="update-status-description-id">
             You are moving requirement <strong>{requirement.requirementUserIdentifier}</strong> to the "<strong>{newStatus}</strong>" column.
           </p>
-          <div className="form-group">
+          <div id="form-group-comment-id" className="form-group">
             <label htmlFor="updateStatusComment" className="optional-label">Add a comment (optional):</label>
             <textarea
               id="updateStatusComment"
@@ -65,11 +65,11 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, requirement, newStatus, sh
           </div>
 
           {openDefects.length > 0 && (
-            <div className="form-group" style={{ marginTop: '15px', backgroundColor: '#FFF8DC', padding: '10px', borderRadius: '4px' }}>
-              <p style={{marginTop: 0, color: '#8B4513', fontSize: '0.9em'}}>
+            <div id="open-defects-warning-container-id" className="form-group" style={{ marginTop: '15px', backgroundColor: '#FFF8DC', padding: '10px', borderRadius: '4px' }}>
+              <p id="open-defects-warning-text-id" style={{marginTop: 0, color: '#8B4513', fontSize: '0.9em'}}>
                 <strong>Warning:</strong> This item has {openDefects.length} open defect(s).
               </p>
-              <div className="new-project-toggle">
+              <div id="acknowledge-defects-toggle-id" className="new-project-toggle">
                 <input
                   type="checkbox"
                   id="acknowledgeDefectsCheckbox"
@@ -83,14 +83,15 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, requirement, newStatus, sh
             </div>
           )}
 
-          <div className="modal-actions">
+          <div id="modal-actions-update-status-id" className="modal-actions">
             <button 
+              id="confirm-update-button-id"
               onClick={handleSave} 
               className="modal-button-save"
             >
               Confirm Update
             </button>
-            <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <button id="cancel-update-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         </div>
       </div>
@@ -104,7 +105,7 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, requirement, newStatus, sh
         title="Unsaved Changes"
         message="You have an unsaved comment. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

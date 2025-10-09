@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 import GifPlayerModal from './GifPlayerModal';
 
-const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProject }) => {
+const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClose }) => {
   const getInitialState = (project = '') => ({
     selectedFile: null,
     targetProject: project,
@@ -70,7 +70,7 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
   };
 
   const tooltipContent = (
-    <>
+    <div id="import-defects-tooltip-content-id">
       <strong>Excel File Format Guide:</strong>
       <ul>
         <li>Only rows with the type 'Defect' in the 'T' column will be imported.</li>
@@ -79,30 +79,30 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
         <li>If a defect with the same 'Key' already exists, it will be imported with a modified title (e.g., "Title (1)").</li>
         <li>Other columns are ignored.</li>
       </ul>
-    </>
+    </div>
   );
 
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content">
-          <div className="modal-header-with-tooltip">
-            <div>
-              <h2>Import Defects from Excel</h2>
-              <span className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
+    <div id="import-defects-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
+          <div id="modal-header-with-tooltip-id" className="modal-header-with-tooltip">
+            <div id="modal-header-content-id">
+              <h2 id="import-defects-title-id">Import Defects from Excel</h2>
+              <span id="how-to-export-link-id" className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
                 How to Export from JIRA?
               </span>
             </div>
             <Tooltip content={tooltipContent} />
           </div>
-          {error && <p className="error-message-modal">{error}</p>}
-          <div className="form-group">
+          {error && <p id="error-message-modal-id" className="error-message-modal">{error}</p>}
+          <div id="form-group-file-id" className="form-group">
             <label htmlFor="importDefectFile">Excel File (.xlsx, .xls):</label>
             <input type="file" id="importDefectFile" name="importDefectFile" accept=".xlsx, .xls" onChange={handleFileChange} />
           </div>
-          <div className="form-group">
+          <div id="form-group-project-id" className="form-group">
             <label id="importDefectProject-label" htmlFor="importDefectProject-button">Target Project:</label>
             <CustomDropdown
               id="importDefectProject"
@@ -113,9 +113,9 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
               placeholder="-- Select a Project --"
             />
           </div>
-          <div className="modal-actions">
-            <button onClick={handleImport} className="modal-button-save">Import</button>
-            <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+          <div id="modal-actions-id" className="modal-actions">
+            <button id="import-button-id" onClick={handleImport} className="modal-button-save">Import</button>
+            <button id="cancel-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         </div>
       </div>
@@ -134,7 +134,7 @@ const ImportDefectsModal = ({ isOpen, onClose, onImport, projects, currentProjec
         onClose={() => setIsGifModalOpen(false)}
         gifSrc="/exportJira.gif"
       />
-    </>
+    </div>
   );
 };
 

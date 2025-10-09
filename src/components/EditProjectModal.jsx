@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 
@@ -81,11 +81,11 @@ const EditProjectModal = ({ isOpen, onClose, onSave, onDelete, projects, current
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+    <div id="edit-project-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '500px' }}>
           <h2>Edit/Delete Project</h2>
-          <div className="form-group">
+          <div id="form-group-project-select-id" className="form-group">
             <label id="project-select-in-edit-modal-label" htmlFor="project-select-in-edit-modal-button">Select Project:</label>
             <CustomDropdown
               id="project-select-in-edit-modal"
@@ -98,8 +98,8 @@ const EditProjectModal = ({ isOpen, onClose, onSave, onDelete, projects, current
           </div>
           
           {formData ? (
-            <form onSubmit={handleSave}>
-              <div className="form-group">
+            <form id="edit-project-form-id" onSubmit={handleSave}>
+              <div id="form-group-project-name-id" className="form-group">
                 <label htmlFor="edit-project-name">Project Name:</label>
                 <input 
                   type="text" 
@@ -110,15 +110,15 @@ const EditProjectModal = ({ isOpen, onClose, onSave, onDelete, projects, current
                   required 
                 />
               </div>
-              <div className="modal-actions">
-                <button type="submit" className="modal-button-save" disabled={!hasUnsavedChanges}>Save Changes</button>
-                <button type="button" onClick={handleDelete} className="modal-button-delete" title={`Delete project: ${formData.originalName}`}>Delete</button>
-                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+              <div id="modal-actions-form-id" className="modal-actions">
+                <button id="modal-button-save-id" type="submit" className="modal-button-save" disabled={!hasUnsavedChanges}>Save Changes</button>
+                <button id="modal-button-delete-id" type="button" onClick={handleDelete} className="modal-button-delete" title={`Delete project: ${formData.originalName}`}>Delete</button>
+                <button id="modal-button-cancel-form-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
               </div>
             </form>
           ) : (
-            <div className="modal-actions">
-              <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <div id="modal-actions-no-form-id" className="modal-actions">
+              <button id="modal-button-cancel-no-form-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
           )}
         </div>
@@ -133,7 +133,7 @@ const EditProjectModal = ({ isOpen, onClose, onSave, onDelete, projects, current
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close the window?"
       />
-    </>
+    </div>
   );
 };
 

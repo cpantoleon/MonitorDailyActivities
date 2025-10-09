@@ -34,12 +34,12 @@ const AddProjectModal = ({ isOpen, onClose, onAddProject }) => {
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '450px' }}>
+    <div id="add-project-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '450px' }}>
           <h2>Add New Project</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
+          <form id="add-project-form-id" onSubmit={handleSubmit}>
+            <div id="form-group-project-name-id" className="form-group">
               <label htmlFor="newProjectName">Project Name:</label>
               <input
                 type="text"
@@ -52,7 +52,7 @@ const AddProjectModal = ({ isOpen, onClose, onAddProject }) => {
                 autoFocus
               />
             </div>
-            <div className="modal-actions">
+            <div id="modal-actions-id" className="modal-actions">
               <button type="submit" className="modal-button-save">Add Project</button>
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
@@ -69,7 +69,7 @@ const AddProjectModal = ({ isOpen, onClose, onAddProject }) => {
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

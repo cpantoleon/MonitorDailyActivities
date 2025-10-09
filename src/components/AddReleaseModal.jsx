@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -69,12 +69,12 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
   const projectOptions = projects.map(p => ({ value: p, label: p }));
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+    <div id="add-release-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '500px' }}>
           <h2>Add New Release</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
+          <form id="add-release-form-id" onSubmit={handleSubmit}>
+            <div id="form-group-project-id" className="form-group">
               <label id="release-project-label" htmlFor="release-project-button">Project:</label>
               <CustomDropdown
                 id="release-project"
@@ -85,11 +85,11 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
                 placeholder="-- Select Project --"
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-release-name-id" className="form-group">
               <label htmlFor="release-name">Release Name:</label>
               <input type="text" id="release-name" name="name" value={formData.name} onChange={handleChange} required />
             </div>
-            <div className="form-group">
+            <div id="form-group-release-date-id" className="form-group">
               <label htmlFor="release-date">Release Date:</label>
               <DatePicker 
                 id="release-date" 
@@ -102,11 +102,11 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
                 popperPlacement="top-start" 
               />
             </div>
-            <div className="form-group new-project-toggle">
+            <div id="form-group-is-current-toggle-id" className="form-group new-project-toggle">
               <input type="checkbox" id="release-is-current" name="is_current" checked={formData.is_current} onChange={handleChange} />
               <label htmlFor="release-is-current" className="checkbox-label optional-label">Set as Current Release for this Project</label>
             </div>
-            <div className="modal-actions">
+            <div id="modal-actions-id" className="modal-actions">
               <button type="submit" className="modal-button-save">Add Release</button>
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
@@ -123,7 +123,7 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

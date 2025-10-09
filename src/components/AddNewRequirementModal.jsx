@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -58,19 +58,19 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
   }));
 
   const releaseTooltipContent = (
-    <>
+    <div id="release-tooltip-content-id">
       <strong>Assign to a Release</strong>
       <p>Associate this requirement with a release. The release marked '(Current)' is the one actively designated for the project.</p>
-    </>
+    </div>
   );
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content">
+    <div id="add-new-requirement-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
           <h2>Add New Requirement</h2>
-          <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-            <div className="form-group">
+          <form id="add-new-requirement-form-id" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+            <div id="form-group-project-id" className="form-group">
               <label id="newReqProject-label" htmlFor="newReqProjectSelect-button">Project:</label>
               <CustomDropdown
                 id="newReqProjectSelect"
@@ -82,11 +82,11 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 placeholder={projects.length === 0 ? "-- No projects available --" : "-- Select a Project --"}
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-requirement-name-id" className="form-group">
               <label htmlFor="newReqName">Requirement Name:</label>
               <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder="e.g., User Login Feature GIV-INT-01" required />
             </div>
-            <div className="form-group">
+            <div id="form-group-type-id" className="form-group">
               <label id="newReqType-label" htmlFor="newReqType-button" className="optional-label">Type:</label>
               <CustomDropdown
                 id="newReqType"
@@ -97,7 +97,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 placeholder="-- Select Type --"
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-status-id" className="form-group">
               <label id="newReqStatus-label" htmlFor="newReqStatus-button">Status:</label>
               <CustomDropdown
                 id="newReqStatus"
@@ -107,7 +107,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 options={statusOptions}
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-sprint-id" className="form-group">
               <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
               <CustomDropdown
                 id="newReqSprint"
@@ -118,12 +118,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 disabled={formData.isBacklog}
               />
             </div>
-            <div className="form-group new-project-toggle">
+            <div id="form-group-backlog-toggle-id" className="form-group new-project-toggle">
               <input type="checkbox" id="isBacklogCheckbox" name="isBacklog" checked={formData.isBacklog} onChange={onFormChange} />
               <label htmlFor="isBacklogCheckbox" className="checkbox-label optional-label">Assign to Backlog</label>
             </div>
-            <div className="form-group">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <div id="form-group-release-id" className="form-group">
+              <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <label id="newReqRelease-label" htmlFor="newReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
                 <Tooltip content={releaseTooltipContent} className="release" />
               </div>
@@ -137,19 +137,19 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 placeholder={!formData.project ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
               />
             </div>
-            <div className="form-group">
+            <div id="form-group-tags-id" className="form-group">
               <label htmlFor="newReqTags" className="optional-label">Tags:</label>
               <input type="text" id="newReqTags" name="tags" value={formData.tags} onChange={onFormChange} placeholder="e.g., Sprint 4, PreA Tools" />
             </div>
-            <div className="form-group">
+            <div id="form-group-link-id" className="form-group">
               <label htmlFor="newReqLink" className="optional-label">Link (e.g., JIRA):</label>
               <input type="url" id="newReqLink" name="link" value={formData.link} onChange={onFormChange} placeholder="https://example.com/issue/123" />
             </div>
-            <div className="form-group">
+            <div id="form-group-comment-id" className="form-group">
               <label htmlFor="newReqComment" className="optional-label">Comment:</label>
               <textarea id="newReqComment" name="comment" value={formData.comment} onChange={onFormChange} rows="3" placeholder="Initial comment (optional)" />
             </div>
-            <div className="modal-actions">
+            <div id="modal-actions-id" className="modal-actions">
               <button type="submit" className="modal-button-save">Add Requirement</button>
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
             </div>
@@ -166,7 +166,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to close?"
       />
-    </>
+    </div>
   );
 };
 

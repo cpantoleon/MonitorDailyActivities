@@ -30,29 +30,31 @@ const KanbanColumn = ({
   };
   
   const handleDragOver = (e) => {
-    e.preventDefault(); // This is crucial to allow dropping
+    e.preventDefault();
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDraggedOver(false);
     dragCounter.current = 0;
-    // THIS LINE WAS MISSING. It calls the function passed down from KanbanBoard.
     onDrop(e, title);
   };
 
+  const safeTitleId = title.replace(/\s+/g, '-').toLowerCase();
+
   return (
     <div 
+      id={`kanban-column-${safeTitleId}-id`}
       className={`kanban-column ${isDraggedOver ? 'drag-over' : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="column-title-section">
-        <h3 className="column-title">{title}</h3>
+      <div id={`column-title-section-${safeTitleId}-id`} className="column-title-section">
+        <h3 id={`column-title-${safeTitleId}-id`} className="column-title">{title}</h3>
       </div>
-      <div className="cards-container">
+      <div id={`cards-container-${safeTitleId}-id`} className="cards-container">
         {requirements.map(req => (
           <KanbanCard
             key={req.id}

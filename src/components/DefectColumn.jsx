@@ -33,20 +33,23 @@ const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteReq
       onDrop(e, title);
     }
   };
+  
+  const safeTitleId = title.replace(/\s+/g, '-').toLowerCase();
 
   return (
     <div 
+      id={`defect-kanban-column-${safeTitleId}-id`}
       className={`defect-kanban-column ${isDraggedOver ? 'drag-over' : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="column-title-section">
-        <h3 className="column-title">{title}</h3>
+      <div id={`column-title-section-${safeTitleId}-id`} className="column-title-section">
+        <h3 id={`column-title-${safeTitleId}-id`} className="column-title">{title}</h3>
       </div>
-      <div className="defect-cards-container">
-        {defects.length === 0 && <p className="empty-column-message">No defects in this status.</p>}
+      <div id={`defect-cards-container-${safeTitleId}-id`} className="defect-cards-container">
+        {defects.length === 0 && <p id={`empty-column-message-${safeTitleId}-id`} className="empty-column-message">No defects in this status.</p>}
         {defects.map(defect => (
           <DefectCard
             key={defect.id}

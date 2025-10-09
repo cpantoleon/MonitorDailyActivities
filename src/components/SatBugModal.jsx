@@ -94,9 +94,9 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
     };
 
     return (
-        <>
+        <div id="sat-bug-modal-wrapper-id">
             <Modal isOpen={isOpen} onClose={onClose} title={bugToEdit ? 'Edit SAT Bug' : 'Add SAT Bug'}>
-                <div className="form-group">
+                <div id="form-group-title-id" className="form-group">
                     <label htmlFor="sat-bug-title">Title</label>
                     <input
                         type="text"
@@ -106,7 +106,7 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
                         placeholder="e.g., UI glitch on login page"
                     />
                 </div>
-                <div className="form-group">
+                <div id="form-group-link-id" className="form-group">
                     <label htmlFor="sat-bug-link">Link</label>
                     <input
                         type="text"
@@ -116,10 +116,11 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
                         placeholder="e.g., https://jira.example.com/browse/PROJ-123"
                     />
                 </div>
-                <div className="form-group">
-                    <label htmlFor="sat-bug-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div id="form-group-label-id" className="form-group">
+                    <label id="sat-bug-label-with-button-id" htmlFor="sat-bug-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span>Label</span>
                         <button 
+                            id="label-info-button-id"
                             type="button" 
                             onClick={(e) => { e.preventDefault(); setIsDescriptionModalOpen(true); }}
                             className="info-button"
@@ -138,9 +139,9 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
                         isComboBox={true}
                     />
                 </div>
-                <div className="form-group">
+                <div id="form-group-estimation-id" className="form-group">
                     <label htmlFor="sat-bug-estimation">Estimation</label>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div id="estimation-input-container-id" style={{ display: 'flex', alignItems: 'center' }}>
                         <input
                             type="number"
                             id="sat-bug-estimation"
@@ -156,9 +157,9 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
                         </select>
                     </div>
                 </div>
-                <div className="modal-actions">
-                    <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
-                    <button type="button" onClick={handleSave} className="modal-button-save">Save</button>
+                <div id="modal-actions-sat-bug-id" className="modal-actions">
+                    <button id="modal-button-cancel-sat-bug-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+                    <button id="modal-button-save-sat-bug-id" type="button" onClick={handleSave} className="modal-button-save">Save</button>
                 </div>
             </Modal>
             <LabelDescriptionModal 
@@ -166,7 +167,7 @@ const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMe
                 onClose={() => setIsDescriptionModalOpen(false)}
                 labels={BUG_LABELS}
             />
-        </>
+        </div>
     );
 };
 

@@ -7,13 +7,13 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>{title}</h2>
-                    <button onClick={onClose} className="modal-close-button">&times;</button>
+        <div id="modal-overlay-id" className="modal-overlay" onClick={onClose}>
+            <div id="modal-content-id" className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div id="modal-header-id" className="modal-header">
+                    <h2 id="modal-title-id">{title}</h2>
+                    <button id="modal-close-button-id" onClick={onClose} className="modal-close-button">&times;</button>
                 </div>
-                <div className="modal-body">
+                <div id="modal-body-id" className="modal-body">
                     {children}
                 </div>
             </div>

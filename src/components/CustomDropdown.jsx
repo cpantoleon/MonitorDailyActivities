@@ -92,7 +92,7 @@ const CustomDropdown = ({
   const labelId = `${id}-label`;
 
   return (
-    <div className="custom-dropdown" ref={dropdownContainerRef}>
+    <div id={`${id}-container`} className="custom-dropdown" ref={dropdownContainerRef}>
       {isComboBox ? (
         <input
           ref={inputRef}
@@ -139,6 +139,7 @@ const CustomDropdown = ({
         >
           {filteredOptions.map(option => (
             <li
+              id={`${id}-option-${String(option.value).replace(/\s+/g, '-')}`}
               key={option.value}
               className={`custom-dropdown-option ${String(option.value) === String(value) ? 'selected' : ''}`}
               onClick={() => handleSelect(option.value)}

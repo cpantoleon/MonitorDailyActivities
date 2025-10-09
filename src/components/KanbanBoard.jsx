@@ -31,7 +31,7 @@ const KanbanBoard = ({
   };
 
   return (
-    <div className="kanban-board-container">
+    <div id="kanban-board-container-id" className="kanban-board-container">
       {columnTitles.map((title) => (
         <KanbanColumn
           key={title}

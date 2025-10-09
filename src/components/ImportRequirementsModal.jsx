@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import CustomDropdown from './CustomDropdown'; // Use the new component
+import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
@@ -97,7 +97,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
   }));
 
   const tooltipContent = (
-    <>
+    <div id="import-reqs-tooltip-content-id">
       <strong>Excel File Format Guide:</strong>
       <ul>
         <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story', 'Incident'.</li>
@@ -107,31 +107,30 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
         <li>The 'Sprint' column can be used to add tags to the requirement.</li>
         <li>Other columns are ignored.</li>
       </ul>
-    </>
+    </div>
   );
 
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="add-new-modal-overlay">
-        <div ref={modalRef} className="add-new-modal-content">
-          <div className="modal-header-with-tooltip">
-            <div>
-              <h2>Import Requirements from Excel</h2>
-              <span className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
+    <div id="import-requirements-modal-wrapper-id">
+      <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
+          <div id="modal-header-with-tooltip-id" className="modal-header-with-tooltip">
+            <div id="modal-header-content-id">
+              <h2 id="import-requirements-title-id">Import Requirements from Excel</h2>
+              <span id="how-to-export-link-id" className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
                 How to Export from JIRA?
               </span>
             </div>
             <Tooltip content={tooltipContent} />
           </div>
-          {error && <p className="error-message-modal">{error}</p>}
-          <div className="form-group">
+          {error && <p id="error-message-modal-id" className="error-message-modal">{error}</p>}
+          <div id="form-group-file-id" className="form-group">
             <label htmlFor="importReqFile">Excel File (.xlsx, .xls):</label>
             <input type="file" id="importReqFile" name="importReqFile" accept=".xlsx, .xls" onChange={handleFileChange} />
           </div>
-          <div className="form-group">
-            {/* FIX: The label now has an ID that we can reference */}
+          <div id="form-group-project-id" className="form-group">
             <label id="importReqProject-label" htmlFor="importReqProject-button">Target Project:</label>
             <CustomDropdown
               id="importReqProject"
@@ -142,8 +141,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
               placeholder="-- Select a Project --"
             />
           </div>
-          <div className="form-group">
-            {/* FIX: The label now has an ID that we can reference */}
+          <div id="form-group-sprint-id" className="form-group">
             <label id="importReqSprint-label" htmlFor="importReqSprint-button">Target Sprint:</label>
             <CustomDropdown
               id="importReqSprint"
@@ -154,12 +152,11 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
               disabled={state.isBacklog}
             />
           </div>
-          <div className="form-group new-project-toggle">
+          <div id="form-group-backlog-toggle-id" className="form-group new-project-toggle">
             <input type="checkbox" id="importIsBacklog" name="isBacklog" checked={state.isBacklog} onChange={handleChange} />
             <label htmlFor="importIsBacklog" className="checkbox-label optional-label">Assign to Backlog</label>
           </div>
-          <div className="form-group">
-            {/* FIX: The label now has an ID that we can reference */}
+          <div id="form-group-release-id" className="form-group">
             <label id="importReqRelease-label" htmlFor="importReqRelease-button" className="optional-label">Assign to Release (Optional):</label>
             <CustomDropdown
               id="importReqRelease"
@@ -171,9 +168,9 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
               placeholder={!state.targetProject ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
             />
           </div>
-          <div className="modal-actions">
-            <button onClick={handleImport} className="modal-button-save">Import</button>
-            <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+          <div id="modal-actions-id" className="modal-actions">
+            <button id="import-button-id" onClick={handleImport} className="modal-button-save">Import</button>
+            <button id="cancel-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         </div>
       </div>
@@ -192,7 +189,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
         onClose={() => setIsGifModalOpen(false)}
         gifSrc="/exportJira.gif"
       />
-    </>
+    </div>
   );
 };
 
