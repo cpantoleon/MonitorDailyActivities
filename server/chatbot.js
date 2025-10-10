@@ -424,6 +424,25 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 return res.json({ reply: `The GitHub command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
             }
         }
+
+        if (lowerCaseMessage === 'github pull') {
+            try {
+                console.log("Received 'github pull' command. Starting process...");
+
+                // Step 1: Git Pull
+                console.log("Executing 'git pull'");
+                await promisifiedExec('git pull');
+
+                console.log("GitHub pull process completed successfully.");
+                return res.json({ reply: "Success! Your local repository has been updated." });
+
+            } catch (error) {
+                console.error("GitHub pull command process failed:", error);
+                // Provide the specific Git error message to the user for easier debugging
+                const errorMessage = error.stderr || error.stdout || error.message;
+                return res.json({ reply: `The GitHub pull command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
+            }
+        }
         
         let preDeterminedIntent = null;
         if (['hello', 'hi', 'hey'].includes(lowerCaseMessage)) {
