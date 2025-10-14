@@ -57,6 +57,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     label: `${i + 1}`
   }));
 
+  
   const releaseTooltipContent = (
     <div id="release-tooltip-content-id">
       <strong>Assign to a Release</strong>

@@ -24,12 +24,8 @@ const FilterSidebar = ({
 }) => {
   const sidebarRef = useClickOutside(onClose);
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div id="filter-sidebar-id" className="filter-sidebar" ref={sidebarRef}>
+    <div id="filter-sidebar-id" className={`filter-sidebar ${!isOpen ? 'closed' : ''}`} ref={sidebarRef}>
       <h3 id="filter-by-type-heading-id">Filter by Type</h3>
       <div id="filter-options-type-id" className="filter-options">
         {types.map((type) => (

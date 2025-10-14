@@ -394,32 +394,33 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             try {
                 console.log("Received 'github' command. Starting process...");
 
-                // Step 1: Git Add
-                console.log("Executing 'git add .'");
-                await promisifiedExec('git add .');
+                const projectRoot = path.resolve(__dirname, '..'); // Resolve to the project root
 
-                // Step 2: Check for changes before committing to avoid an error
-                const { stdout: statusOutput } = await promisifiedExec('git status --porcelain');
+                // Step 1: Git Add
+                console.log("Executing 'git add .' in project root");
+                await promisifiedExec('git add .', { cwd: projectRoot });
+
+                // Step 2: Check for changes before committing
+                const { stdout: statusOutput } = await promisifiedExec('git status --porcelain', { cwd: projectRoot });
                 if (!statusOutput) {
                     console.log("No changes to commit.");
                     return res.json({ reply: "No changes to commit. The working directory is clean." });
                 }
                 
                 // Step 3: Git Commit
-                console.log("Executing 'git commit'");
-                const commitMessage = "db updated"; // The commit message you requested
-                await promisifiedExec(`git commit -m "${commitMessage}"`);
+                console.log("Executing 'git commit' in project root");
+                const commitMessage = "db updated";
+                await promisifiedExec(`git commit -m "${commitMessage}"`, { cwd: projectRoot });
 
                 // Step 4: Git Push
-                console.log("Executing 'git push'");
-                await promisifiedExec('git push');
+                console.log("Executing 'git push' in project root");
+                await promisifiedExec('git push', { cwd: projectRoot });
 
                 console.log("GitHub commit process completed successfully.");
                 return res.json({ reply: "Success! Your changes have been added, committed, and pushed." });
 
             } catch (error) {
                 console.error("GitHub command process failed:", error);
-                // Provide the specific Git error message to the user for easier debugging
                 const errorMessage = error.stderr || error.stdout || error.message;
                 return res.json({ reply: `The GitHub command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
             }
@@ -429,16 +430,17 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
             try {
                 console.log("Received 'github pull' command. Starting process...");
 
+                const projectRoot = path.resolve(__dirname, '..'); // Resolve to the project root
+
                 // Step 1: Git Pull
-                console.log("Executing 'git pull'");
-                await promisifiedExec('git pull');
+                console.log("Executing 'git pull' in project root");
+                await promisifiedExec('git pull', { cwd: projectRoot });
 
                 console.log("GitHub pull process completed successfully.");
                 return res.json({ reply: "Success! Your local repository has been updated." });
 
             } catch (error) {
                 console.error("GitHub pull command process failed:", error);
-                // Provide the specific Git error message to the user for easier debugging
                 const errorMessage = error.stderr || error.stdout || error.message;
                 return res.json({ reply: `The GitHub pull command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
             }

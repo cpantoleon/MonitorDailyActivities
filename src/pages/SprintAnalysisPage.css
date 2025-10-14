@@ -1,0 +1,8 @@
+.main-content-area {
+    transition: margin-right 0.5s ease-in-out;
+    padding: 20px;
+}
+
+.main-content-area.sidebar-open {
+    margin-right: 250px; /* Same as sidebar width */
+}

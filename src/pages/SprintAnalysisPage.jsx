@@ -19,6 +19,7 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false); // State for filter sidebar
 
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
@@ -163,7 +164,7 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   };
 
   return (
-    <div id="main-content-area-id" className="main-content-area">
+    <div id="main-content-area-id" className={`main-content-area ${isFilterOpen ? 'sidebar-open' : ''}`}>
       <div id="retrospective-controls-id" className="retrospective-controls">
         <div id="selection-group-container-id" className="selection-group-container">
           <ProjectSelector
@@ -180,6 +181,13 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
             disabled={!selectedProject}
           >
             + Add Retrospective Item
+          </button>
+          <button
+            id="filter-button-id"
+            onClick={() => setIsFilterOpen(true)}
+            className="add-retro-item-button"
+          >
+            Filter
           </button>
         </div>
       </div>
@@ -217,6 +225,27 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
         onConfirm={confirmDeleteItem}
         title="Confirm Deletion"
         message="Are you sure you want to delete this retrospective item?"
+      />
+      <FilterSidebar
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        types={COLUMN_TYPES.map(c => c.label)}
+        selectedTypes={[]}
+        onTypeChange={() => {}}
+        enabledTypes={COLUMN_TYPES.map(c => c.label)}
+        linkedDefectsFilter={null}
+        onLinkedDefectsChange={() => {}}
+        isLinkedDefectsYesEnabled={true}
+        isLinkedDefectsNoEnabled={true}
+        releases={[]}
+        selectedReleases={[]}
+        onReleaseChange={() => {}}
+        enabledReleases={[]}
+        dateFrom=""
+        dateTo=""
+        onDateFromChange={() => {}}
+        onDateToChange={() => {}}
+        onClearFilters={() => {}}
       />
     </div>
   );
