@@ -191,8 +191,7 @@ const processExcelData = (fileBuffer) => {
             return;
         }
 
-        const linkRegex = /\[(.*?)\]/;
-        const title = summary.replace(linkRegex, '').trim();
+        const title = summary;
         const key = row['Key'] ? String(row['Key']).trim() : '';
         const tags = row['Sprint'] ? String(row['Sprint']).trim() : null;
         
