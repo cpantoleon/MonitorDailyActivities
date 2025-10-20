@@ -1,7 +1,8 @@
 /* src/components/AppNavigationBar.css */
 .app-navigation {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   background-color: #D2B48C; /* Tan background for the nav bar */
   padding: 10px 0;
   border-bottom: 1px solid #8B4513; /* Dark Brown border */

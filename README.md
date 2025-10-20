@@ -129,6 +129,7 @@ Once synced, you can start asking questions! For a full list of example commands
 -   **Filter Sidebar**: Refine the view with a powerful sidebar to filter requirements by type, linked defects (yes/no), associated release, and last updated date range.
 -   View the complete, chronologically-ordered history of a requirement's status changes and logged scope changes.
 -   See defects that are linked to a specific requirement for full traceability.
+-   The application now features a logo and the title "cp project" in the main navigation bar.
 
 #### 2. Defects
 -   Track defects on a separate Kanban board (Assigned to Developer, Assigned to Tester, Done).
