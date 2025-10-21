@@ -1713,6 +1713,45 @@
         }
       }
     },
+    "/retrospective/project/{project}": {
+      "delete": {
+        "summary": "Delete all retrospective items for a project",
+        "tags": [
+          "Retrospective"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All retrospective items for the project have been deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "changes": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/defects/all": {
       "get": {
         "summary": "Get all defects from all projects",

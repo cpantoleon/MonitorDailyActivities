@@ -8,7 +8,9 @@ const AppNavigationBar = () => {
     <nav className="app-navigation">
       <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '20px' }}>
         <img src={logo} alt="Logo" style={{ width: '40px', marginRight: '10px' }} />
-        <span style={{ color: '#5C4033', fontWeight: 'bold' }}>cp project</span>
+        <span style={{ color: '#5C4033', fontWeight: 'bold' }}>
+        <a href="https://www.linkedin.com/in/christos-pantoleon/" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Cpantoleon</a> - Project
+      </span>
       </div>
       <div>
         <NavLink to="/" end className={({ isActive }) => isActive ? "nav-tab active" : "nav-tab"}>

@@ -939,6 +939,31 @@ app.post("/api/notes", async (req, res) => {
     }
 });
 
+// Add this new route for deleting all items for a project
+app.delete("/api/retrospective/project/:project", async (req, res) => {
+    const projectName = req.params.project;
+    if (!projectName) {
+        return res.status(400).json({ error: "Project name is required." });
+    }
+
+    try {
+        const projectId = await getProjectId(projectName);
+        const sql = 'DELETE FROM retrospective_items WHERE project_id = ?';
+        db.run(sql, [projectId], function (err) {
+            if (err) {
+                return res.status(400).json({ "error": err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(200).json({ message: "No items found to delete for this project.", changes: 0 });
+            }
+            scheduleQdrantSync();
+            res.json({ message: `All retrospective items for project '${projectName}' have been deleted.`, changes: this.changes });
+        });
+    } catch (error) {
+        return res.status(404).json({ error: error.message });
+    }
+});
+
 app.get("/api/retrospective/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProjectSelector from '../components/ProjectSelector';
 import RetrospectiveColumn from '../components/RetrospectiveColumn';
 import RetrospectiveItemModal from '../components/RetrospectiveItemModal';
@@ -20,6 +20,8 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
 
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
+  const [isConfirmDeleteAllModalOpen, setIsConfirmDeleteAllModalOpen] = useState(false);
+
 
   useEffect(() => {
     const savedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
@@ -129,6 +131,26 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
     }
   };
 
+  const confirmDeleteAllItems = async () => {
+    if (!selectedProject) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/retrospective/project/${selectedProject}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to delete all items');
+      }
+      if (showMessage) showMessage('All retrospective items deleted successfully!', 'success');
+      fetchRetrospectiveItems(selectedProject);
+    } catch (error) {
+      console.error("Error deleting all items:", error);
+      if (showMessage) showMessage(`Error: ${error.message}`, 'error');
+    } finally {
+      setIsConfirmDeleteAllModalOpen(false);
+    }
+  };
+
   const handleDragStart = (e, item) => {
     e.dataTransfer.setData("retroItemId", item.id);
   };
@@ -179,6 +201,14 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
           >
             + Add Retrospective Item
           </button>
+          <button
+            id="delete-all-retro-items-button-id"
+            onClick={() => setIsConfirmDeleteAllModalOpen(true)}
+            className="delete-all-retro-items-button"
+            disabled={!selectedProject || retrospectiveItems.length === 0}
+          >
+            Delete All
+          </button>
         </div>
       </div>
 
@@ -215,6 +245,13 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
         onConfirm={confirmDeleteItem}
         title="Confirm Deletion"
         message="Are you sure you want to delete this retrospective item?"
+      />
+      <ConfirmationModal
+        isOpen={isConfirmDeleteAllModalOpen}
+        onClose={() => setIsConfirmDeleteAllModalOpen(false)}
+        onConfirm={confirmDeleteAllItems}
+        title="Confirm Delete All"
+        message={`Are you sure you want to delete all items for project '${selectedProject}'? This action cannot be undone.`}
       />
 
     </div>
