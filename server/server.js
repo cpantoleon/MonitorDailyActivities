@@ -109,32 +109,26 @@ const getProjectId = (projectName) => {
     });
 };
 
-// Helper function to calculate duration based on special business rules.
 const calculateBusinessHours = (start, end) => {
     let startDate = new Date(start);
     let endDate = new Date(end);
 
     if (endDate <= startDate) return 0;
 
-    const endDayOfWeek = endDate.getUTCDay(); // Sunday = 0, Saturday = 6
+    const endDayOfWeek = endDate.getUTCDay(); 
     const isEndOnWeekend = (endDayOfWeek === 0 || endDayOfWeek === 6);
 
-    // RULE 1: If the ticket is closed on a weekend, count all calendar days.
     if (isEndOnWeekend) {
-        // Simple difference in hours between the two dates.
         const diffInMs = endDate.getTime() - startDate.getTime();
         return diffInMs / (1000 * 60 * 60);
     }
 
-    // RULE 2: If the ticket is closed on a weekday, skip weekends.
     let totalHours = 0;
     let current = new Date(startDate);
 
-    // Loop day by day from the start until we pass the end date
     while (current < endDate) {
         const dayOfWeek = current.getUTCDay();
 
-        // Only perform calculations for weekdays
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
             let startOfDay = new Date(current);
             startOfDay.setUTCHours(0, 0, 0, 0);
@@ -150,7 +144,6 @@ const calculateBusinessHours = (start, end) => {
             }
         }
         
-        // Move to the start of the next day
         current.setUTCDate(current.getUTCDate() + 1);
         current.setUTCHours(0, 0, 0, 0);
     }
@@ -401,6 +394,20 @@ app.get("/api/requirements", (req, res) => {
         requirementsGroupMap.forEach(reqGroup => {
             if (reqGroup.history.length > 0) {
                 reqGroup.currentStatusDetails = reqGroup.history.find(h => h.isCurrent) || reqGroup.history[0];
+
+                // If the current 'Done' status is from an archive and has no link,
+                // try to find the link from the most recent previous history entry.
+                if (
+                    reqGroup.currentStatusDetails.status === 'Done' &&
+                    !reqGroup.currentStatusDetails.link &&
+                    reqGroup.currentStatusDetails.sprint &&
+                    reqGroup.currentStatusDetails.sprint.startsWith('Archived_from_')
+                ) {
+                    const previousEntryWithLink = reqGroup.history.find(h => h.link);
+                    if (previousEntryWithLink) {
+                        reqGroup.currentStatusDetails.link = previousEntryWithLink.link;
+                    }
+                }
             }
             processedRequirements.push(reqGroup);
         });
@@ -939,7 +946,6 @@ app.post("/api/notes", async (req, res) => {
     }
 });
 
-// Add this new route for deleting all items for a project
 app.delete("/api/retrospective/project/:project", async (req, res) => {
     const projectName = req.params.project;
     if (!projectName) {
@@ -1270,7 +1276,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
         if (!release) return res.status(404).json({ error: "Release not found." });
 
         const requirementsSql = `
-            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status
+            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link
             FROM activities a
             WHERE a.release_id = ? AND a.isCurrent = 1
         `;
@@ -1359,8 +1365,8 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                     const statusDate = now.split('T')[0];
                                     const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
                                     
-                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
-                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
+                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent, created_at, updated_at, release_id)
+                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, 1, ?, ?, NULL)`;
                                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
 
                                     let activitiesProcessed = 0;
@@ -1375,7 +1381,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                                     return;
                                                 }
                                                 const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, now, now], function(err) {
+                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, now, now], function(err) {
                                                     if (err) {
                                                         db.run("ROLLBACK");
                                                         if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
@@ -1514,8 +1520,8 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                     const statusDate = now.split('T')[0];
                     const newSprintName = `Archived_from_${projectName.replace(/\s/g, '_')}`;
                     
-                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, isCurrent, created_at, updated_at, release_id)
-                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, 1, ?, ?, NULL)`;
+                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent, created_at, updated_at, release_id)
+                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, 1, ?, ?, NULL)`;
                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
 
                     let activitiesProcessed = 0;
@@ -1523,23 +1529,27 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                         finalizeCompletion();
                     } else {
                         items.forEach(item => {
-                            db.run(updateOldSql, [item.requirement_group_id], function(err) {
-                                if (err) {
-                                    db.run("ROLLBACK");
-                                    if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
-                                    return;
-                                }
-                                const comment = `Item completed as part of completing archived release '${projectName}'`;
-                                db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, now, now], function(err) {
+                            db.get("SELECT link FROM activities WHERE requirementGroupId = ? AND isCurrent = 1", [item.requirement_group_id], (getLinkErr, currentActivity) => {
+                                const lastLink = currentActivity ? currentActivity.link : null;
+
+                                db.run(updateOldSql, [item.requirement_group_id], function(err) {
                                     if (err) {
                                         db.run("ROLLBACK");
-                                        if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                        if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                         return;
                                     }
-                                    activitiesProcessed++;
-                                    if (activitiesProcessed === items.length) {
-                                        finalizeCompletion();
-                                    }
+                                    const comment = `Item completed as part of completing archived release '${projectName}'`;
+                                    db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, lastLink, now, now], function(err) {
+                                        if (err) {
+                                            db.run("ROLLBACK");
+                                            if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                            return;
+                                        }
+                                        activitiesProcessed++;
+                                        if (activitiesProcessed === items.length) {
+                                            finalizeCompletion();
+                                        }
+                                    });
                                 });
                             });
                         });
@@ -1813,7 +1823,6 @@ app.delete("/api/fat/:fat_period_id", (req, res) => {
 app.get("/api/fat/:project", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
-        // MODIFICATION 1: Add fsr.release_id and fsr.archived_release_id to the SELECT statement
         const sql = `
             SELECT fp.id, fp.project_id, fp.start_date, fp.completion_date, fp.status,
                    fsr.release_id, fsr.archived_release_id, fsr.release_name, fsr.release_type,
@@ -1851,7 +1860,6 @@ app.get("/api/fat/:project", async (req, res) => {
                     });
                 }
                 if (row.release_name) {
-                    // MODIFICATION 2: Add the 'id' to the selected_releases object
                     fatPeriodsMap.get(row.id).selected_releases.push({
                         id: row.release_type === 'active' ? row.release_id : row.archived_release_id,
                         name: row.release_name,
@@ -1880,10 +1888,6 @@ app.post("/api/fat/:project", async (req, res) => {
             if (err) return res.status(500).json({ error: "DB error checking for active FAT periods." });
             if (activeFat) return res.status(409).json({ error: "An active FAT period already exists for this project. Please complete it before starting a new one." });
 
-            // --- THIS IS THE CRITICAL FIX ---
-            // Create a date object representing 9 AM in Greece time (EEST = UTC+3)
-            // Then convert it to a standard UTC ISO string for storage.
-            // This will be stored in the DB as '...T06:00:00.000Z'
             const startDateUTC = new Date(`${start_date}T09:00:00+03:00`).toISOString();
 
             db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
@@ -1894,7 +1898,6 @@ app.post("/api/fat/:project", async (req, res) => {
                 db.serialize(() => {
                     db.run("BEGIN TRANSACTION");
                     const insertPeriodSql = `INSERT INTO fat_periods (project_id, start_date) VALUES (?, ?)`;
-                    // Use the new UTC string for the database insert
                     db.run(insertPeriodSql, [projectId, startDateUTC], function(err) {
                         if (err) {
                             db.run("ROLLBACK");
@@ -2017,7 +2020,6 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                         return res.status(404).json({ error: "Active FAT period not found or already completed." });
                     }
                     
-                    // --- START: Calculate and Store KPIs ---
                     db.get("SELECT project_id, start_date FROM fat_periods WHERE id = ?", [fatPeriodId], (err, fatPeriod) => {
                         if (err || !fatPeriod) {
                             db.run("ROLLBACK");
@@ -2031,7 +2033,14 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                         };
                         const fatStartDate = normalizeToUTCDate(fatPeriod.start_date);
 
-                        db.all("SELECT id, status, created_at FROM defects WHERE project_id = ? AND is_fat_defect = 1", [fatPeriod.project_id], (err, fatDefects) => {
+                        const fatDefectsSql = `
+                            SELECT id, status, created_at 
+                            FROM defects 
+                            WHERE project_id = ? AND is_fat_defect = 1 AND created_at >= ? AND created_at <= ?
+                        `;
+                        const fatDefectsParams = [fatPeriod.project_id, fatPeriod.start_date, completionDate];
+                        
+                        db.all(fatDefectsSql, fatDefectsParams, (err, fatDefects) => {
                             if (err) {
                                 db.run("ROLLBACK");
                                 return res.status(500).json({ error: "DB error fetching FAT defects for KPI calculation." });
@@ -2112,7 +2121,6 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                             });
                         });
                     });
-                    // --- END: Calculate and Store KPIs ---
                 });
             });
         });
@@ -2136,14 +2144,12 @@ app.get("/api/fat/:fat_period_id/stored-kpis", (req, res) => {
 app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
     const fatPeriodId = req.params.fat_period_id;
 
-    // Helper function to handle both old and new timestamp formats
     const normalizeToUTCDate = (dateString) => {
         if (!dateString) return null;
         const s = String(dateString);
         if (s.includes('T') && s.includes('Z')) {
             return new Date(s);
         }
-        // Assume old format is Greece Time (UTC+3)
         return new Date(s.replace(' ', 'T') + '+03:00');
     };
 
@@ -2158,9 +2164,14 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
 
         const fatStartDate = normalizeToUTCDate(fatPeriod.start_date);
 
+        const nowUTC = new Date().toISOString();
         const fatDefects = await new Promise((resolve, reject) => {
-            const sql = "SELECT id, status, created_at FROM defects WHERE project_id = ? AND is_fat_defect = 1";
-            db.all(sql, [fatPeriod.project_id], (err, rows) => err ? reject(err) : resolve(rows));
+            const sql = `
+                SELECT id, status, created_at 
+                FROM defects 
+                WHERE project_id = ? AND is_fat_defect = 1 AND created_at >= ? AND created_at <= ?
+            `;
+            db.all(sql, [fatPeriod.project_id, fatPeriod.start_date, nowUTC], (err, rows) => err ? reject(err) : resolve(rows));
         });
 
         if (fatDefects.length === 0) {
@@ -2184,12 +2195,10 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
             historyMap.get(rec.defect_id).push(rec);
         });
 
-        // DRE Calculation
         const totalFatDefects = fatDefects.length;
         const fixedFatDefectsCount = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed').length;
         const dre = totalFatDefects > 0 ? (fixedFatDefectsCount / totalFatDefects) * 100 : 0;
 
-        // MTTD Calculation
         let totalDetectionHours = 0;
         fatDefects.forEach(defect => {
             const defectCreatedAt = normalizeToUTCDate(defect.created_at);
@@ -2199,34 +2208,28 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
         });
         const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
 
-        // --- ADJUSTED MTTR CALCULATION STARTS HERE ---
         let totalRepairHours = 0;
         let fixedForMttrCount = 0;
 
-        // Step 1: Include defects that are currently 'Done' OR 'Closed'.
         const fixedDefectsForMttr = fatDefects.filter(d => d.status === 'Done' || d.status === 'Closed');
 
         fixedDefectsForMttr.forEach(defect => {
             const defectHistory = historyMap.get(defect.id) || [];
             let lastDoneDate = null;
 
-            // Step 2: Find the most recent history entry where the status became "Done".
-            // We iterate backwards through the history to find the last one first.
             for (let i = defectHistory.length - 1; i >= 0; i--) {
                 const historyItem = defectHistory[i];
                 if (historyItem.changes_summary) {
                     try {
                         const changes = JSON.parse(historyItem.changes_summary);
-                        // We are specifically looking for the "Done" event, as requested.
                         if (changes.status && changes.status.new === 'Done') {
                             lastDoneDate = normalizeToUTCDate(historyItem.changed_at);
-                            break; // Stop after finding the most recent "Done" event.
+                            break; 
                         }
-                    } catch (e) { /* ignore parse errors */ }
+                    } catch (e) { }
                 }
             }
             
-            // Step 3: If we found a "Done" date, calculate the duration.
             if (lastDoneDate) {
                 const defectCreatedAt = normalizeToUTCDate(defect.created_at);
                 if (defectCreatedAt) {
@@ -2236,7 +2239,6 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
             }
         });
         const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
-        // --- MTTR CALCULATION ENDS HERE ---
 
         res.json({
             message: "success",
@@ -2491,11 +2493,8 @@ app.post("/api/defects", async (req, res) => {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             
-            // --- THIS IS THE FIX ---
-            // Add BOTH created_date and created_at to the INSERT statement.
             const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`;
             
-            // Add the timestamp for both columns in the parameters array.
             const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp];
             
             db.run(insertDefectSql, defectParams, function(err) {
@@ -2579,12 +2578,10 @@ app.put("/api/defects/:id", (req, res) => {
         const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
         const hasComment = comment && comment.trim() !== "";
         
-        // Check if linked requirements have changed
         const currentLinks = currentDefect.linkedRequirementGroupIds || [];
         const newLinks = linkedRequirementGroupIds || [];
         const linksChanged = linkedRequirementGroupIds !== undefined && (currentLinks.length !== newLinks.length || !currentLinks.every(id => newLinks.includes(id)));
 
-        // --- FIX 1: Early exit if no changes are detected ---
         if (!hasFieldChanges && !hasComment && !linksChanged) {
             return res.json({ message: "No changes detected.", defectId: defectId });
         }
@@ -2602,7 +2599,7 @@ app.put("/api/defects/:id", (req, res) => {
                                 let completed = 0;
                                 newLinks.forEach(reqId => {
                                     db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
-                                        if(insertErr) console.error("Error inserting link:", insertErr.message); // Log but don't halt transaction
+                                        if(insertErr) console.error("Error inserting link:", insertErr.message); 
                                         completed++;
                                         if (completed === newLinks.length) callback(null);
                                     });
@@ -2616,7 +2613,6 @@ app.put("/api/defects/:id", (req, res) => {
                     }
                 };
 
-                // --- FIX 2: Chain the database calls using callbacks ---
                 handleLinks((linkErr) => {
                     if (linkErr) {
                         db.run("ROLLBACK");

@@ -482,7 +482,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
 };
 
 
-const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToRequirement, allProcessedRequirements }) => {
+const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToRequirement, allProcessedRequirements, onDataRefresh }) => {
     const [activeFatPeriod, setActiveFatPeriod] = useState(null);
     const [completedFatPeriods, setCompletedFatPeriods] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -547,6 +547,9 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
             if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
             showMainMessage(result.message, 'success');
             fetchFatData();
+            if (onDataRefresh) {
+                onDataRefresh();
+            }
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -1782,16 +1785,35 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     yPos += 8;
 
                     const tableBody = archive.requirements.flatMap(req => {
+                        // If there are no linked defects, return a single simple row
+                        if (!req.linkedDefects || req.linkedDefects.length === 0) {
+                            return [[
+                                { content: req.requirement_title, data: { url: req.link } },
+                                'None'
+                            ]];
+                        }
+
+                        // If there are defects, create the first row with a rowSpan
                         const mainRow = [
-                            { content: req.requirement_title, data: { url: req.link } },
-                            (req.linkedDefects && req.linkedDefects.length > 0)
-                                ? { content: req.linkedDefects[0].title, data: { url: req.linkedDefects[0].link } }
-                                : 'None'
+                            {
+                                content: req.requirement_title,
+                                data: { url: req.link },
+                                rowSpan: req.linkedDefects.length // This tells the library to span this cell over N rows
+                            },
+                            {
+                                content: req.linkedDefects[0].title,
+                                data: { url: req.linkedDefects[0].link }
+                            }
                         ];
-                        const additionalDefectRows = (req.linkedDefects || []).slice(1).map(defect => [
-                            '',
-                            { content: defect.title, data: { url: defect.link } }
+
+                        // Create subsequent rows with only the defect cell. The library will handle the layout.
+                        const additionalDefectRows = req.linkedDefects.slice(1).map(defect => [
+                            {
+                                content: defect.title,
+                                data: { url: defect.link }
+                            }
                         ]);
+
                         return [mainRow, ...additionalDefectRows];
                     });
 
@@ -2995,10 +3017,18 @@ const releasesPageTooltipContent = (
             }
     
             if (satBugs && satBugs.length > 0) {
-                const body = satBugs.map(bug => [
-                    { content: bug.title, data: { url: bug.link } },
-                    bug.label || 'N/A'
-                ]);
+                const body = satBugs.map(bug => {
+                    let fullTitle = bug.title;
+                    if (bug.link) {
+                        const parts = bug.link.split('/');
+                        const jiraKey = parts[parts.length - 1];
+                        fullTitle = `[${jiraKey}] ${bug.title}`;
+                    }
+                    return [
+                        { content: fullTitle, data: { url: bug.link } },
+                        bug.label || 'N/A'
+                    ];
+                });
                 pdf.setFontSize(12);
                 pdf.text('SAT Bugs', leftMargin, yPos);
                 yPos += 6;
@@ -3133,6 +3163,7 @@ const releasesPageTooltipContent = (
                     onNavigateToDefect={onNavigateToDefect}
                     onNavigateToRequirement={onNavigateToRequirement}
                     allProcessedRequirements={allProcessedRequirements}
+                    onDataRefresh={fetchData}
                 />;
             default:
                 return <div id="select-view-message-id" className="empty-column-message">Please select a view.</div>;
