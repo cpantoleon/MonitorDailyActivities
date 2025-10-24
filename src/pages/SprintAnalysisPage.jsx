@@ -3,6 +3,7 @@ import ProjectSelector from '../components/ProjectSelector';
 import RetrospectiveColumn from '../components/RetrospectiveColumn';
 import RetrospectiveItemModal from '../components/RetrospectiveItemModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import './SprintAnalysisPage.css';
 const API_BASE_URL = '/api';
 
 const COLUMN_TYPES = [
