@@ -578,22 +578,17 @@ function App() {
           if (sprintParam && sprints.includes(sprintParam)) {
             setSelectedSprint(sprintParam);
           } else {
-            const sortedSprints = [...sprints].sort((a, b) => {
-              const numA = parseInt(a.match(/\d+/)?.[0], 10);
-              const numB = parseInt(b.match(/\d+/)?.[0], 10);
-    
-              if (!isNaN(numA) && !isNaN(numB)) {
-                return numA - numB;
-              }
-              if (isNaN(numA) && !isNaN(numB)) {
-                return -1;
-              }
-              if (!isNaN(numA) && isNaN(numB)) {
-                return 1;
-              }
-              return a.localeCompare(b);
-            });
-            setSelectedSprint(sortedSprints[sortedSprints.length - 1]);
+            // Find the last sprint that is NOT an archive sprint.
+            const nonArchivedSprints = sprints.filter(s => !s.startsWith('Archived_'));
+            if (nonArchivedSprints.length > 0) {
+              // Since the list is correctly sorted, the last one is the highest active sprint.
+              setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
+            } else if (sprints.length > 0) {
+              // If only archived sprints exist, fall back to selecting the first one.
+              setSelectedSprint(sprints[0]);
+            } else {
+              setSelectedSprint('');
+            }
           }
         } else {
           setSelectedSprint('');

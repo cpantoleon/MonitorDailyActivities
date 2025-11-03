@@ -33,12 +33,26 @@ export const getSprintsForProject = (requirements, projectName) => {
   });
 
   return Array.from(sprintSet).sort((a, b) => {
+    // Backlog always comes first
+    if (a === 'Backlog') return -1;
+    if (b === 'Backlog') return 1;
+
+    // Archived sprints always come last
+    const isA_Archive = a.startsWith('Archived_');
+    const isB_Archive = b.startsWith('Archived_');
+    if (isA_Archive && !isB_Archive) return 1;
+    if (!isA_Archive && isB_Archive) return -1;
+    if (isA_Archive && isB_Archive) return a.localeCompare(b); // Sort archives alphabetically
+
+    // Sort numbered sprints numerically
     const numA = parseInt(a.match(/\d+/)?.[0]);
     const numB = parseInt(b.match(/\d+/)?.[0]);
 
     if (!isNaN(numA) && !isNaN(numB)) {
         if (numA !== numB) return numA - numB;
     }
+    
+    // Fallback for any other cases
     return a.localeCompare(b);
   });
 };
