@@ -1164,15 +1164,18 @@ const ArchivedDefectList = ({ defects, onNavigate, listHeightClass }) => {
     return (
         <div id="archived-defect-list-id" className="defect-list">
             <h4>Defects ({defects.length})</h4>
-            <ul className={`requirement-list ${listHeightClass}`}>
-                {defects.length > 0 ? defects.map(defect => (
-                    <li key={defect.id}>
-                        <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
-                            {defect.title}
-                        </button>
-                    </li>
-                )) : <li>No defects in this release.</li>}
-            </ul>
+            <div className="requirements-list-wrapper">
+                <ul className={`requirement-list ${listHeightClass}`}>
+                    {defects.length > 0 ? defects.map(defect => (
+                        <li key={defect.id}>
+                            <button type="button" onClick={() => onNavigate(defect, defect.status === 'Closed')} className="link-button">
+                                {defect.title}
+                                {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
+                            </button>
+                        </li>
+                    )) : <li>No defects in this release.</li>}
+                </ul>
+            </div>
         </div>
     );
 };
@@ -1497,7 +1500,23 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                     </div>
 
                     <div id="defects-column-id" className="archived-details-column defects-column">
-                        <ArchivedDefectList defects={defects} onNavigate={onNavigateToDefect} listHeightClass={listHeightClass} />
+                        <div id="archived-defects-container-id" className="release-requirements">
+                            <h4>Defects ({defects.length})</h4>
+                            <div id="archived-defects-list-wrapper-id" className="requirements-list-wrapper">
+                                {isLoading ? <LoadingSpinner /> : (
+                                    <ul className={`requirement-list frozen ${listHeightClass}`}>
+                                        {defects.length > 0 ? defects.map(defect => (
+                                            <li key={defect.id}>
+                                                <button type="button" onClick={() => onNavigateToDefect(defect, defect.status === 'Closed')} className="link-button">
+                                                    {defect.title}
+                                                    {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
+                                                </button>
+                                            </li>
+                                        )) : <li>No defects in this release.</li>}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -1785,7 +1804,6 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     yPos += 8;
 
                     const tableBody = archive.requirements.flatMap(req => {
-                        // If there are no linked defects, return a single simple row
                         if (!req.linkedDefects || req.linkedDefects.length === 0) {
                             return [[
                                 { content: req.requirement_title, data: { url: req.link } },
@@ -1793,12 +1811,11 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                             ]];
                         }
 
-                        // If there are defects, create the first row with a rowSpan
                         const mainRow = [
                             {
                                 content: req.requirement_title,
                                 data: { url: req.link },
-                                rowSpan: req.linkedDefects.length // This tells the library to span this cell over N rows
+                                rowSpan: req.linkedDefects.length
                             },
                             {
                                 content: req.linkedDefects[0].title,
@@ -1806,7 +1823,6 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                             }
                         ];
 
-                        // Create subsequent rows with only the defect cell. The library will handle the layout.
                         const additionalDefectRows = req.linkedDefects.slice(1).map(defect => [
                             {
                                 content: defect.title,
@@ -2327,7 +2343,7 @@ const releasesPageTooltipContent = (
         }));
 
         const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
-        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Sprints', 'Status', 'Return to Dev Count'];
+        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Sprints', 'Status', 'FAT Defect', 'Return to Dev Count'];
         const defectsData = uniqueDefects.map(defect => {
             const linkedRequirements = allProcessedRequirements
                 .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
@@ -2339,11 +2355,12 @@ const releasesPageTooltipContent = (
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Sprints': Array.from(linkedSprints).sort().join(', '),
                 'Status': defect.status,
+                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });
 
-        const reqDefectHeaders = ['Requirement Name', 'Type', 'Defect Name', 'Sprint', 'Return to Dev Count'];
+        const reqDefectHeaders = ['Requirement Name', 'Type', 'Defect Name', 'Sprint', 'FAT Defect', 'Return to Dev Count'];
         const reqDefectData = [];
         requirements.forEach(req => {
             if (req.linkedDefects && req.linkedDefects.length > 0) {
@@ -2355,6 +2372,7 @@ const releasesPageTooltipContent = (
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
                         'Sprint': req.currentStatusDetails.sprint || '',
+                        'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                         'Return to Dev Count': returnCountsMap.get(defect.id) || 0
                     });
                 });
@@ -2376,6 +2394,7 @@ const releasesPageTooltipContent = (
                     row['Type'],
                     row['Defect Name'],
                     row['Sprint'],
+                    row['FAT Defect'],
                     row['Return to Dev Count']
                 ])
             ];
@@ -2401,7 +2420,7 @@ const releasesPageTooltipContent = (
                 }
 
                 if (rowData['Defect Link']) {
-                    const defNameCellRef = XLSX.utils.encode_cell({ c: 1, r: R });
+                    const defNameCellRef = XLSX.utils.encode_cell({ c: 2, r: R });
                     if (wsReqDefects[defNameCellRef]) {
                         wsReqDefects[defNameCellRef].l = { Target: rowData['Defect Link'], Tooltip: 'Click to open defect' };
                         wsReqDefects[defNameCellRef].s = linkStyle;
@@ -2425,7 +2444,7 @@ const releasesPageTooltipContent = (
         XLSX.writeFile(wb, `${release.name}_Details.xlsx`);
     };
 
-    const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs, sprintInfo) => {
+const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs, sprintInfo) => {
         const { reqChart, defectChart } = chartRefs;
         const reqChartData = reqChart?.data;
         const defectChartData = defectChart?.data;
@@ -2579,7 +2598,7 @@ const releasesPageTooltipContent = (
                 pdf.setFontSize(14);
                 pdf.text('Requirements', leftMargin, yPos);
                 yPos += 8;
-                const body = requirements.map(r => [
+                const reqBody = requirements.map(r => [
                     { content: r.requirementUserIdentifier, data: { url: r.currentStatusDetails.link || '' } },
                     r.currentStatusDetails.sprint || 'N/A',
                     r.currentStatusDetails.status
@@ -2587,7 +2606,7 @@ const releasesPageTooltipContent = (
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Requirement', 'Sprint', 'Status']],
-                    body: body,
+                    body: reqBody,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
                     columnStyles: { 1: { cellWidth: 25 } },
@@ -2610,14 +2629,14 @@ const releasesPageTooltipContent = (
                 pdf.setFontSize(14);
                 pdf.text('Defects', leftMargin, yPos);
                 yPos += 8;
-                const body = defects.map(d => [
-                    { content: d.title, data: { url: d.link || '' } },
+                const defectBody = defects.map(d => [
+                    { content: d.title, data: { url: d.link || '', isFat: d.is_fat_defect } },
                     d.status
                 ]);
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
-                    body: body,
+                    body: defectBody,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
                     didParseCell: function (data) {
@@ -2628,6 +2647,35 @@ const releasesPageTooltipContent = (
                     didDrawCell: function (data) {
                         if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
                             pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+
+                        if (data.section === 'body' && data.column.index === 0 && data.cell.raw?.data?.isFat) {
+                            const text = data.cell.text[0] || '';
+                            const textWidth = pdf.getStringUnitWidth(text) * data.cell.styles.fontSize / pdf.internal.scaleFactor;
+                            
+                            const labelFontSize = 7;
+                            const labelPadding = 1.5;
+                            const labelHeight = 4;
+                            const labelText = 'FAT';
+                            const labelWidth = pdf.getStringUnitWidth(labelText) * labelFontSize / pdf.internal.scaleFactor + (labelPadding * 2);
+
+                            const x = data.cell.x + data.cell.padding('left') + textWidth + 2;
+                            const y = data.cell.y + (data.cell.height / 2) - (labelHeight / 2);
+
+                            pdf.setFillColor(220, 53, 69);
+                            pdf.roundedRect(x, y, labelWidth, labelHeight, 2, 2, 'F');
+
+                            pdf.setFontSize(labelFontSize);
+                            pdf.setTextColor(255, 255, 255);
+                            pdf.text(labelText, x + labelPadding, y + labelHeight / 2, { baseline: 'middle' });
+
+                            pdf.setFontSize(data.cell.styles.fontSize);
+                            const textColor = data.cell.styles.textColor;
+                            if (Array.isArray(textColor)) {
+                                pdf.setTextColor(...textColor);
+                            } else {
+                                pdf.setTextColor(textColor);
+                            }
                         }
                     }
                 });
@@ -2754,7 +2802,7 @@ const releasesPageTooltipContent = (
             XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
         }
 
-        const reqDefectHeaders = ['Requirement Name', 'Requirement Link', 'Type', 'Defect Name', 'Defect Link', 'Return to Dev Count'];
+        const reqDefectHeaders = ['Requirement Name', 'Requirement Link', 'Type', 'Defect Name', 'Defect Link', 'FAT Defect', 'Return to Dev Count'];
         const reqDefectData = [];
         items.forEach(item => {
             const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
@@ -2766,6 +2814,7 @@ const releasesPageTooltipContent = (
                         'Type': requirement.currentStatusDetails.type || '',
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
+                        'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                         'Return to Dev Count': returnCountsMap.get(defect.id) || 0
                     });
                 });
@@ -2778,7 +2827,7 @@ const releasesPageTooltipContent = (
         }
 
         const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
-        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Status', 'Return to Dev Count'];
+        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Status', 'FAT Defect', 'Return to Dev Count'];
         const defectsData = uniqueDefects.map(defect => {
             const linkedRequirements = allProcessedRequirements
                 .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
@@ -2788,6 +2837,7 @@ const releasesPageTooltipContent = (
                 'Defect Link': defect.link || '',
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Status': defect.status,
+                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });
@@ -2832,7 +2882,7 @@ const releasesPageTooltipContent = (
         XLSX.writeFile(wb, `${archive.name}_Archive_Details.xlsx`);
     };
 
-    const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs, chartRefs) => {
+const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs, chartRefs) => {
         if (!chartRefs || !chartRefs.metricsChart) {
             showMainMessage('Could not generate PDF. Chart data is not available.', 'error');
             return;
@@ -2991,15 +3041,15 @@ const releasesPageTooltipContent = (
             }
     
             if (defects.length > 0) {
-                const body = defects.map(d => [
-                    { content: d.title, data: { url: d.link || '' } },
+                const defectBody = defects.map(d => [
+                    { content: d.title, data: { url: d.link || '', isFat: d.is_fat_defect } },
                     d.status
                 ]);
     
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
-                    body: body,
+                    body: defectBody,
                     theme: 'grid',
                     headStyles: { fillColor: [76, 56, 48] },
                     didParseCell: function (data) {
@@ -3010,6 +3060,35 @@ const releasesPageTooltipContent = (
                     didDrawCell: function (data) {
                         if (data.column.index === 0 && data.cell.raw?.data?.url && data.section === 'body') {
                             pdf.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: data.cell.raw.data.url });
+                        }
+
+                        if (data.section === 'body' && data.column.index === 0 && data.cell.raw?.data?.isFat) {
+                            const text = data.cell.text[0] || '';
+                            const textWidth = pdf.getStringUnitWidth(text) * data.cell.styles.fontSize / pdf.internal.scaleFactor;
+                            
+                            const labelFontSize = 7;
+                            const labelPadding = 1.5;
+                            const labelHeight = 4;
+                            const labelText = 'FAT';
+                            const labelWidth = pdf.getStringUnitWidth(labelText) * labelFontSize / pdf.internal.scaleFactor + (labelPadding * 2);
+
+                            const x = data.cell.x + data.cell.padding('left') + textWidth + 2;
+                            const y = data.cell.y + (data.cell.height / 2) - (labelHeight / 2);
+
+                            pdf.setFillColor(220, 53, 69);
+                            pdf.roundedRect(x, y, labelWidth, labelHeight, 2, 2, 'F');
+
+                            pdf.setFontSize(labelFontSize);
+                            pdf.setTextColor(255, 255, 255);
+                            pdf.text(labelText, x + labelPadding, y + labelHeight / 2, { baseline: 'middle' });
+
+                            pdf.setFontSize(data.cell.styles.fontSize);
+                            const textColor = data.cell.styles.textColor;
+                            if (Array.isArray(textColor)) {
+                                pdf.setTextColor(...textColor);
+                            } else {
+                                pdf.setTextColor(textColor);
+                            }
                         }
                     }
                 });
