@@ -395,6 +395,13 @@ app.get("/api/requirements", (req, res) => {
             if (reqGroup.history.length > 0) {
                 reqGroup.currentStatusDetails = reqGroup.history.find(h => h.isCurrent) || reqGroup.history[0];
 
+                const isArchivedAndCompleted = 
+                    reqGroup.currentStatusDetails.status === 'Done' &&
+                    reqGroup.currentStatusDetails.sprint &&
+                    reqGroup.currentStatusDetails.sprint.startsWith('Archived_from_');
+                
+                reqGroup.isActive = !isArchivedAndCompleted;
+
                 // If the current 'Done' status is from an archive and has no link,
                 // try to find the link from the most recent previous history entry.
                 if (
@@ -408,6 +415,8 @@ app.get("/api/requirements", (req, res) => {
                         reqGroup.currentStatusDetails.link = previousEntryWithLink.link;
                     }
                 }
+            } else {
+                reqGroup.isActive = true; 
             }
             processedRequirements.push(reqGroup);
         });
@@ -1276,7 +1285,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
         if (!release) return res.status(404).json({ error: "Release not found." });
 
         const requirementsSql = `
-            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link
+            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags
             FROM activities a
             WHERE a.release_id = ? AND a.isCurrent = 1
         `;
@@ -1365,8 +1374,8 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                     const statusDate = now.split('T')[0];
                                     const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
                                     
-                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent, created_at, updated_at, release_id)
-                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, 1, ?, ?, NULL)`;
+                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id)
+                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)`;
                                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
 
                                     let activitiesProcessed = 0;
@@ -1381,7 +1390,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                                     return;
                                                 }
                                                 const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, now, now], function(err) {
+                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now], function(err) {
                                                     if (err) {
                                                         db.run("ROLLBACK");
                                                         if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
@@ -1520,8 +1529,8 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                     const statusDate = now.split('T')[0];
                     const newSprintName = `Archived_from_${projectName.replace(/\s/g, '_')}`;
                     
-                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent, created_at, updated_at, release_id)
-                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, 1, ?, ?, NULL)`;
+                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id)
+                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)`;
                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
 
                     let activitiesProcessed = 0;
@@ -1529,8 +1538,10 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                         finalizeCompletion();
                     } else {
                         items.forEach(item => {
-                            db.get("SELECT link FROM activities WHERE requirementGroupId = ? AND isCurrent = 1", [item.requirement_group_id], (getLinkErr, currentActivity) => {
+                            db.get("SELECT link, type, tags FROM activities WHERE requirementGroupId = ? AND isCurrent = 1", [item.requirement_group_id], (getLinkErr, currentActivity) => {
                                 const lastLink = currentActivity ? currentActivity.link : null;
+                                const lastType = currentActivity ? currentActivity.type : null;
+                                const lastTags = currentActivity ? currentActivity.tags : null;
 
                                 db.run(updateOldSql, [item.requirement_group_id], function(err) {
                                     if (err) {
@@ -1539,7 +1550,7 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                                         return;
                                     }
                                     const comment = `Item completed as part of completing archived release '${projectName}'`;
-                                    db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, lastLink, now, now], function(err) {
+                                    db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, lastLink, lastType, lastTags, now, now], function(err) {
                                         if (err) {
                                             db.run("ROLLBACK");
                                             if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });

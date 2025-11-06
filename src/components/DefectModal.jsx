@@ -40,7 +40,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const requirementsForSelectedProject = useMemo(() => {
     if (!formData.project || !allRequirements) return [];
-    return allRequirements.filter(r => r.project === formData.project);
+    return allRequirements.filter(r => r.project === formData.project && r.isActive);
   }, [formData.project, allRequirements]);
 
   useEffect(() => {

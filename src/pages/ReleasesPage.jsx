@@ -2343,7 +2343,7 @@ const releasesPageTooltipContent = (
         }));
 
         const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
-        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Sprints', 'Status', 'FAT Defect', 'Return to Dev Count'];
+        const defectHeaders = ['Defect Name', 'FAT Defect', 'Defect Link', 'Linked Requirements', 'Sprints', 'Status', 'Return to Dev Count'];
         const defectsData = uniqueDefects.map(defect => {
             const linkedRequirements = allProcessedRequirements
                 .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
@@ -2351,11 +2351,11 @@ const releasesPageTooltipContent = (
             const linkedSprints = new Set(linkedRequirements.map(req => req.currentStatusDetails.sprint).filter(Boolean));
             return {
                 'Defect Name': defect.title,
+                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Defect Link': defect.link || '',
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Sprints': Array.from(linkedSprints).sort().join(', '),
                 'Status': defect.status,
-                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });
@@ -2802,7 +2802,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
             XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
         }
 
-        const reqDefectHeaders = ['Requirement Name', 'Requirement Link', 'Type', 'Defect Name', 'Defect Link', 'FAT Defect', 'Return to Dev Count'];
+        const reqDefectHeaders = ['Requirement Name', 'FAT Defect', 'Requirement Link', 'Type', 'Defect Name', 'Defect Link', 'Return to Dev Count'];
         const reqDefectData = [];
         items.forEach(item => {
             const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
@@ -2810,11 +2810,11 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 requirement.linkedDefects.forEach(defect => {
                     reqDefectData.push({
                         'Requirement Name': item.requirement_title,
+                        'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                         'Requirement Link': requirement.currentStatusDetails.link,
                         'Type': requirement.currentStatusDetails.type || '',
                         'Defect Name': defect.title,
                         'Defect Link': defect.link,
-                        'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                         'Return to Dev Count': returnCountsMap.get(defect.id) || 0
                     });
                 });
@@ -2827,17 +2827,17 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
         }
 
         const uniqueDefects = Array.from(new Map(defects.map(d => [d.id, d])).values());
-        const defectHeaders = ['Defect Name', 'Defect Link', 'Linked Requirements', 'Status', 'FAT Defect', 'Return to Dev Count'];
+        const defectHeaders = ['Defect Name', 'FAT Defect', 'Defect Link', 'Linked Requirements', 'Status', 'Return to Dev Count'];
         const defectsData = uniqueDefects.map(defect => {
             const linkedRequirements = allProcessedRequirements
                 .filter(req => req.linkedDefects && req.linkedDefects.some(d => d.id === defect.id));
             const linkedRequirementsNames = linkedRequirements.map(req => req.requirementUserIdentifier);
             return {
                 'Defect Name': defect.title,
+                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Defect Link': defect.link || '',
                 'Linked Requirements': linkedRequirementsNames.join('\n'),
                 'Status': defect.status,
-                'FAT Defect': defect.is_fat_defect ? 'Yes' : 'No',
                 'Return to Dev Count': returnCountsMap.get(defect.id) || 0
             };
         });

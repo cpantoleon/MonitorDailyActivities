@@ -3009,6 +3009,10 @@
           "changeCount": {
             "type": "integer",
             "description": "The number of logged scope changes for this requirement."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Indicates if the requirement is currently active. It is false if its current status is 'Done' as part of an 'archive_and_complete' release action."
           }
         }
       },
