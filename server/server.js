@@ -642,7 +642,7 @@ app.post('/api/import/validate', upload.single('file'), async (req, res) => {
         const projectId = await getProjectId(project);
         const { validRows, skippedCount } = processExcelData(req.file.buffer);
 
-        const getExistingKeysSql = `SELECT key FROM activities WHERE project_id = ? AND isCurrent = 1 AND key IS NOT NULL AND key != ''`;
+        const getExistingKeysSql = `SELECT key FROM activities WHERE project_id = ? AND key IS NOT NULL AND key != ''`;
         db.all(getExistingKeysSql, [projectId], (err, existingRows) => {
             if (err) return res.status(500).json({ error: "Failed to check for existing requirements." });
 
@@ -677,7 +677,7 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
         const now = new Date().toISOString();
         const statusDate = now.split('T')[0];
 
-        const getExistingDataSql = `SELECT key, requirementUserIdentifier FROM activities WHERE project_id = ? AND isCurrent = 1`;
+        const getExistingDataSql = `SELECT key, requirementUserIdentifier FROM activities WHERE project_id = ?`;
         db.all(getExistingDataSql, [projectId], (err, existingRows) => {
             if (err) return res.status(500).json({ error: "Failed to check for existing requirements." });
             
