@@ -642,14 +642,15 @@ app.post('/api/import/validate', upload.single('file'), async (req, res) => {
         const projectId = await getProjectId(project);
         const { validRows, skippedCount } = processExcelData(req.file.buffer);
 
-        const getExistingKeysSql = `SELECT key FROM activities WHERE project_id = ? AND key IS NOT NULL AND key != ''`;
-        db.all(getExistingKeysSql, [projectId], (err, existingRows) => {
+        const getExistingDataSql = `SELECT key, requirementUserIdentifier FROM activities WHERE project_id = ?`;
+        db.all(getExistingDataSql, [projectId], (err, existingRows) => {
             if (err) return res.status(500).json({ error: "Failed to check for existing requirements." });
 
-            const existingKeys = new Set(existingRows.map(r => r.key));
+            const existingKeys = new Set(existingRows.map(r => r.key).filter(Boolean));
+            const existingNames = new Set(existingRows.map(r => r.requirementUserIdentifier));
             
-            const duplicates = validRows.filter(row => row.key && existingKeys.has(row.key));
-            const newItems = validRows.filter(row => !row.key || !existingKeys.has(row.key));
+            const duplicates = validRows.filter(row => (row.key && existingKeys.has(row.key)) || existingNames.has(row.title));
+            const newItems = validRows.filter(row => (!row.key || !existingKeys.has(row.key)) && !existingNames.has(row.title));
 
             res.status(200).json({
                 message: "Validation complete.",
@@ -688,7 +689,11 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
             let itemsToImport;
 
             if (importMode === 'new_only') {
-                itemsToImport = validRows.filter(item => !item.key || !existingKeys.has(item.key));
+                itemsToImport = validRows.filter(item => {
+                    const keyExists = item.key && existingKeys.has(item.key);
+                    const titleExists = existingNames.has(item.title);
+                    return !keyExists && !titleExists;
+                });
             } else {
                 itemsToImport = validRows.map(item => {
                     let newItem = { ...item };
