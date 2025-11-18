@@ -295,18 +295,69 @@ const syncWithQdrant = (db) => async (req, res) => {
             return res.status(200).json({ message: "No valid documents to sync." });
         }
 
-        console.log(`Embedding and upserting ${documents.length} documents...`);
-        const BATCH_SIZE = 100;
-        for (let i = 0; i < documents.length; i += BATCH_SIZE) {
-            const batchDocuments = documents.slice(i, i + BATCH_SIZE);
-            const textsToEmbed = batchDocuments.map(d => d.text);
-            
-            const embeddingResult = await embedBatchWithRetry(textsToEmbed);
+        // in chatbot.js, inside syncWithQdrant function
 
+        console.log(`Embedding and upserting ${documents.length} documents...`);
+
+        // Define the API limit with a safety margin (e.g., 90% of 4MB)
+        const API_PAYLOAD_LIMIT_BYTES = 4194304;
+        const SAFE_LIMIT_BYTES = API_PAYLOAD_LIMIT_BYTES * 0.9;
+
+        let currentBatch = [];
+        let currentBatchSizeBytes = 0;
+
+        for (const doc of documents) {
+            // Calculate the byte size of the document's text
+            const docSizeBytes = Buffer.byteLength(doc.text, 'utf8');
+
+            // If adding this doc would exceed the safe limit, process the current batch first.
+            // Also, handle the edge case where a single document is larger than the limit.
+            if (currentBatch.length > 0 && (currentBatchSizeBytes + docSizeBytes > SAFE_LIMIT_BYTES)) {
+                console.log(`Processing batch of ${currentBatch.length} documents (${Math.round(currentBatchSizeBytes / 1024)} KB)...`);
+                
+                const textsToEmbed = currentBatch.map(d => d.text);
+                const embeddingResult = await embedBatchWithRetry(textsToEmbed);
+                const embeddings = embeddingResult.embeddings.map(e => e.values);
+
+                await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
+                    wait: true,
+                    points: currentBatch.map((batchDoc, index) => ({
+                        id: batchDoc.id,
+                        vector: embeddings[index],
+                        payload: batchDoc.payload
+                    })),
+                });
+
+                // Start a new batch with the current document
+                currentBatch = [doc];
+                currentBatchSizeBytes = docSizeBytes;
+            } else if (docSizeBytes > SAFE_LIMIT_BYTES) {
+                // Handle the case where a single document is too large
+                console.warn(`Skipping document with ID ${doc.payload.id || 'N/A'} because its size (${docSizeBytes} bytes) exceeds the safe limit.`);
+                continue; // Skip this document
+            }
+            else {
+                // Add the current document to the batch
+                currentBatch.push(doc);
+                currentBatchSizeBytes += docSizeBytes;
+            }
+        }
+
+        // Don't forget to process the last batch if it has any documents
+        if (currentBatch.length > 0) {
+            console.log(`Processing the final batch of ${currentBatch.length} documents (${Math.round(currentBatchSizeBytes / 1024)} KB)...`);
+            
+            const textsToEmbed = currentBatch.map(d => d.text);
+            const embeddingResult = await embedBatchWithRetry(textsToEmbed);
             const embeddings = embeddingResult.embeddings.map(e => e.values);
+
             await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
                 wait: true,
-                points: batchDocuments.map((doc, index) => ({ id: doc.id, vector: embeddings[index], payload: doc.payload })),
+                points: currentBatch.map((batchDoc, index) => ({
+                    id: batchDoc.id,
+                    vector: embeddings[index],
+                    payload: batchDoc.payload
+                })),
             });
         }
         console.log("Sync successful!");

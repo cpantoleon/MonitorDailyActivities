@@ -226,17 +226,15 @@
         ],
         "responses": {
           "200": {
-            "description": "Project and its data deleted successfully",
+            "description": "Project and all its associated data have been deleted.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "message": {
-                      "type": "string"
-                    },
-                    "changes": {
-                      "type": "integer"
+                      "type": "string",
+                      "example": "Project 'Project A' and all its associated data have been deleted."
                     }
                   }
                 }
@@ -401,7 +399,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ReleaseIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "requestBody": {
@@ -436,7 +434,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ReleaseIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "responses": {
@@ -461,7 +459,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ReleaseIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "requestBody": {
@@ -616,7 +614,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ItemIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "responses": {
@@ -641,7 +639,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ItemIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "responses": {
@@ -1665,7 +1663,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ItemIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "requestBody": {
@@ -1697,7 +1695,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/ItemIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "responses": {
@@ -1890,7 +1888,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/DefectIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "requestBody": {
@@ -1925,7 +1923,7 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/DefectIdPath"
+            "$ref": "#/components/parameters/IdPath"
           }
         ],
         "responses": {
@@ -2582,16 +2580,14 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "description": {
             "type": "string",
             "nullable": true
           },
           "area": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "status": {
             "type": "string",
@@ -2600,8 +2596,7 @@
               "Assigned to Tester",
               "Done",
               "Closed"
-            ],
-            "nullable": true
+            ]
           },
           "link": {
             "type": "string",
@@ -2610,8 +2605,7 @@
           },
           "created_date": {
             "type": "string",
-            "format": "date",
-            "nullable": true
+            "format": "date"
           },
           "comment": {
             "type": "string",
@@ -3268,15 +3262,6 @@
           "type": "integer"
         }
       },
-      "DefectIdPath": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "description": "ID of the defect",
-        "schema": {
-          "type": "integer"
-        }
-      },
       "FatPeriodIdPath": {
         "name": "fat_period_id",
         "in": "path",
@@ -3286,11 +3271,11 @@
           "type": "integer"
         }
       },
-      "ItemIdPath": {
+      "IdPath": {
         "name": "id",
         "in": "path",
         "required": true,
-        "description": "ID of the item",
+        "description": "The unique identifier of the resource.",
         "schema": {
           "type": "integer"
         }
@@ -3311,15 +3296,6 @@
         "description": "Name of the project",
         "schema": {
           "type": "string"
-        }
-      },
-      "ReleaseIdPath": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "description": "ID of the release",
-        "schema": {
-          "type": "integer"
         }
       },
       "RequirementGroupIdPath": {

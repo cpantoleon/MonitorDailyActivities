@@ -280,17 +280,58 @@ app.post("/api/projects", (req, res) => {
     });
 });
 
-app.delete("/api/projects/:name", (req, res) => {
-    const projectName = decodeURIComponent(req.params.name);
-    if (!projectName) return res.status(400).json({ error: "Project name is required." });
+const util = require('util');
 
-    const sql = 'DELETE FROM projects WHERE name = ?';
-    db.run(sql, [projectName], function(err) {
-        if (err) return res.status(500).json({ error: `Failed to delete project '${projectName}': ${err.message}` });
-        if (this.changes === 0) return res.status(404).json({ error: `Project '${projectName}' not found.` });
+// Promisify the database methods so we can use them with async/await
+// You can place this near the top of your server.js file
+const dbGet = util.promisify(db.get.bind(db));
+const dbAll = util.promisify(db.all.bind(db));
+const dbRun = util.promisify(db.run.bind(db));
+
+app.delete("/api/projects/:name", async (req, res) => { // <-- Use async
+    const projectName = decodeURIComponent(req.params.name);
+    if (!projectName) {
+        return res.status(400).json({ error: "Project name is required." });
+    }
+
+    try {
+        await dbRun("BEGIN TRANSACTION");
+
+        // Step 1: Get the project ID.
+        const project = await dbGet("SELECT id FROM projects WHERE name = ?", [projectName]);
+        if (!project) {
+            await dbRun("ROLLBACK");
+            return res.status(404).json({ error: `Project '${projectName}' not found.` });
+        }
+        const projectId = project.id;
+
+        // Step 2: Find all requirement group IDs that are about to be deleted.
+        const findGroupIdsSql = "SELECT DISTINCT requirementGroupId FROM activities WHERE project_id = ?";
+        const activities = await dbAll(findGroupIdsSql, [projectId]);
+        const groupIds = activities.map(a => a.requirementGroupId).filter(id => id != null);
+
+        // Step 3: Clean up the orphaned data from `requirement_changes`.
+        if (groupIds.length > 0) {
+            const placeholders = groupIds.map(() => '?').join(',');
+            const deleteChangesSql = `DELETE FROM requirement_changes WHERE requirement_group_id IN (${placeholders})`;
+            await dbRun(deleteChangesSql, groupIds);
+        }
+
+        // Step 4: Delete the project. ON DELETE CASCADE will handle the rest.
+        await dbRun("DELETE FROM projects WHERE id = ?", [projectId]);
+
+        // Step 5: Commit the transaction if everything succeeded.
+        await dbRun("COMMIT");
+        
         scheduleQdrantSync();
-        res.json({ message: `Project '${projectName}' and all its associated data have been deleted.`, changes: this.changes });
-    });
+        res.json({ message: `Project '${projectName}' and all its associated data have been deleted.` });
+
+    } catch (error) {
+        // If any error occurs in the 'try' block, it will be caught here.
+        await dbRun("ROLLBACK");
+        console.error("Failed to delete project:", error.message);
+        res.status(500).json({ error: "Failed to delete project: " + error.message });
+    }
 });
 
 app.put("/api/projects/:name", (req, res) => {

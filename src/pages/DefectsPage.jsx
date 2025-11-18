@@ -636,9 +636,24 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         tooltip: {
             callbacks: {
                 title: function(context) { 
-                    const dataIndex = context[0].dataIndex; 
-                    const fullLabel = context[0].dataset.fullLabels[dataIndex]; 
-                    return fullLabel; 
+                    const dataIndex = context[0].dataIndex;
+                    const fullLabel = context[0].dataset.fullLabels[dataIndex];
+                    const maxCharsPerLine = 50;
+                    const words = fullLabel.split(' ');
+                    const lines = [];
+                    let currentLine = '';
+                    for (const word of words) {
+                        if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+                            lines.push(currentLine);
+                            currentLine = word;
+                        } else {
+                            currentLine = currentLine ? `${currentLine} ${word}` : word;
+                        }
+                    }
+                    if (currentLine) {
+                        lines.push(currentLine);
+                    }
+                    return lines;
                 }, 
                 label: function(context) { 
                     let label = context.dataset.label || ''; 
