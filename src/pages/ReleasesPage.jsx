@@ -1490,7 +1490,6 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                                 <button type="button" onClick={() => handleRequirementClick(item)} className="link-button">
                                                     {item.requirement_title}
                                                 </button>
-                                                <span className={`status-badge status-${item.final_status.toLowerCase().replace(/\s+/g, '-')}`}>{item.final_status}</span>
                                             </li>
                                         )) : <li>No requirements were in this release.</li>}
                                     </ul>
@@ -2174,9 +2173,28 @@ const releasesPageTooltipContent = (
             const response = await fetch(`${API_BASE_URL}/archives/${selectedProject}`);
             if (!response.ok) throw new Error('Failed to fetch archived releases.');
             const result = await response.json();
-            const data = result.data || [];
-            setArchivedReleases(data);
-            return data;
+            const archives = result.data || [];
+    
+        const archivesWithDefects = await Promise.all(archives.map(async (archive) => {
+            const detailsRes = await fetch(`${API_BASE_URL}/archives/details/${archive.id}`);
+            if (!detailsRes.ok) {
+                console.error(`Failed to fetch details for archive ${archive.id}`);
+                return { ...archive, defectCount: 0 };
+            }
+            const detailsData = await detailsRes.json();
+            const items = detailsData.data || [];
+            
+            const releaseDefects = items.flatMap(item => {
+                const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+                return requirement ? (requirement.linkedDefects || []) : [];
+            });
+            const uniqueDefects = Array.from(new Map(releaseDefects.map(defect => [defect.id, defect])).values());
+            
+            return { ...archive, defectCount: uniqueDefects.length };
+        }));
+
+            setArchivedReleases(archivesWithDefects);
+            return archivesWithDefects;
         } catch (error) {
             showMainMessage(error.message, 'error');
             setArchivedReleases([]);
@@ -2184,7 +2202,7 @@ const releasesPageTooltipContent = (
         } finally {
             setIsLoading(false);
         }
-    }, [selectedProject, showMainMessage]);
+    }, [selectedProject, showMainMessage, allProcessedRequirements]);
 
     useEffect(() => {
         if (selectedProject) {
@@ -3215,7 +3233,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                                 <h4>Final Metrics</h4>
                                 <div id={`archived-metrics-${archive.id}`} className="archived-metrics">
                                     <span className="metric-item done">Done: {archive.metrics.doneCount}</span>
-                                    <span className="metric-item not-done">Not Done: {archive.metrics.notDoneCount}</span>
+                                    <span className="metric-item not-done">Defects: {archive.defectCount}</span>
                                 </div>
                             </div>
                             <div id={`archived-card-actions-${archive.id}`} className="release-card-actions">

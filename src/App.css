@@ -190,6 +190,31 @@ body {
   opacity: 0.7;
 }
 
+.show-archived-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-bottom: 5px;
+}
+
+.show-archived-container label {
+  font-size: 0.9em;
+  color: #5C4033;
+  cursor: pointer;
+  user-select: none;
+}
+
+.show-archived-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #8B4513;
+  transform: scale(1.1);
+}
+
+.show-archived-container input[type="checkbox"]:disabled + label {
+  cursor: not-allowed;
+  color: #ab987a;
+}
+
 .kanban-board-container {
   flex-grow: 1;
   padding: 15px;

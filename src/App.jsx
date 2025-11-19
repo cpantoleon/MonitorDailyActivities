@@ -117,6 +117,8 @@ const SprintActivitiesPage = ({
   projectReleases,
   allProcessedRequirements,
   hasAnyReleases,
+  showArchivedSprints,
+  onSetShowArchived,
 }) => {
   const [showCharts, setShowCharts] = useState(false);
 
@@ -282,6 +284,16 @@ const SprintActivitiesPage = ({
           <button onClick={onToggleFilterSidebar} className="defect-action-button filter-toggle-button" disabled={!selectedProject || !selectedSprint}>
             Filter
           </button>
+          <div className="show-archived-container">
+            <input
+              type="checkbox"
+              id="show-archived-sprints"
+              checked={showArchivedSprints}
+              onChange={(e) => onSetShowArchived(e.target.checked)}
+              disabled={!selectedProject || projects.length === 0}
+            />
+            <label htmlFor="show-archived-sprints">Show Archived</label>
+          </div>
         </div>
         <div className="page-actions-group">
            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -391,6 +403,7 @@ function App() {
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [linkedDefectsFilter, setLinkedDefectsFilter] = useState(null);
   const [selectedReleases, setSelectedReleases] = useState([]);
+  const [showArchivedSprints, setShowArchivedSprints] = useState(false);
 
   const [filterOptions, setFilterOptions] = useState({
     enabledTypes: [],
@@ -562,44 +575,56 @@ function App() {
   }, [fetchData]);
 
   useEffect(() => {
+    let sprintsForProject = [];
     if (selectedProject) {
-      const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
-      setAvailableSprints(sprints);
-    } else {
-      setAvailableSprints([]);
+        sprintsForProject = getSprintsForProject(allProcessedRequirements, selectedProject);
     }
-  
-    if (prevSelectedProject.current !== selectedProject) {
-      const params = new URLSearchParams(location.search);
-      const sprintParam = params.get('sprint');
-      if (selectedProject) {
-        const sprints = getSprintsForProject(allProcessedRequirements, selectedProject);
-        if (sprints.length > 0) {
-          if (sprintParam && sprints.includes(sprintParam)) {
-            setSelectedSprint(sprintParam);
-          } else {
-            // Find the last sprint that is NOT an archive sprint.
-            const nonArchivedSprints = sprints.filter(s => !s.startsWith('Archived_'));
-            if (nonArchivedSprints.length > 0) {
-              // Since the list is correctly sorted, the last one is the highest active sprint.
-              setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
-            } else if (sprints.length > 0) {
-              // If only archived sprints exist, fall back to selecting the first one.
-              setSelectedSprint(sprints[0]);
+
+    const visibleSprints = showArchivedSprints 
+        ? sprintsForProject 
+        : sprintsForProject.filter(s => !s.startsWith('Archived_'));
+    
+    setAvailableSprints(visibleSprints);
+
+    const projectChanged = prevSelectedProject.current !== selectedProject;
+    
+    if (projectChanged) {
+        const params = new URLSearchParams(location.search);
+        const sprintParam = params.get('sprint');
+
+        if (visibleSprints.length > 0) {
+            if (sprintParam && visibleSprints.includes(sprintParam)) {
+                setSelectedSprint(sprintParam);
             } else {
-              setSelectedSprint('');
+                const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
+                if (nonArchivedSprints.length > 0) {
+                    setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
+                } else if (visibleSprints.length > 0) {
+                    setSelectedSprint(visibleSprints[0]);
+                } else {
+                    setSelectedSprint('');
+                }
             }
-          }
         } else {
-          setSelectedSprint('');
+            setSelectedSprint('');
         }
-      } else {
-        setSelectedSprint('');
-      }
+    } else {
+        if (selectedSprint && !visibleSprints.includes(selectedSprint)) {
+            if (visibleSprints.length > 0) {
+                const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
+                if (nonArchivedSprints.length > 0) {
+                    setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
+                } else {
+                    setSelectedSprint(visibleSprints[0]);
+                }
+            } else {
+                setSelectedSprint('');
+            }
+        }
     }
-  
+
     prevSelectedProject.current = selectedProject;
-  }, [selectedProject, allProcessedRequirements, location.search]);
+  }, [selectedProject, allProcessedRequirements, location.search, showArchivedSprints, selectedSprint]);
 
   useEffect(() => {
     if (isSearching && !isSearchUpdate.current) {
@@ -1441,6 +1466,8 @@ function App() {
               projectReleases={projectReleases}
               allProcessedRequirements={allProcessedRequirements}
               hasAnyReleases={allReleases.length > 0}
+              showArchivedSprints={showArchivedSprints}
+              onSetShowArchived={setShowArchivedSprints}
             />
           }
         />
