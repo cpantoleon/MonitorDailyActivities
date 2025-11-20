@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProjectSelector from '../components/ProjectSelector';
 import DefectColumn from '../components/DefectColumn';
@@ -9,6 +9,7 @@ import SearchComponent from '../components/SearchComponent';
 import UpdateStatusModal from '../components/UpdateStatusModal';
 import ImportDefectsModal from '../components/ImportDefectsModal';
 import Tooltip from '../components/Tooltip';
+import FilterSidebar from '../components/FilterSidebar';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
@@ -95,10 +96,55 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const [isMoveToClosedConfirmModalOpen, setIsMoveToClosedConfirmModalOpen] = useState(false);
   const [defectToMove, setDefectToMove] = useState(null);
   const [isChartTruncated, setIsChartTruncated] = useState(false);
+  const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
+  const [selectedReleases, setSelectedReleases] = useState([]);
+  const [projectReleases, setProjectReleases] = useState([]);
+  const [archivedReleases, setArchivedReleases] = useState([]);
+  const [fatDefectFilter, setFatDefectFilter] = useState(null);
+  const [filterOptions, setFilterOptions] = useState({
+    enabledReleases: [],
+    isFatDefectYesEnabled: false,
+    isFatDefectNoEnabled: false,
+  });
+
+  const filterButtonRef = useRef(null);
+  const sidebarWrapperRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
   const hasFetched = useRef(false);
+
+  useEffect(() => {
+    const chatbotContainer = document.getElementById('chatbot-container-id');
+    if (chatbotContainer) {
+      if (isFilterSidebarOpen) {
+        chatbotContainer.classList.add('sidebar-open');
+      } else {
+        chatbotContainer.classList.remove('sidebar-open');
+      }
+    }
+  }, [isFilterSidebarOpen]);
+
+  useEffect(() => {
+    const handleInteraction = (event) => {
+      if (filterButtonRef.current && filterButtonRef.current.contains(event.target)) {
+        setIsFilterSidebarOpen(prev => !prev);
+        return;
+      }
+      if (
+        isFilterSidebarOpen &&
+        sidebarWrapperRef.current &&
+        !sidebarWrapperRef.current.contains(event.target)
+      ) {
+        setIsFilterSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleInteraction);
+    return () => {
+      document.removeEventListener('mousedown', handleInteraction);
+    };
+  }, [isFilterSidebarOpen]);
 
   useEffect(() => {
     const savedProject = sessionStorage.getItem('defectsPageSelectedProject');
@@ -121,6 +167,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       setDefectQuery('');
       setSearchResults([]);
       setSearchSuggestions([]);
+      setSelectedReleases([]);
   }, []);
 
   const defectChartTooltipContent = (
@@ -152,6 +199,22 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       setIsLoading(false);
     }
   }, [showMessage]);
+  
+  const fetchArchivedReleases = useCallback(async (project) => {
+      if (!project) {
+          setArchivedReleases([]);
+          return;
+      }
+      try {
+          const response = await fetch(`${API_BASE_URL}/archives/${project}`);
+          if (!response.ok) throw new Error('Failed to fetch archived releases');
+          const result = await response.json();
+          setArchivedReleases(result.data || []);
+      } catch (error) {
+          showMessage(`Error loading archived releases: ${error.message}`, 'error');
+          setArchivedReleases([]);
+      }
+  }, [showMessage]);
 
   useEffect(() => {
     if (!hasFetched.current) {
@@ -162,6 +225,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   useEffect(() => {
     if (selectedProject) {
+      fetchArchivedReleases(selectedProject);
       const projectDefects = allDefects.filter(d => d.project === selectedProject);
       const currentClosedDefects = projectDefects.filter(d => d.status === 'Closed');
       setActiveDefects(projectDefects.filter(d => d.status !== 'Closed'));
@@ -169,8 +233,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     } else {
       setActiveDefects([]);
       setClosedDefects([]);
+      setArchivedReleases([]);
     }
-  }, [allDefects, selectedProject]);
+  }, [allDefects, selectedProject, fetchArchivedReleases]);
 
   useEffect(() => {
     if (highlightedDefectId && (activeDefects.length > 0 || closedDefects.length > 0)) {
@@ -214,7 +279,146 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     }
   }, [location.search, navigate, projects, onSelectProject]);
 
-  const updateChartData = useCallback(async () => {
+  const filteredDefects = useMemo(() => {
+    let defectsToFilter = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
+
+    if (fatDefectFilter) {
+      defectsToFilter = defectsToFilter.filter(defect => {
+        const isFat = defect.is_fat_defect === 1 || defect.is_fat_defect === true;
+        if (fatDefectFilter === 'yes') return isFat;
+        if (fatDefectFilter === 'no') return !isFat;
+        return true;
+      });
+    }
+
+    if (selectedReleases.length === 0) {
+        return defectsToFilter;
+    }
+
+    const originalReleaseIdToArchiveIdMap = new Map(
+        archivedReleases.map(ar => [ar.original_release_id, ar.id])
+    );
+
+    return defectsToFilter.filter(defect => {
+        if (!defect.linkedRequirements || defect.linkedRequirements.length === 0) {
+            return false;
+        }
+        
+        const linkedReqsWithDetails = defect.linkedRequirements.map(lr => 
+            allRequirements.find(ar => ar.id === lr.groupId)
+        ).filter(Boolean);
+
+        if (showClosedView) {
+            return linkedReqsWithDetails.some(req => {
+                const sprint = req.currentStatusDetails.sprint;
+                if (sprint && sprint.startsWith('Archived_from_')) {
+                    const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
+                    const matchingArchivedRelease = archivedReleases.find(ar => ar.name === releaseName);
+                    if (matchingArchivedRelease && selectedReleases.includes(matchingArchivedRelease.id)) {
+                        return true;
+                    }
+                } 
+                
+                if (req.currentStatusDetails.releaseId) {
+                    const originalReleaseId = req.currentStatusDetails.releaseId;
+                    const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
+                    
+                    if (archiveId && selectedReleases.includes(archiveId)) {
+                        return true;
+                    }
+                    if (!archiveId && selectedReleases.includes(originalReleaseId)) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        } else {
+            return linkedReqsWithDetails.some(req => 
+                req.currentStatusDetails.releaseId && selectedReleases.includes(req.currentStatusDetails.releaseId)
+            );
+        }
+    });
+  }, [isSearching, searchResults, showClosedView, closedDefects, activeDefects, selectedReleases, allRequirements, archivedReleases, fatDefectFilter]);
+
+  useEffect(() => {
+    if (selectedProject) {
+        const releases = allRequirements
+            .filter(r => r.project === selectedProject && r.isActive && r.currentStatusDetails.releaseId && r.currentStatusDetails.releaseName)
+            .map(r => ({
+                id: r.currentStatusDetails.releaseId,
+                name: r.currentStatusDetails.releaseName,
+                is_current: false 
+            }));
+        const uniqueReleases = Array.from(new Map(releases.map(item => [item.id, item])).values())
+            .sort((a, b) => a.name.localeCompare(b.name));
+        setProjectReleases(uniqueReleases);
+    } else {
+        setProjectReleases([]);
+    }
+  }, [selectedProject, allRequirements]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+        setFilterOptions({ enabledReleases: [], isFatDefectYesEnabled: false, isFatDefectNoEnabled: false });
+        return;
+    }
+    const baseItems = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
+    
+    const originalReleaseIdToArchiveIdMap = new Map(
+        archivedReleases.map(ar => [ar.original_release_id, ar.id])
+    );
+
+    const relevantReleaseIds = new Set();
+    if (showClosedView) {
+        baseItems.forEach(defect => {
+            const linkedReqs = (defect.linkedRequirements || []).map(lr => allRequirements.find(ar => ar.id === lr.groupId)).filter(Boolean);
+            linkedReqs.forEach(req => {
+                const sprint = req.currentStatusDetails.sprint;
+                
+                if (sprint && sprint.startsWith('Archived_from_')) {
+                    const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
+                    const matchingArchive = archivedReleases.find(ar => ar.name === releaseName);
+                    if (matchingArchive) {
+                        relevantReleaseIds.add(matchingArchive.id);
+                    }
+                } else if (req.currentStatusDetails.releaseId) {
+                    const originalReleaseId = req.currentStatusDetails.releaseId;
+                    const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
+                    
+                    if (archiveId) {
+                        relevantReleaseIds.add(archiveId);
+                    } else {
+                        relevantReleaseIds.add(originalReleaseId);
+                    }
+                }
+            });
+        });
+    } else {
+        baseItems.forEach(defect => {
+            const linkedReqsWithDetails = (defect.linkedRequirements || []).map(lr => 
+                allRequirements.find(ar => ar.id === lr.groupId)
+            ).filter(Boolean);
+
+            linkedReqsWithDetails.forEach(req => {
+                if (req.currentStatusDetails.releaseId) {
+                    relevantReleaseIds.add(req.currentStatusDetails.releaseId);
+                }
+            });
+        });
+    }
+
+    const isFatDefectYesEnabled = baseItems.some(d => d.is_fat_defect);
+    const isFatDefectNoEnabled = baseItems.some(d => !d.is_fat_defect);
+
+    setFilterOptions({
+      enabledReleases: Array.from(relevantReleaseIds),
+      isFatDefectYesEnabled,
+      isFatDefectNoEnabled,
+    });
+  }, [selectedProject, isSearching, searchResults, showClosedView, closedDefects, activeDefects, allRequirements, archivedReleases]);
+
+
+  const updateChartData = useCallback(async (defectsForChart) => {
     if (!selectedProject) {
         setAreaChartData(null);
         setReturnToDevChartData(null);
@@ -223,9 +427,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         return;
     }
 
-    if (!showClosedView && activeDefects.length > 0) {
+    if (!showClosedView && defectsForChart.length > 0) {
         let doneCount = 0, notDoneCount = 0;
-        activeDefects.forEach(defect => {
+        defectsForChart.forEach(defect => {
             if (defect.status === 'Done') doneCount++;
             else notDoneCount++;
         });
@@ -247,7 +451,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         setDoneNotDoneChartData(null);
     }
 
-    const defectsForChart = showClosedView ? closedDefects : activeDefects;
     const defectsForAreaChart = defectsForChart.filter(defect => defect.area !== 'Imported');
     if (defectsForAreaChart.length > 0) {
         const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
@@ -275,7 +478,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             if (!response.ok) throw new Error('Failed to fetch return to developer counts');
             const result = await response.json();
             if (result.data && result.data.length > 0) {
-                let filteredData = result.data.filter(d => d.return_count >= 2);
+                const defectIdsInView = new Set(defectsForChart.map(d => d.id));
+                let filteredData = result.data.filter(d => d.return_count >= 2 && defectIdsInView.has(d.id));
                 if (filteredData.length > 5) {
                     setIsChartTruncated(true);
                     filteredData = filteredData.slice(-5);
@@ -324,13 +528,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     } else {
         setReturnToDevChartData(null);
     }
-}, [selectedProject, showClosedView, activeDefects, closedDefects, showMessage]);
+}, [selectedProject, showClosedView, showMessage]);
 
   useEffect(() => {
     if (showAreaChart) {
-      updateChartData();
+      updateChartData(filteredDefects);
     }
-  }, [showAreaChart, updateChartData]);
+  }, [showAreaChart, updateChartData, filteredDefects]);
 
   const handleToggleCharts = () => setShowAreaChart(prev => !prev);
   const handleOpenModal = (defect = null) => { setEditingDefect(defect); setIsModalOpen(true); };
@@ -495,6 +699,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setSearchResults([]);
     setSearchSuggestions([]);
     setSelectedProject('');
+    handleClearFilters();
   };
 
   const handleDefectQueryChange = (query) => {
@@ -605,6 +810,23 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setDefectToMove(null);
   };
 
+  const handleReleaseChange = (releaseId) => {
+    setSelectedReleases(prev =>
+        prev.includes(releaseId)
+            ? prev.filter(id => id !== releaseId)
+            : [...prev, releaseId]
+    );
+  };
+
+  const handleFatDefectChange = (value) => {
+    setFatDefectFilter(prev => (prev === value ? null : value));
+  };
+
+  const handleClearFilters = () => {
+    setSelectedReleases([]);
+    setFatDefectFilter(null);
+  };
+
   const baseChartOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: {
@@ -708,8 +930,24 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       </div>
     );
   };
+  
+  const releasesForFilter = useMemo(() => {
+      if (!showClosedView) {
+          return projectReleases;
+      }
+      
+      const archivedAsReleases = archivedReleases.map(ar => ({ 
+          id: ar.id, 
+          name: ar.name, 
+          is_current: false 
+      }));
+      
+      const combined = [...projectReleases, ...archivedAsReleases];
+      
+      return Array.from(new Map(combined.map(item => [item.name, item])).values())
+          .sort((a, b) => a.name.localeCompare(b.name));
 
-  const defectsForNormalView = showClosedView ? closedDefects : activeDefects;
+  }, [showClosedView, projectReleases, archivedReleases]);
 
   return (
     <div id="defects-page-main-content-area-id" className="main-content-area">
@@ -726,11 +964,18 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
               suggestions={searchSuggestions}
               placeholder="Search defects by title..."
             />
+            <button
+              ref={filterButtonRef}
+              className="defect-action-button defects-filter-toggle-button"
+              disabled={!selectedProject}
+            >
+                Filter
+            </button>
         </div>
         <div id="defects-page-actions-group-id" className="page-actions-group">
             <div id="charts-actions-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <Tooltip content={defectChartTooltipContent} position="bottom" />
-                <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || defectsForNormalView.length === 0}>
+                <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || filteredDefects.length === 0}>
                     {showAreaChart ? 'Hide' : 'Show'} Charts
                 </button>
             </div>
@@ -758,13 +1003,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
           {returnToDevChartData && <div id="return-to-dev-chart-container-id" className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
           {!areaChartData && !returnToDevChartData && (showClosedView || !doneNotDoneChartData) && !isLoading && (
             <div id="no-chart-data-container-id" className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
-              <p>No chart data available for the selected project.</p>
+              <p>No chart data available for the selected project and filters.</p>
             </div>
           )}
         </div>
       )}
 
-      {!isLoading && (isSearching ? (searchResults.length > 0 ? renderBoard(searchResults) : <div id="no-search-results-message-id" className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(defectsForNormalView) : null))}
+      {!isLoading && (isSearching ? (filteredDefects.length > 0 ? renderBoard(filteredDefects) : <div id="no-search-results-message-id" className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(filteredDefects) : null))}
 
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
@@ -797,6 +1042,21 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
               </div>
           </div>
       )}
+      <div ref={sidebarWrapperRef}>
+        <FilterSidebar
+          isOpen={isFilterSidebarOpen}
+          onClose={() => setIsFilterSidebarOpen(false)}
+          releases={releasesForFilter}
+          selectedReleases={selectedReleases}
+          onReleaseChange={handleReleaseChange}
+          enabledReleases={filterOptions.enabledReleases}
+          onClearFilters={handleClearFilters}
+          fatDefectFilter={fatDefectFilter}
+          onFatDefectChange={handleFatDefectChange}
+          isFatDefectYesEnabled={filterOptions.isFatDefectYesEnabled}
+          isFatDefectNoEnabled={filterOptions.isFatDefectNoEnabled}
+        />
+      </div>
     </div>
   );
 };

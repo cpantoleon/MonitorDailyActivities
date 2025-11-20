@@ -425,6 +425,10 @@ function App() {
     const highlightId = params.get('highlight');
     let urlWasChanged = false;
 
+    if (sprintParam && sprintParam.startsWith('Archived_')) {
+      setShowArchivedSprints(true);
+    }
+
     if (projectParam) {
       setSelectedProject(projectParam);
       urlWasChanged = true;
