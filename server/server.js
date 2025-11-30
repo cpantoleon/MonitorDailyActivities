@@ -1642,7 +1642,7 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
     const { blocked, failed, executing, aborted, passed, pending } = req.body;
 
     const values = [blocked, failed, executing, aborted, passed, pending];
-    const numericValues = values.map(v => v === '' || v === null ? 0 : parseInt(v, 10));
+    const numericValues = values.map(v => v === '' || v === null ? 0 : parseFloat(v));
 
     if (numericValues.some(isNaN)) {
         return res.status(400).json({ error: "All fields must be numbers." });
@@ -1661,8 +1661,8 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
         return;
     }
 
-    if (total !== 100) {
-        return res.status(400).json({ error: `The sum of all fields must be 100%. Current sum is ${total}%.` });
+    if (Math.abs(total - 100) > 0.01) {
+        return res.status(400).json({ error: `The sum of all fields must be 100%. Current sum is ${total.toFixed(1)}%.` });
     }
 
     const sql = `

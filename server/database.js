@@ -124,12 +124,12 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             db.run(`CREATE TABLE IF NOT EXISTS sat_reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 archive_id INTEGER NOT NULL UNIQUE,
-                blocked INTEGER DEFAULT 0,
-                failed INTEGER DEFAULT 0,
-                executing INTEGER DEFAULT 0,
-                aborted INTEGER DEFAULT 0,
-                passed INTEGER DEFAULT 0,
-                pending INTEGER DEFAULT 0,
+                blocked REAL DEFAULT 0,
+                failed REAL DEFAULT 0,
+                executing REAL DEFAULT 0,
+                aborted REAL DEFAULT 0,
+                passed REAL DEFAULT 0,
+                pending REAL DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
             )`, (err) => {

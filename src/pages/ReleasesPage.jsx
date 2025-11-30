@@ -1556,42 +1556,58 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 };
 
 const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }) => {
-    const initialData = {
+    // Define initialData based on the archive prop
+    const initialData = useMemo(() => ({
         passed: archive?.sat_report?.passed || 0,
         failed: archive?.sat_report?.failed || 0,
         blocked: archive?.sat_report?.blocked || 0,
         pending: archive?.sat_report?.pending || 0,
         executing: archive?.sat_report?.executing || 0,
         aborted: archive?.sat_report?.aborted || 0,
-    };
+    }), [archive]);
+
     const [satData, setSatData] = useState(initialData);
 
     useEffect(() => {
         setSatData(initialData);
-    }, [archive]);
+    }, [initialData, isOpen]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setSatData(prev => ({ ...prev, [name]: value === '' ? 0 : parseInt(value, 10) }));
+        // Store raw value to allow typing decimals (e.g. "9.")
+        setSatData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleReset = () => {
         setSatData({ passed: 0, failed: 0, blocked: 0, pending: 0, executing: 0, aborted: 0 });
     };
 
-    const total = useMemo(() => Object.values(satData).reduce((sum, val) => sum + (val || 0), 0), [satData]);
-    const isTotalValid = useMemo(() => total === 100 || total === 0, [total]);
+    // Calculate total using parseFloat to handle decimals
+    const total = useMemo(() => Object.values(satData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0), [satData]);
+    
+    // Validate using epsilon for float precision (allow slight rounding errors)
+    const isTotalValid = useMemo(() => Math.abs(total - 100) < 0.01 || total === 0, [total]);
 
     const handleSave = async () => {
-        if (total !== 100 && total !== 0) {
+        if (!isTotalValid) {
             showMainMessage('Total must be exactly 100% or 0% to clear the report.', 'error');
             return;
         }
         try {
+            // Ensure values are sent as numbers
+            const payload = {
+                passed: parseFloat(satData.passed) || 0,
+                failed: parseFloat(satData.failed) || 0,
+                blocked: parseFloat(satData.blocked) || 0,
+                pending: parseFloat(satData.pending) || 0,
+                executing: parseFloat(satData.executing) || 0,
+                aborted: parseFloat(satData.aborted) || 0,
+            };
+
             const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/sat-report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(satData),
+                body: JSON.stringify(payload),
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
@@ -1619,12 +1635,13 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
                             onFocus={e => e.target.select()}
                             min="0"
                             max="100"
+                            step="0.1" 
                         />
                     </div>
                 ))}
             </div>
             <div id="sat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
-                Total: {total}%
+                Total: {Number(total).toFixed(1).replace(/\.0$/, '')}%
                 {!isTotalValid && <div id="sat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
             </div>
             <div id="sat-report-modal-actions-id" className="modal-actions">
