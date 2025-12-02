@@ -2373,7 +2373,7 @@ const releasesPageTooltipContent = (
             'Requirement Link': req.currentStatusDetails.link || '',
             'Type': req.currentStatusDetails.type || '',
             'Sprint': req.currentStatusDetails.sprint || '',
-            'Linked Defects': (req.linkedDefects || []).map(d => d.title).join('\n'),
+            'Linked Defects': (req.linkedDefects || []).map(d => d.title).join(', '), 
             'Status': req.currentStatusDetails.status
         }));
 
@@ -2827,7 +2827,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 'Requirement Name': item.requirement_title,
                 'Requirement Link': requirement ? requirement.currentStatusDetails.link : '',
                 'Type': requirement ? requirement.currentStatusDetails.type : '',
-                'Linked Defects': requirement ? (requirement.linkedDefects || []).map(d => d.title).join('\n') : '',
+                'Linked Defects': requirement ? (requirement.linkedDefects || []).map(d => d.title).join(', ') : '',
                 'Final Status': item.final_status
             };
         });
