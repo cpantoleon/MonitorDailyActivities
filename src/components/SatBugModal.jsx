@@ -26,7 +26,6 @@ const BUG_LABELS = [
     { value: 'EUIPO_PERFORMANCE', label: 'EUIPO_PERFORMANCE', description: 'for performance issues' },
     { value: 'EUIPO_SAT/UAT_RUN_IN_PARALLEL_WITH_FAT', label: 'EUIPO_SAT/UAT_RUN_IN_PARALLEL_WITH_FAT', description: 'bugs found during FAT period from EUIPO' },
     { value: 'EUIPO_FOUND_IN_FAT_NOTFIXED', label: 'EUIPO_FOUND_IN_FAT_NOTFIXED', description: 'bug found during FAT and not fixed (time limitations etc.)' },
-    { value: 'EUIPO_FOUND_IN_SAT_NOTFIXED', label: 'EUIPO_FOUND_IN_SAT_NOTFIXED', description: 'bug found during SAT and not fixed' }
 ];
 
 const SatBugModal = ({ isOpen, onClose, onSave, archiveId, bugToEdit, showMainMessage }) => {
