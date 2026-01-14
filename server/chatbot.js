@@ -8,6 +8,12 @@ const { exec } = require('child_process');
 const util = require('util');
 const promisifiedExec = util.promisify(exec);
 
+// --- CONFIGURATION FROM ENV ---
+const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || 'deepseek-r1:1.5b';
+const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
+
 let genAI, qdrantClient, embeddingModel, generativeModel;
 const QDRANT_COLLECTION_NAME = "requirements_defects";
 
@@ -17,6 +23,115 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
+
+// --- HELPER FUNCTIONS ---
+
+async function getHybridEmbedding(text) {
+    if (USE_OLLAMA) {
+        try {
+            const response = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: OLLAMA_EMBED_MODEL, prompt: text })
+            });
+            
+            if (!response.ok) {
+                 const errText = await response.text();
+                 throw new Error(`Ollama API Error: ${response.statusText} - ${errText}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.embedding || !Array.isArray(data.embedding)) {
+                throw new Error("Invalid embedding received from Ollama");
+            }
+
+            return data.embedding;
+        } catch (error) {
+            throw error;
+        }
+    } else {
+        const result = await embeddingModel.embedContent(text);
+        return result.embedding.values;
+    }
+}
+
+async function getHybridCompletion(prompt, jsonMode = false) {
+    let cleanResponse = "";
+    
+    if (USE_OLLAMA) {
+        const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: OLLAMA_CHAT_MODEL,
+                prompt: prompt,
+                stream: false,
+                format: jsonMode ? 'json' : undefined
+            })
+        });
+        const data = await response.json();
+        cleanResponse = data.response;
+    } else {
+        const result = await generativeModel.generateContent(prompt);
+        cleanResponse = result.response.text();
+    }
+
+    cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+    if (jsonMode) {
+        const firstBrace = cleanResponse.indexOf('{');
+        const lastBrace = cleanResponse.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanResponse = cleanResponse.substring(firstBrace, lastBrace + 1);
+        } else {
+            cleanResponse = cleanResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        }
+    }
+
+    return cleanResponse;
+}
+
+// --- NEW INTENT DETECTION HELPER ---
+function detectIntentAndEntity(message) {
+    const lowerMsg = message.toLowerCase();
+
+    // 1. Defects Count
+    if (lowerMsg.match(/how many defects|count of defects|number of defects/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_defects_count',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
+            }
+        };
+    }
+
+    // 2. Defects List
+    if (lowerMsg.match(/defects (?:for|in)|list defects|show me defects|give me the defects/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_defects_list',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
+            }
+        };
+    }
+
+    // 3. Release Date
+    if (lowerMsg.includes('release date')) {
+        const match = lowerMsg.match(/release date (?:for|of) (.+)/);
+        return { 
+            intent: 'get_release_date', 
+            parameters: { project_name: match ? match[1].replace('?', '').trim() : null } 
+        };
+    }
+
+    return null; // Fallback to AI
+}
 
 function extractProjectFromMessage(message, intent) {
     let regex;
@@ -29,7 +144,7 @@ function extractProjectFromMessage(message, intent) {
             break;
         case 'get_defects_list':
         case 'get_defects_count':
-            regex = /(?:defects?|counter of(?: the)? defects?|number of(?: the)? defects?|undone defects?|not done defects?|done defects?|closed defects?)(?:.*?)(?: for| in| have| of)\s+(?:the\s+)?(.+)/i;
+            regex = /(?:defects?|counter|number|undone|not done|done|closed)(?:.*?)(?: for| in| of)\s+(?:the\s+)?([a-zA-Z0-9\s-_]+)(?:\?|$)/i;
             break;
         default:
             return null;
@@ -59,7 +174,6 @@ function extractProjectFromMessage(message, intent) {
 
 function extractConversationalProject(message) {
     const pattern = /(?:(?:for|in|on|to)\s+project|project|for|in|on|to)\s+(?:the\s+)?(['"]?)([\w\s-]+?)\1(?=\s|,\s|\.\s|\?\s|sprint|title|titled|called|requirement|defect|$)/i;
-    
     let match = message.match(pattern);
 
     if (!match) {
@@ -77,7 +191,6 @@ function extractConversationalProject(message) {
     
     return null;
 }
-
 
 function extractTitleFromMessage(message) {
     const patterns = [
@@ -139,48 +252,69 @@ async function fetchNamedaysFromWidget() {
 }
 
 function initializeClients() {
-  if (genAI) {
+  if (qdrantClient) {
     return;
   }
+  
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const QDRANT_URL = process.env.QDRANT_URL;
   const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
   const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
 
-  if (!GEMINI_API_KEY || !QDRANT_URL || !QDRANT_API_KEY || !OPENWEATHER_API_KEY) {
-    throw new Error("One or more required environment variables are missing (GEMINI_API_KEY, QDRANT_URL, QDRANT_API_KEY, OPENWEATHER_API_KEY).");
+  if (!QDRANT_URL || !QDRANT_API_KEY || !OPENWEATHER_API_KEY) {
+    throw new Error("One or more required environment variables are missing (QDRANT_URL, QDRANT_API_KEY, OPENWEATHER_API_KEY).");
   }
 
-  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   qdrantClient = new QdrantClient({
       url: QDRANT_URL,
       apiKey: QDRANT_API_KEY,
   });
 
-  embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
-  generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", safetySettings });
+  if (!USE_OLLAMA) {
+      if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing for Cloud mode.");
+      genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
+      generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", safetySettings });
+  }
 
-  console.log("Chatbot clients initialized successfully.");
+  console.log(`Chatbot initialized. Mode: ${USE_OLLAMA ? 'LOCAL (Ollama)' : 'CLOUD (Gemini)'}`);
 }
 
 async function embedBatchWithRetry(textsToEmbed, maxRetries = 5) {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            const embeddingResult = await embeddingModel.batchEmbedContents({
-                requests: textsToEmbed.map(text => ({ model: "models/embedding-001", content: { parts: [{ text }] } })),
-            });
-            return embeddingResult;
-        } catch (error) {
-            if (error.status === 429 && attempt < maxRetries - 1) {
-                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-                console.warn(`Rate limit hit. Retrying in ${Math.round(delay / 1000)}s... (Attempt ${attempt + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                throw error;
+    if (USE_OLLAMA) {
+        const embeddings = [];
+        for (const text of textsToEmbed) {
+            try {
+                // TRUNCATION TO 100 CHARS: Critical for all-minilm stability
+                const safeText = text.replace(/[\r\n]+/g, ' ').substring(0, 100);
+                
+                await new Promise(resolve => setTimeout(resolve, 20)); // Small delay
+                const embedding = await getHybridEmbedding(safeText);
+                embeddings.push(embedding);
+            } catch (error) {
+                console.error(`Skipping document due to Ollama error:`, error.message);
+                embeddings.push(null);
             }
         }
+        return embeddings;
+    } else {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const embeddingResult = await embeddingModel.batchEmbedContents({
+                    requests: textsToEmbed.map(text => ({ model: "models/embedding-001", content: { parts: [{ text }] } })),
+                });
+                return embeddingResult.embeddings.map(e => e.values);
+            } catch (error) {
+                if (error.status === 429 && attempt < maxRetries - 1) {
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw error;
+                }
+            }
+        }
+        throw new Error("Failed to embed batch after multiple retries.");
     }
-    throw new Error("Failed to embed batch after multiple retries.");
 }
 
 const syncWithQdrant = (db) => async (req, res) => {
@@ -198,8 +332,12 @@ const syncWithQdrant = (db) => async (req, res) => {
         }
 
         console.log("Creating new collection and indexes...");
+        // Auto-detect size: 384 for minilm, 768 for nomic/gemini
+        const vectorSize = (USE_OLLAMA && OLLAMA_EMBED_MODEL.includes('minilm')) ? 384 : 768;
+        console.log(`Setting vector size to ${vectorSize} based on model: ${USE_OLLAMA ? OLLAMA_EMBED_MODEL : 'Gemini'}`);
+
         await qdrantClient.createCollection(QDRANT_COLLECTION_NAME, {
-            vectors: { size: 768, distance: 'Cosine' },
+            vectors: { size: vectorSize, distance: 'Cosine' },
         });
 
         await qdrantClient.createPayloadIndex(QDRANT_COLLECTION_NAME, { field_name: 'project', field_schema: 'keyword', wait: true });
@@ -296,18 +434,26 @@ const syncWithQdrant = (db) => async (req, res) => {
         }
 
         console.log(`Embedding and upserting ${documents.length} documents...`);
-        const BATCH_SIZE = 100;
+        const BATCH_SIZE = USE_OLLAMA ? 5 : 100;
+        
         for (let i = 0; i < documents.length; i += BATCH_SIZE) {
             const batchDocuments = documents.slice(i, i + BATCH_SIZE);
             const textsToEmbed = batchDocuments.map(d => d.text);
             
-            const embeddingResult = await embedBatchWithRetry(textsToEmbed);
+            const embeddings = await embedBatchWithRetry(textsToEmbed);
 
-            const embeddings = embeddingResult.embeddings.map(e => e.values);
-            await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
-                wait: true,
-                points: batchDocuments.map((doc, index) => ({ id: doc.id, vector: embeddings[index], payload: doc.payload })),
-            });
+            const points = batchDocuments.map((doc, index) => {
+                const vector = embeddings[index];
+                if (!vector) return null;
+                return { id: doc.id, vector: vector, payload: doc.payload };
+            }).filter(p => p !== null);
+
+            if (points.length > 0) {
+                await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
+                    wait: true,
+                    points: points,
+                });
+            }
         }
         console.log("Sync successful!");
         res.status(200).json({ message: "Sync successful! Collection was rebuilt.", synced: documents.length });
@@ -393,27 +539,18 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         if (lowerCaseMessage === 'github') {
             try {
                 console.log("Received 'github' command. Starting process...");
+                const projectRoot = path.resolve(__dirname, '..'); 
 
-                const projectRoot = path.resolve(__dirname, '..'); // Resolve to the project root
-
-                // Step 1: Git Add
-                console.log("Executing 'git add .' in project root");
                 await promisifiedExec('git add .', { cwd: projectRoot });
 
-                // Step 2: Check for changes before committing
                 const { stdout: statusOutput } = await promisifiedExec('git status --porcelain', { cwd: projectRoot });
                 if (!statusOutput) {
                     console.log("No changes to commit.");
                     return res.json({ reply: "No changes to commit. The working directory is clean." });
                 }
                 
-                // Step 3: Git Commit
-                console.log("Executing 'git commit' in project root");
                 const commitMessage = "db updated";
                 await promisifiedExec(`git commit -m "${commitMessage}"`, { cwd: projectRoot });
-
-                // Step 4: Git Push
-                console.log("Executing 'git push' in project root");
                 await promisifiedExec('git push', { cwd: projectRoot });
 
                 console.log("GitHub commit process completed successfully.");
@@ -429,11 +566,7 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         if (lowerCaseMessage === 'github pull') {
             try {
                 console.log("Received 'github pull' command. Starting process...");
-
-                const projectRoot = path.resolve(__dirname, '..'); // Resolve to the project root
-
-                // Step 1: Git Pull
-                console.log("Executing 'git pull' in project root");
+                const projectRoot = path.resolve(__dirname, '..'); 
                 await promisifiedExec('git pull', { cwd: projectRoot });
 
                 console.log("GitHub pull process completed successfully.");
@@ -477,57 +610,50 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         let intentData = {};
 
         if (!preDeterminedIntent) {
-            const intentPrompt = `
-            Analyze the user's message to determine their primary intent and extract key parameters.
-            Your response must be ONLY a single JSON object.
-            **INTENTS:**
-            - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm".
-            - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?".
-            - "create_item": User wants to create a new item (requirement or defect). The parameters can appear in any order. Examples: "for the crm-project project, please create a requirement in sprint 7 called 'API Rate Limiting'", "I need a new requirement with the title 'User Profile V2' for the crm-project project, please put it in sprint 10", "crm-project project requirement, 3 sprint, 'Password Reset UI' title", "In sprint 12 for the crm-project project, I need a new requirement with the title 'Add GDPR Compliance Banner'", "Let's make a new requirement in sprint 4 for the crm-project project. Call it 'Implement Two-Factor Authentication'.", "Hey, I found a bug. Can you log a defect in the crm-project project? The title should be 'Session timeout is too short'.", "I'm reporting a defect in the crm-project project. It's called 'Incorrect calculation in summary report'.", "Log a defect in project 'crm-project project', title is 'Submit button is disabled incorrectly'.".
-            - "get_joke": User asks for a joke.
-            - "get_weather": User wants to know the current or future weather.
-            - "get_nameday": User wants to know who is celebrating their nameday.
-            - "get_release_date": User is asking for the release date of a project or a specific item.
-            - "get_project_summary": User wants a summary of a project's data.
-            - "get_general_info": A general question that requires searching the database that does not match any other intent.
-            - "unknown": The intent is unclear.
-            **PARAMETERS TO EXTRACT:**
-            - "project_name": The name of the project (e.g., "crm-project", "test project").
-            - "defect_status_filter": The status filter for defect queries. Infer from words like "undone", "not done", "done", "closed". Default is "all".
-            - "item_type": The type of item, must be one of: "requirement", "defect".
-            - "item_id": The specific ID of an item (e.g., "REQ-GAS-030", "DEF-123").
-            - "title": The title for an item to be created.
-            - "sprint": The name or number of the sprint.
-            - "location": The city/place for the weather forecast (e.g., "Athens", "London").
-            - "timeframe": When the user wants something for (e.g., "today", "tomorrow", "next 7 days").
-            - "query": The user's core question for general info searches.
-            User message: "${message}"
-            `;
-            try {
-                const chat = generativeModel.startChat({ history: [] });
-                const result = await chat.sendMessage(intentPrompt);
-                const responseText = result.response.text();
+            // TRY REGEX FIRST (Priority for simple queries like count/list)
+            intentData = detectIntentAndEntity(message);
 
-                const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                intentData = JSON.parse(cleanedText);
-            } catch (apiError) {
-                console.error("Error calling Google Generative AI:", apiError);
-                if (apiError.status === 400) {
-                    return res.json({ reply: "I'm sorry, I can't process that request. API key not valid. Please pass a valid API key." });
+            if (!intentData) {
+                // If Regex fails, fallback to AI
+                const intentPrompt = `
+                Analyze the user's message to determine their primary intent and extract key parameters.
+                Your response must be ONLY a single JSON object.
+                **INTENTS:**
+                - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm".
+                - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?".
+                - "create_item": User wants to create a new item (requirement or defect). The parameters can appear in any order.
+                - "get_joke": User asks for a joke.
+                - "get_weather": User wants to know the current or future weather.
+                - "get_nameday": User wants to know who is celebrating their nameday.
+                - "get_release_date": User is asking for the release date of a project or a specific item.
+                - "get_project_summary": User wants a summary of a project's data.
+                - "get_general_info": A general question that requires searching the database that does not match any other intent.
+                - "unknown": The intent is unclear.
+                **PARAMETERS TO EXTRACT:**
+                - "project_name": The name of the project.
+                - "defect_status_filter": The status filter for defect queries.
+                - "item_type": "requirement" or "defect".
+                - "item_id": The specific ID of an item.
+                - "title": The title for an item to be created.
+                - "sprint": The name or number of the sprint.
+                - "location": The city/place for the weather forecast.
+                - "timeframe": "today", "tomorrow", "next 7 days".
+                - "query": The user's core question.
+                User message: "${message}"
+                `;
+                try {
+                    const cleanedText = await getHybridCompletion(intentPrompt, true);
+                    intentData = JSON.parse(cleanedText);
+                } catch (apiError) {
+                    console.error("Error calling AI Service:", apiError);
+                    intentData = { intent: "get_general_info", parameters: {} };
                 }
-                if (apiError.status === 429) {
-                    return res.json({ reply: "The AI service is currently busy. Please wait a moment and try your request again." });
-                }
-                if (apiError.status === 503) {
-                    return res.json({ reply: "The AI service is temporarily unavailable. Please try again in a moment." });
-                }
-                return res.json({ reply: "Sorry, I encountered an issue with an external service. Please try again." });
             }
         } else {
             intentData = { intent: preDeterminedIntent, parameters: {} };
         }
         
-        const { intent, parameters } = intentData;
+        const { intent, parameters } = intentData || {};
         
         switch (intent) {
             case "get_joke": {
@@ -882,11 +1008,11 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 ${defectContext || "No open defects found."}
                 
                 ---
-                Provide a clear, bulleted summary.
+                Provide a clear, bulleted summary. Do not output <think> tags.
                 `;
                 
-                const finalResult = await generativeModel.generateContent(finalPrompt);
-                return res.json({ reply: finalResult.response.text() });
+                const finalResultText = await getHybridCompletion(finalPrompt);
+                return res.json({ reply: finalResultText });
             }
             
             case "get_defects_list":
@@ -1006,9 +1132,12 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     }
                 }
 
-                const queryEmbedding = await embeddingModel.embedContent(parameters?.query || message);
+                // TRUNCATE QUERY TOO FOR ALL-MINILM SAFETY
+                const safeQuery = (parameters?.query || message).substring(0, 100);
+                const queryEmbedding = await getHybridEmbedding(safeQuery);
+                
                 const searchResults = await qdrantClient.search(QDRANT_COLLECTION_NAME, {
-                    vector: queryEmbedding.embedding.values,
+                    vector: queryEmbedding,
                     limit: 5,
                     with_payload: true,
                     ...(finalProjectName && { filter: { must: [{ key: "project", match: { value: finalProjectName } }] } })
@@ -1027,10 +1156,10 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 
                 User's Question: ${message}
                 
-                Provide a concise, direct answer.`;
+                Provide a concise, direct answer. Do not output <think> tags.`;
                 
-                const finalResult = await generativeModel.generateContent(finalPrompt);
-                return res.json({ reply: finalResult.response.text() });
+                const finalResultText = await getHybridCompletion(finalPrompt);
+                return res.json({ reply: finalResultText });
             }
         }
     } catch (error) {
