@@ -123,7 +123,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
                 How to Export from JIRA?
               </span>
             </div>
-            <Tooltip content={tooltipContent} />
+            <Tooltip content={tooltipContent} position="bottom" />
           </div>
           {error && <p id="error-message-modal-id" className="error-message-modal">{error}</p>}
           <div id="form-group-file-id" className="form-group">
