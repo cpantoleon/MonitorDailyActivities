@@ -3249,7 +3249,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                             <div id={`archived-card-body-${archive.id}`} className="archived-card-body">
                                 <h4>Final Metrics</h4>
                                 <div id={`archived-metrics-${archive.id}`} className="archived-metrics">
-                                    <span className="metric-item done">Done: {archive.metrics.doneCount}</span>
+                                    <span className="metric-item done">Requirements : {archive.metrics.doneCount}</span>
                                     <span className="metric-item not-done">Defects: {archive.defectCount}</span>
                                 </div>
                             </div>
