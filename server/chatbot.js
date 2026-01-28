@@ -8,7 +8,6 @@ const { exec } = require('child_process');
 const util = require('util');
 const promisifiedExec = util.promisify(exec);
 
-// --- CONFIGURATION FROM ENV ---
 const USE_OLLAMA = process.env.USE_OLLAMA === 'true';
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || 'deepseek-r1:1.5b';
@@ -23,8 +22,6 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
-
-// --- HELPER FUNCTIONS ---
 
 async function getHybridEmbedding(text) {
     if (USE_OLLAMA) {
@@ -93,46 +90,6 @@ async function getHybridCompletion(prompt, jsonMode = false) {
     return cleanResponse;
 }
 
-// --- NEW INTENT DETECTION HELPER ---
-function detectIntentAndEntity(message) {
-    const lowerMsg = message.toLowerCase();
-
-    // 1. Defects Count
-    if (lowerMsg.match(/how many defects|count of defects|number of defects/)) {
-        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
-        return {
-            intent: 'get_defects_count',
-            parameters: { 
-                project_name: match ? match[1].replace('?', '').trim() : null,
-                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
-            }
-        };
-    }
-
-    // 2. Defects List
-    if (lowerMsg.match(/defects (?:for|in)|list defects|show me defects|give me the defects/)) {
-        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
-        return {
-            intent: 'get_defects_list',
-            parameters: { 
-                project_name: match ? match[1].replace('?', '').trim() : null,
-                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
-            }
-        };
-    }
-
-    // 3. Release Date
-    if (lowerMsg.includes('release date')) {
-        const match = lowerMsg.match(/release date (?:for|of) (.+)/);
-        return { 
-            intent: 'get_release_date', 
-            parameters: { project_name: match ? match[1].replace('?', '').trim() : null } 
-        };
-    }
-
-    return null; // Fallback to AI
-}
-
 function extractProjectFromMessage(message, intent) {
     let regex;
     switch (intent) {
@@ -194,7 +151,8 @@ function extractConversationalProject(message) {
 
 function extractTitleFromMessage(message) {
     const patterns = [
-        /(?:titled|title is|title|with title|called|call it|the title should be)\s+(['"]?)(.+?)\1(?=[.,]?(\s+for|\s+in|\s+on|\s+sprint|project|$))/i,
+        /(?:requirement|defect)\s+(['"])(.+?)\1/i,
+        /(?:titled|title is|title|with title|named|called|call it|the title should be)\s+(['"]?)(.+?)\1(?=[.,]?(\s+for|\s+in|\s+on|\s+sprint|project|$))/i,
         /:\s+(['"]?)(.+?)\1$/i,
         /(['"])(.+?)\1\s+title/i
     ];
@@ -218,6 +176,57 @@ function extractTitleFromMessage(message) {
 function extractSprintFromMessage(message) {
     const match = message.match(/(?:in\s+)?sprint\s+([a-zA-Z0-9_.-]+)|([a-zA-Z0-9_.-]+)\s+sprint/i);
     return match ? (match[1] || match[2]).trim() : null;
+}
+
+function detectIntentAndEntity(message) {
+    const lowerMsg = message.toLowerCase();
+
+    if (lowerMsg.match(/how many defects|count of defects|number of defects/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_defects_count',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
+            }
+        };
+    }
+
+    if (lowerMsg.match(/defects (?:for|in)|list defects|show me defects|give me the defects/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_defects_list',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                defect_status_filter: lowerMsg.includes('done') || lowerMsg.includes('closed') ? 'closed' : 'undone'
+            }
+        };
+    }
+
+    if (lowerMsg.includes('release date')) {
+        const match = lowerMsg.match(/release date (?:for|of) (.+)/);
+        return { 
+            intent: 'get_release_date', 
+            parameters: { project_name: match ? match[1].replace('?', '').trim() : null } 
+        };
+    }
+
+    if (lowerMsg.startsWith('create') || lowerMsg.startsWith('add') || lowerMsg.startsWith('new') || lowerMsg.includes('create a')) {
+        const typeMatch = lowerMsg.match(/(requirement|defect)/);
+        if (typeMatch) {
+             return {
+                intent: 'create_item',
+                parameters: {
+                    item_type: typeMatch[1],
+                    title: extractTitleFromMessage(message),
+                    project_name: extractConversationalProject(message),
+                    sprint: extractSprintFromMessage(message)
+                }
+            };
+        }
+    }
+
+    return null;
 }
 
 async function fetchNamedaysFromWidget() {
@@ -276,8 +285,6 @@ function initializeClients() {
       embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" });
       generativeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", safetySettings });
   }
-
-  console.log(`Chatbot initialized. Mode: ${USE_OLLAMA ? 'LOCAL (Ollama)' : 'CLOUD (Gemini)'}`);
 }
 
 async function embedBatchWithRetry(textsToEmbed, maxRetries = 5) {
@@ -285,10 +292,9 @@ async function embedBatchWithRetry(textsToEmbed, maxRetries = 5) {
         const embeddings = [];
         for (const text of textsToEmbed) {
             try {
-                // TRUNCATION TO 100 CHARS: Critical for all-minilm stability
                 const safeText = text.replace(/[\r\n]+/g, ' ').substring(0, 100);
                 
-                await new Promise(resolve => setTimeout(resolve, 20)); // Small delay
+                await new Promise(resolve => setTimeout(resolve, 20));
                 const embedding = await getHybridEmbedding(safeText);
                 embeddings.push(embedding);
             } catch (error) {
@@ -321,20 +327,17 @@ const syncWithQdrant = (db) => async (req, res) => {
     try {
         initializeClients();
 
-        try {
-            const collectionExists = await qdrantClient.getCollection(QDRANT_COLLECTION_NAME).catch(() => null);
-            if (collectionExists) {
-                console.log("Existing collection found. Deleting to perform a clean sync...");
-                await qdrantClient.deleteCollection(QDRANT_COLLECTION_NAME);
-            }
-        } catch (e) {
-            console.log("Could not delete collection (it may not have existed), proceeding with creation.");
+        let vectorSize = 768; 
+        if (USE_OLLAMA) {
+             if (OLLAMA_EMBED_MODEL.includes('minilm') || OLLAMA_EMBED_MODEL.includes('small')) {
+                 vectorSize = 384;
+             }
         }
-
-        console.log("Creating new collection and indexes...");
-        // Auto-detect size: 384 for minilm, 768 for nomic/gemini
-        const vectorSize = (USE_OLLAMA && OLLAMA_EMBED_MODEL.includes('minilm')) ? 384 : 768;
-        console.log(`Setting vector size to ${vectorSize} based on model: ${USE_OLLAMA ? OLLAMA_EMBED_MODEL : 'Gemini'}`);
+        
+        try {
+            await qdrantClient.deleteCollection(QDRANT_COLLECTION_NAME);
+        } catch (e) {
+        }
 
         await qdrantClient.createCollection(QDRANT_COLLECTION_NAME, {
             vectors: { size: vectorSize, distance: 'Cosine' },
@@ -352,7 +355,6 @@ const syncWithQdrant = (db) => async (req, res) => {
             wait: true 
         });
         
-        console.log("Fetching latest data from the database...");
         const requirementsSql = `
             SELECT 
                 a.id as activityDbId, a.requirementGroupId, a.requirementUserIdentifier, 
@@ -429,11 +431,9 @@ const syncWithQdrant = (db) => async (req, res) => {
         ].filter(doc => doc.id && !doc.id.includes('_null') && !doc.id.includes('_undefined'));
 
         if (documents.length === 0) {
-            console.log("No documents to sync.");
             return res.status(200).json({ message: "No valid documents to sync." });
         }
 
-        console.log(`Embedding and upserting ${documents.length} documents...`);
         const BATCH_SIZE = USE_OLLAMA ? 5 : 100;
         
         for (let i = 0; i < documents.length; i += BATCH_SIZE) {
@@ -455,7 +455,6 @@ const syncWithQdrant = (db) => async (req, res) => {
                 });
             }
         }
-        console.log("Sync successful!");
         res.status(200).json({ message: "Sync successful! Collection was rebuilt.", synced: documents.length });
     } catch (error) {
         console.error("Failed to sync data with Qdrant:", error);
@@ -538,14 +537,12 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
         if (lowerCaseMessage === 'github') {
             try {
-                console.log("Received 'github' command. Starting process...");
                 const projectRoot = path.resolve(__dirname, '..'); 
 
                 await promisifiedExec('git add .', { cwd: projectRoot });
 
                 const { stdout: statusOutput } = await promisifiedExec('git status --porcelain', { cwd: projectRoot });
                 if (!statusOutput) {
-                    console.log("No changes to commit.");
                     return res.json({ reply: "No changes to commit. The working directory is clean." });
                 }
                 
@@ -553,11 +550,9 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                 await promisifiedExec(`git commit -m "${commitMessage}"`, { cwd: projectRoot });
                 await promisifiedExec('git push', { cwd: projectRoot });
 
-                console.log("GitHub commit process completed successfully.");
                 return res.json({ reply: "Success! Your changes have been added, committed, and pushed." });
 
             } catch (error) {
-                console.error("GitHub command process failed:", error);
                 const errorMessage = error.stderr || error.stdout || error.message;
                 return res.json({ reply: `The GitHub command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
             }
@@ -565,15 +560,12 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
 
         if (lowerCaseMessage === 'github pull') {
             try {
-                console.log("Received 'github pull' command. Starting process...");
                 const projectRoot = path.resolve(__dirname, '..'); 
                 await promisifiedExec('git pull', { cwd: projectRoot });
 
-                console.log("GitHub pull process completed successfully.");
                 return res.json({ reply: "Success! Your local repository has been updated." });
 
             } catch (error) {
-                console.error("GitHub pull command process failed:", error);
                 const errorMessage = error.stderr || error.stdout || error.message;
                 return res.json({ reply: `The GitHub pull command failed:\n\n\`\`\`\n${errorMessage}\n\`\`\`` });
             }
@@ -610,11 +602,9 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         let intentData = {};
 
         if (!preDeterminedIntent) {
-            // TRY REGEX FIRST (Priority for simple queries like count/list)
             intentData = detectIntentAndEntity(message);
 
             if (!intentData) {
-                // If Regex fails, fallback to AI
                 const intentPrompt = `
                 Analyze the user's message to determine their primary intent and extract key parameters.
                 Your response must be ONLY a single JSON object.
@@ -1132,7 +1122,6 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
                     }
                 }
 
-                // TRUNCATE QUERY TOO FOR ALL-MINILM SAFETY
                 const safeQuery = (parameters?.query || message).substring(0, 100);
                 const queryEmbedding = await getHybridEmbedding(safeQuery);
                 
@@ -1164,6 +1153,13 @@ const handleChatbotQuery = (db, getProjectId, port) => async (req, res) => {
         }
     } catch (error) {
         console.error("Chatbot error:", error);
+        
+        if (error.status === 400 && (error.data?.status?.error || "").includes("Vector dimension error")) {
+             return res.json({ 
+                 reply: "⚠️ **System Mismatch Detected**\n\nThe AI model has changed, but the database allows the old format. \n\n**Please click the 'Sync Data' button** to rebuild the database with the correct settings." 
+             });
+        }
+
         if (error instanceof SyntaxError) {
              return res.status(500).json({ error: "Sorry, I had trouble understanding that. Could you please rephrase your request?", details: "Failed to parse LLM response." });
         }
