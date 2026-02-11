@@ -1,0 +1,111 @@
+/* Container for the whole widget including search */
+.weather-widget-container {
+  max-width: 250px; /* Matched width with eortologio widget */
+  margin: 0 auto;
+  margin-bottom: 20px;
+}
+
+/* The main card element */
+.weather-card-static-bg {
+  position: relative;
+  border-radius: 25px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  color: #333;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 0.5s ease-in-out;
+}
+
+/* Add an overlay for text readability */
+.weather-card-static-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 25px;
+  background-color: rgba(240, 248, 255, 0.55); /* Slightly adjusted overlay */
+  z-index: 1;
+}
+
+/* The container for the text content */
+.card-img-overlay-content {
+  position: relative;
+  z-index: 2;
+  padding: 0.8rem; /* Reduced padding */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 160px; /* Reduced height */
+}
+
+/* Typography styles */
+.location-name {
+  font-size: 1.1rem; /* Reduced font size */
+  font-weight: 500;
+  margin-bottom: 0.25rem; /* Reduced margin */
+}
+
+.temperature {
+  font-size: 2.8rem; /* Reduced font size */
+  font-weight: 400;
+  margin: 0.25rem 0; /* Reduced margin */
+}
+
+.feels-like {
+  font-size: 0.8rem; /* Reduced font size */
+  margin-bottom: 0.5rem; /* Reduced margin */
+}
+
+.description {
+  font-size: 1rem; /* Reduced font size */
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+/* Loading and Error states */
+.loading-text,
+.error-text {
+  color: #333;
+  font-weight: 500;
+  padding: 2rem;
+}
+.error-text {
+  color: #842029;
+}
+
+/* Search input styles */
+.weather-search {
+  margin-top: 12px; /* Increased space */
+  display: flex;
+  gap: 5px;
+}
+
+.weather-search input {
+  flex-grow: 1;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  border: 1px solid #DEB887;
+  border-radius: 4px;
+  background-color: #FFFAF0;
+  min-width: 0;
+}
+
+.weather-search button {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border: 1px solid #8B4513;
+  background-color: #D2B48C;
+  color: #5C4033;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.weather-search button:hover {
+  background-color: #C8A679;
+}

@@ -1,0 +1,126 @@
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 90px; /* Made smaller */
+  height: 30px; /* Made smaller */
+}
+
+.toggle-switch-checkbox {
+  display: none;
+}
+
+.toggle-switch-label {
+  display: block;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #ccc; /* Thinner border */
+  border-radius: 15px; /* Adjusted for new height */
+}
+
+.toggle-switch-inner {
+  display: block;
+  width: 200%;
+  margin-left: -100%;
+  transition: margin 0.3s ease-in 0s;
+}
+
+.toggle-switch-inner:before, .toggle-switch-inner:after {
+  display: block;
+  float: left;
+  width: 50%;
+  height: 28px; /* Adjusted for new height and border */
+  padding: 0;
+  line-height: 28px; /* Adjusted for new height */
+  font-size: 12px; /* Smaller font */
+  color: white;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+.toggle-switch-inner:before {
+  content: attr(data-option1);
+  padding-left: 10px;
+  background-color: #007bff;
+  color: #fff;
+}
+
+.toggle-switch-inner:after {
+  content: attr(data-option2);
+  padding-right: 10px;
+  background-color: #ccc;
+  color: #333;
+  text-align: right; 
+}
+
+.toggle-switch-switch {
+  display: block;
+  width: 22px; /* Made smaller */
+  margin: 3px; /* Reduced margin */
+  background: #fff;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 62px; /* Adjusted position for new size */
+  border: 1px solid #ccc; /* Thinner border */
+  border-radius: 15px; /* Adjusted for new height */
+  transition: all 0.3s ease-in 0s;
+}
+
+.toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-inner {
+  margin-left: 0;
+}
+
+.toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-switch {
+  right: 3px; /* Adjusted position for new size */
+}
+
+.simple-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  top: 4px;
+}
+
+.simple-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.simple-toggle-switch-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 26px;
+}
+
+.simple-toggle-switch-switch {
+  position: absolute;
+  content: '';
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 1.2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.simple-toggle-switch-checkbox:checked + .simple-toggle-switch-label {
+  background-color: #007bff; /* Blue color when checked */
+}
+
+.simple-toggle-switch-checkbox:checked + .simple-toggle-switch-label .simple-toggle-switch-switch {
+  transform: translateX(24px);
+}
+
+.simple-toggle-switch-label::before,
+.simple-toggle-switch-label::after {
+  content: none !important;
+}

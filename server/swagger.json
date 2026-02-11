@@ -1,0 +1,3799 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Kanban API",
+    "version": "1.0.0",
+    "description": "API for the Kanban Application"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001/api",
+      "description": "Development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Projects",
+      "description": "Operations for managing projects"
+    },
+    {
+      "name": "Releases",
+      "description": "Operations for managing project releases"
+    },
+    {
+      "name": "Archives",
+      "description": "Operations for managing archived releases"
+    },
+    {
+      "name": "FAT",
+      "description": "Operations for managing Factory Acceptance Testing (FAT) periods"
+    },
+    {
+      "name": "SAT Bugs",
+      "description": "Operations for managing SAT bugs associated with an archived release"
+    },
+    {
+      "name": "Requirements",
+      "description": "Operations related to sprint requirements and activities"
+    },
+    {
+      "name": "Import",
+      "description": "Operations for importing data from external sources"
+    },
+    {
+      "name": "Jira",
+      "description": "Operations for Jira integration"
+    },
+    {
+      "name": "Notes",
+      "description": "Operations for daily notes"
+    },
+    {
+      "name": "Retrospective",
+      "description": "Operations for the key findings items"
+    },
+    {
+      "name": "Defects",
+      "description": "Operations for defect tracking"
+    },
+    {
+      "name": "Settings",
+      "description": "Operations for managing application settings"
+    },
+    {
+      "name": "Chatbot",
+      "description": "Operations for the AI Chatbot"
+    }
+  ],
+  "paths": {
+    "/projects": {
+      "get": {
+        "summary": "Get all projects",
+        "tags": [
+          "Projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of project names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": [
+                        "Project A",
+                        "Project B"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new project",
+        "tags": [
+          "Projects"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Project"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/projects/{name}": {
+      "put": {
+        "summary": "Rename a project",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectNamePath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "newName"
+                ],
+                "properties": {
+                  "newName": {
+                    "type": "string",
+                    "description": "The new name for the project."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project renamed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "oldName": {
+                          "type": "string"
+                        },
+                        "newName": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a project and all its associated data",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectNamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project and all its associated data have been deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Project 'Project A' and all its associated data have been deleted."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/releases/{project}": {
+      "get": {
+        "summary": "Get all active releases for a project",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of active releases for the specified project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Release"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/releases/{project}/selectable": {
+      "get": {
+        "summary": "Get all selectable active releases for a project",
+        "description": "Retrieves a list of active releases suitable for selection in a new FAT period.",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of selectable active releases.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "active"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/releases": {
+      "post": {
+        "summary": "Create a new release",
+        "tags": [
+          "Releases"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Release created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Release"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/releases/{id}": {
+      "put": {
+        "summary": "Update an existing release",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a release",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release deleted successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/releases/{id}/close": {
+      "post": {
+        "summary": "Close and archive a release",
+        "description": "Closes an active release, archives its details and associated requirements, and optionally marks requirements as 'Done'.",
+        "tags": [
+          "Releases"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseCloseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release successfully finalized and archived."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/{project}": {
+      "get": {
+        "summary": "Get all archived releases for a project",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of archived releases for the specified project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ArchivedRelease"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/archives/details/{archiveId}": {
+      "get": {
+        "summary": "Get detailed items for an archived release",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of requirement items that were part of the archived release.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ArchivedReleaseItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/archives/{archiveId}/sat-report": {
+      "post": {
+        "summary": "Add or update a SAT report for an archive",
+        "tags": [
+          "Archives"
+        ],
+        "description": "Adds or updates the SAT (System Acceptance Testing) report for a specific archived release. The total of all percentage fields must equal 100 to save, or 0 to clear the report.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatReportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SAT report cleared successfully."
+          },
+          "201": {
+            "description": "SAT report saved or updated successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/{id}": {
+      "delete": {
+        "summary": "Delete an archived release",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived release deleted successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/archives/{id}/complete": {
+      "post": {
+        "summary": "Complete an 'archive_only' release",
+        "description": "Moves all requirements from an 'archive_only' release to a 'Done' state, effectively changing its status to 'archive_and_complete'. This is for releases that were archived without completing the items first.",
+        "tags": [
+          "Archives"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived release has been successfully completed."
+          },
+          "400": {
+            "description": "The release was not of type 'archive_only'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{project}": {
+      "get": {
+        "summary": "Get all FAT periods for a project",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of all FAT periods (active and completed) for the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FatPeriod"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Start a new FAT period for a project",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FatPeriodInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FAT period started successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "An active FAT period already exists for this project."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}": {
+      "delete": {
+        "summary": "Delete or cancel a FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FAT period deleted successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/details/{fat_period_id}": {
+      "get": {
+        "summary": "Get details for a specific FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of requirements and defects for the FAT period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requirements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "defects": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Defect"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/complete": {
+      "put": {
+        "summary": "Complete an active FAT period",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FAT period completed successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/report": {
+      "post": {
+        "summary": "Add or update a FAT execution report",
+        "description": "Saves the execution results for a FAT period. The sum of all fields must equal the total number of requirements in scope. Submitting all zeros will clear the report.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FatReportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FAT report saved successfully."
+          },
+          "200": {
+            "description": "FAT report cleared successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/kpis": {
+      "get": {
+        "summary": "Calculate KPIs for a FAT period",
+        "description": "Calculates key performance indicators (DRE, MTTD, MTTR) for a specific FAT period based on its associated defects. This is a real-time calculation.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully calculated KPIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FatKpis"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/fat/{fat_period_id}/stored-kpis": {
+      "get": {
+        "summary": "Get stored KPIs for a completed FAT period",
+        "description": "Retrieves the KPIs (DRE, MTTD, MTTR) that were calculated and stored when the FAT period was completed.",
+        "tags": [
+          "FAT"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FatPeriodIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved stored KPIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FatKpis"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/{archiveId}/sat-bugs": {
+      "get": {
+        "summary": "Get all SAT bugs for an archived release",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of SAT bugs for the specified archive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SatBug"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add a new SAT bug to an archived release",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ArchiveIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatBugInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "SAT bug added successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/archives/sat-bugs/{bugId}": {
+      "put": {
+        "summary": "Update an existing SAT bug",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SatBugIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SatBugInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SAT bug updated successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a SAT bug",
+        "tags": [
+          "SAT Bugs"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SatBugIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SAT bug deleted successfully."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/requirements": {
+      "get": {
+        "summary": "Get all requirement groups",
+        "tags": [
+          "Requirements"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of requirement groups with linked defects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequirementGroup"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/activities": {
+      "post": {
+        "summary": "Create a new activity (can create or update a requirement)",
+        "tags": [
+          "Requirements"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activity processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ActivityOutput"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/activities/{activityId}": {
+      "put": {
+        "summary": "Update an existing activity's details",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActivityIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activity updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "changes": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/requirements/{requirementGroupId}/changes": {
+      "get": {
+        "summary": "Get scope change history for a requirement",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequirementGroupIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of scope change entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequirementChange"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Log a new scope change for a requirement",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequirementGroupIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementChangeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Change logged successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/requirements/{requirementGroupId}/rename": {
+      "put": {
+        "summary": "Rename a requirement group",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequirementGroupIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementRenameInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Requirement name updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/requirements/{requirementGroupId}/set-release": {
+      "put": {
+        "summary": "Set the release for a requirement group",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequirementGroupIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "release_id": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "The ID of the release to associate. Null to disassociate."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release updated for the requirement group."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/requirements/{requirementGroupId}": {
+      "delete": {
+        "summary": "Delete a requirement group and all its activities",
+        "tags": [
+          "Requirements"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequirementGroupIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Requirement group deleted successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/import/validate": {
+      "post": {
+        "summary": "Validate a requirements Excel file for import",
+        "tags": [
+          "Import"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "project": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file",
+                  "project"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation complete."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/import/requirements": {
+      "post": {
+        "summary": "Import requirements from an Excel file",
+        "tags": [
+          "Import"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "project": {
+                    "type": "string"
+                  },
+                  "sprint": {
+                    "type": "string"
+                  },
+                  "release_id": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "importMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "new_only"
+                    ],
+                    "description": "Determines how to handle duplicates. 'all' renames duplicates, 'new_only' skips them."
+                  }
+                },
+                "required": [
+                  "file",
+                  "project",
+                  "sprint"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Import successful."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/import/defects/validate": {
+      "post": {
+        "summary": "Validate a defects Excel file for import",
+        "tags": [
+          "Import"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "project": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file",
+                  "project"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation complete."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/import/defects": {
+      "post": {
+        "summary": "Import defects from an Excel file",
+        "tags": [
+          "Import"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "project": {
+                    "type": "string"
+                  },
+                  "importMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "new_only"
+                    ],
+                    "description": "Determines how to handle duplicates. 'all' renames duplicates, 'new_only' skips them."
+                  }
+                },
+                "required": [
+                  "file",
+                  "project"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Import successful."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/settings/jira-token": {
+      "get": {
+        "summary": "Check if a Jira token exists",
+        "tags": [
+          "Jira"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns whether a token is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasToken": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Save a Jira personal access token",
+        "tags": [
+          "Jira"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraTokenInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token saved successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/settings/jira-token-exists": {
+      "get": {
+        "summary": "Check if a Jira token exists (alternative endpoint)",
+        "tags": [
+          "Jira"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns whether a token is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exists": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/jira/config/{project}": {
+      "get": {
+        "summary": "Get JQL configuration for a project",
+        "tags": [
+          "Jira"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the saved JQL query for the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jql": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/jira/config": {
+      "post": {
+        "summary": "Save JQL configuration for a project",
+        "tags": [
+          "Jira"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraConfigInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Config saved successfully"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/jira/import": {
+      "post": {
+        "summary": "Import data from Jira using unified endpoint",
+        "tags": [
+          "Jira"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "newCount": {
+                          "type": "integer"
+                        },
+                        "updatedCount": {
+                          "type": "integer"
+                        },
+                        "skippedCount": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/jira/import/requirements": {
+      "post": {
+        "summary": "Import requirements from Jira (specific endpoint)",
+        "tags": [
+          "Jira"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project",
+                  "jql"
+                ],
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "jql": {
+                    "type": "string"
+                  },
+                  "release_id": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "sprint": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/jira/import/defects": {
+      "post": {
+        "summary": "Import defects from Jira (specific endpoint)",
+        "tags": [
+          "Jira"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project",
+                  "jql"
+                ],
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "jql": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notes/{project}": {
+      "get": {
+        "summary": "Get all notes for a specific project",
+        "tags": [
+          "Notes"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A map of notes (date: text)"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/notes": {
+      "post": {
+        "summary": "Create or update a note for a project and date",
+        "tags": [
+          "Notes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Note processed successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/retrospective/{project}": {
+      "get": {
+        "summary": "Get all retrospective items for a project",
+        "tags": [
+          "Retrospective"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of retrospective items"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/retrospective/project/{project}": {
+      "delete": {
+        "summary": "Delete all retrospective items for a project",
+        "tags": [
+          "Retrospective"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All retrospective items for the project have been deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "changes": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/retrospective": {
+      "post": {
+        "summary": "Add a new retrospective item",
+        "tags": [
+          "Retrospective"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrospectiveItemInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Retrospective item added"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/retrospective/{id}": {
+      "put": {
+        "summary": "Update an existing retrospective item",
+        "tags": [
+          "Retrospective"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrospectiveItemUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Retrospective item updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a retrospective item",
+        "tags": [
+          "Retrospective"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retrospective item deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/defects/all": {
+      "get": {
+        "summary": "Get all defects from all projects",
+        "tags": [
+          "Defects"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of all defects"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/defects/{project}": {
+      "get": {
+        "summary": "Get defects for a project",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          },
+          {
+            "name": "statusType",
+            "in": "query",
+            "description": "The type of defects to retrieve ('active' or 'closed')",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "closed"
+              ],
+              "default": "active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of defects"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/defects/{project}/return-counts": {
+      "get": {
+        "summary": "Get 'Back to Developer' counts for defects in a project",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectPath"
+          },
+          {
+            "name": "statusType",
+            "in": "query",
+            "description": "Filter defects by their current status ('active' or 'closed')",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "closed"
+              ],
+              "default": "active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of defects with their return counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DefectReturnCount"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/defects": {
+      "post": {
+        "summary": "Create a new defect",
+        "tags": [
+          "Defects"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Defect created successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/defects/{id}": {
+      "put": {
+        "summary": "Update an existing defect",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Defect updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Permanently delete a defect",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Defect deleted successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/defects/{defectId}/history": {
+      "get": {
+        "summary": "Get history for a specific defect",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "name": "defectId",
+            "in": "path",
+            "required": true,
+            "description": "ID of the defect to get history for",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of defect history entries"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/settings/weather-location": {
+      "get": {
+        "summary": "Get the saved weather location",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "The currently saved weather location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Set the weather location",
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "location"
+                ],
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city name to save for weather."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Location saved successfully."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/chatbot/sync": {
+      "post": {
+        "summary": "Synchronize data with the vector database",
+        "description": "Triggers a full synchronization of project data (requirements, defects, etc.) with the vector database for the chatbot to use. This can be a long-running process. The server will respond immediately while the sync runs in the background.",
+        "tags": [
+          "Chatbot"
+        ],
+        "responses": {
+          "200": {
+            "description": "Synchronization successful.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatbotSyncResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ChatbotDisabled"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/chatbot": {
+      "post": {
+        "summary": "Send a query to the chatbot",
+        "description": "Asks a question to the AI chatbot. The chatbot uses the synchronized data to answer questions about projects, requirements, defects, and more.",
+        "tags": [
+          "Chatbot"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatbotQueryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response from the chatbot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatbotResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ChatbotDisabled"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "requirementName",
+          "status",
+          "statusDate",
+          "sprint"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "requirementName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "sprint": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "release_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "existingRequirementGroupId": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "ActivityLog": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "sprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "releaseId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "releaseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "releaseDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "ActivityOutput": {
+        "type": "object",
+        "properties": {
+          "activityDbId": {
+            "type": "integer"
+          },
+          "requirementGroupId": {
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "requirementUserIdentifier": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "sprint": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "release_id": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "ActivityUpdateInput": {
+        "type": "object",
+        "description": "Fields to update for an activity log. At least one must be provided.",
+        "properties": {
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "release_id": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "minProperties": 1
+      },
+      "ArchivedRelease": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release record."
+          },
+          "original_release_id": {
+            "type": "integer",
+            "description": "ID of the original release that was archived."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the archived release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the release was closed and archived."
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Metrics captured at the time of archiving.",
+            "properties": {
+              "doneCount": {
+                "type": "integer",
+                "description": "Number of requirements marked 'Done' in the release."
+              },
+              "notDoneCount": {
+                "type": "integer",
+                "description": "Number of requirements not marked 'Done' in the release."
+              }
+            }
+          },
+          "sat_report": {
+            "$ref": "#/components/schemas/SatReport",
+            "nullable": true,
+            "description": "The SAT (System Acceptance Testing) report associated with this archive, if available."
+          },
+          "fat_execution_report": {
+            "$ref": "#/components/schemas/FatExecutionReport",
+            "nullable": true,
+            "description": "The FAT execution report associated with this archive at the time of completion, if available."
+          },
+          "close_action": {
+            "type": "string",
+            "enum": [
+              "archive_only",
+              "archive_and_complete"
+            ],
+            "description": "The action taken when the release was closed."
+          }
+        }
+      },
+      "ArchivedReleaseItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the archived release item record."
+          },
+          "requirement_group_id": {
+            "type": "integer",
+            "description": "The ID of the requirement group."
+          },
+          "requirement_title": {
+            "type": "string",
+            "description": "The title of the requirement at the time of archiving."
+          },
+          "final_status": {
+            "type": "string",
+            "description": "The final status of the requirement at the time of archiving."
+          }
+        }
+      },
+      "ChatbotQueryInput": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The natural language question for the chatbot.",
+            "example": "What is the status of requirement 'REQ-123'?"
+          },
+          "projectContext": {
+            "type": "string",
+            "description": "Optional project name to provide context for the query.",
+            "example": "crm-project"
+          }
+        }
+      },
+      "ChatbotResponse": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "The chatbot's answer to the query."
+          },
+          "data_changed": {
+            "type": "boolean",
+            "description": "Indicates if the query resulted in a database modification.",
+            "example": true
+          },
+          "new_item": {
+            "type": "object",
+            "description": "Details of the newly created item, if any.",
+            "properties": {
+              "project": {
+                "type": "string"
+              },
+              "sprint": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ChatbotSyncResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Sync successful!"
+          },
+          "synced": {
+            "type": "integer",
+            "description": "The number of documents successfully synchronized.",
+            "example": 152
+          }
+        }
+      },
+      "Defect": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done",
+              "Closed"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_fat_defect": {
+            "type": "integer",
+            "description": "1 if it's a FAT defect, 0 otherwise."
+          },
+          "linkedRequirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkedRequirement"
+            }
+          }
+        }
+      },
+      "DefectHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "defect_id": {
+            "type": "integer"
+          },
+          "changes_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DefectInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "title",
+          "area",
+          "status",
+          "created_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_fat_defect": {
+            "type": "boolean",
+            "description": "Set to true if this is a FAT defect."
+          },
+          "linkedRequirementGroupIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "DefectReturnCount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "return_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "DefectUpdateInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Assigned to Developer",
+              "Assigned to Tester",
+              "Done",
+              "Closed"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "nullable": true
+          },
+          "created_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_fat_defect": {
+            "type": "boolean",
+            "description": "Set to true if this is a FAT defect."
+          },
+          "linkedRequirementGroupIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "minProperties": 1
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "FatExecutionReport": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "caution": {
+            "type": "integer"
+          },
+          "not_run": {
+            "type": "integer"
+          }
+        }
+      },
+      "FatKpis": {
+        "type": "object",
+        "properties": {
+          "dre": {
+            "type": "string",
+            "description": "Defect Removal Efficiency, as a percentage string (e.g., '95.50')."
+          },
+          "mttd": {
+            "type": "string",
+            "description": "Mean Time To Detect, in days (e.g., '1.25')."
+          },
+          "mttr": {
+            "type": "string",
+            "description": "Mean Time To Repair, in days (e.g., '3.50')."
+          }
+        }
+      },
+      "FatPeriod": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completion_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "selected_releases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FatPeriodInput": {
+        "type": "object",
+        "required": [
+          "start_date",
+          "release_id"
+        ],
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "The start date for the FAT period."
+          },
+          "release_id": {
+            "type": "integer",
+            "description": "The ID of the single active release to be tested."
+          }
+        }
+      },
+      "FatReportInput": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "caution": {
+            "type": "integer"
+          },
+          "not_run": {
+            "type": "integer"
+          }
+        }
+      },
+      "JiraConfigInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "jql"
+        ],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Project name"
+          },
+          "jql": {
+            "type": "string",
+            "description": "JQL query string"
+          }
+        }
+      },
+      "JiraImportInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "jql",
+          "importType"
+        ],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Target project name"
+          },
+          "jql": {
+            "type": "string",
+            "description": "JQL query to fetch issues"
+          },
+          "token": {
+            "type": "string",
+            "description": "Jira Personal Access Token (optional if already saved)"
+          },
+          "importType": {
+            "type": "string",
+            "enum": [
+              "requirements",
+              "defects"
+            ],
+            "description": "Type of items to import"
+          },
+          "sprint": {
+            "type": "string",
+            "description": "Target sprint name (required for requirements)"
+          },
+          "release_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Target release ID (optional for requirements)"
+          },
+          "saveToken": {
+            "type": "boolean",
+            "description": "Whether to save the token for future use"
+          }
+        }
+      },
+      "JiraTokenInput": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Jira Personal Access Token"
+          }
+        }
+      },
+      "LinkedDefect": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "project": {
+            "type": "string"
+          },
+          "is_fat_defect": {
+            "type": "integer"
+          }
+        }
+      },
+      "LinkedRequirement": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sprint": {
+            "type": "string"
+          }
+        }
+      },
+      "NoteInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "noteDate"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "noteDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "noteText": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the project."
+          }
+        }
+      },
+      "Release": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "integer",
+            "description": "1 if current, 0 if not"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ],
+            "default": "active",
+            "description": "The status of the release."
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp when the release was closed, if applicable."
+          },
+          "fat_execution_report": {
+            "$ref": "#/components/schemas/FatExecutionReport",
+            "nullable": true,
+            "description": "The execution report from the latest completed FAT period this release was a part of, if available."
+          }
+        }
+      },
+      "ReleaseCloseInput": {
+        "type": "object",
+        "required": [
+          "closeAction"
+        ],
+        "properties": {
+          "closeAction": {
+            "type": "string",
+            "enum": [
+              "archive_only",
+              "archive_and_complete"
+            ],
+            "description": "Action to take upon closing the release. 'archive_only' archives the release and unlinks requirements. 'archive_and_complete' archives the release and marks linked requirements as 'Done'."
+          }
+        }
+      },
+      "ReleaseInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "name",
+          "release_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ReleaseUpdateInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "name",
+          "release_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Project must be sent for is_current logic"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RequirementChange": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RequirementChangeInput": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "The reason for the scope change."
+          }
+        }
+      },
+      "RequirementGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Requirement Group ID"
+          },
+          "project": {
+            "type": "string"
+          },
+          "requirementUserIdentifier": {
+            "type": "string",
+            "description": "User-facing name/ID"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityLog"
+            }
+          },
+          "currentStatusDetails": {
+            "$ref": "#/components/schemas/ActivityLog"
+          },
+          "linkedDefects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkedDefect"
+            }
+          },
+          "changeCount": {
+            "type": "integer",
+            "description": "The number of logged scope changes for this requirement."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Indicates if the requirement is currently active. It is false if its current status is 'Done' as part of an 'archive_and_complete' release action."
+          }
+        }
+      },
+      "RequirementRenameInput": {
+        "type": "object",
+        "required": [
+          "newRequirementName"
+        ],
+        "properties": {
+          "newRequirementName": {
+            "type": "string"
+          }
+        }
+      },
+      "RetrospectiveItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project": {
+            "type": "string"
+          },
+          "column_type": {
+            "type": "string",
+            "enum": [
+              "well",
+              "wrong",
+              "improve"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional details or context for the item."
+          },
+          "item_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RetrospectiveItemInput": {
+        "type": "object",
+        "required": [
+          "project",
+          "column_type",
+          "description",
+          "details",
+          "item_date"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "column_type": {
+            "type": "string",
+            "enum": [
+              "well",
+              "wrong",
+              "improve"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional details or context for the item."
+          },
+          "item_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "RetrospectiveItemUpdateInput": {
+        "type": "object",
+        "properties": {
+          "column_type": {
+            "type": "string",
+            "enum": [
+              "well",
+              "wrong",
+              "improve"
+            ],
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "string",
+            "nullable": true,
+            "description": "Additional details or context for the item."
+          },
+          "item_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "minProperties": 1
+      },
+      "SatBug": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri"
+          },
+          "estimation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The estimated effort in hours."
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "An optional label for categorization."
+          }
+        }
+      },
+      "SatBugInput": {
+        "type": "object",
+        "required": [
+          "title",
+          "link"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the SAT bug."
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "description": "A URL link to the bug tracking system (e.g., Jira)."
+          },
+          "estimation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The estimated effort for the bug."
+          },
+          "estimation_unit": {
+            "type": "string",
+            "enum": [
+              "h",
+              "d"
+            ],
+            "nullable": true,
+            "description": "The unit for the estimation ('h' for hours, 'd' for days)."
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "An optional label for categorization."
+          }
+        }
+      },
+      "SatReport": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "default": 0
+          },
+          "pending": {
+            "type": "integer",
+            "default": 0
+          },
+          "executing": {
+            "type": "integer",
+            "default": 0
+          },
+          "aborted": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      },
+      "SatReportInput": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "default": 0
+          },
+          "pending": {
+            "type": "integer",
+            "default": 0
+          },
+          "executing": {
+            "type": "integer",
+            "default": 0
+          },
+          "aborted": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      }
+    },
+    "parameters": {
+      "ActivityIdPath": {
+        "name": "activityId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the specific activity log entry",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "ArchiveIdPath": {
+        "name": "archiveId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the archived release",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "FatPeriodIdPath": {
+        "name": "fat_period_id",
+        "in": "path",
+        "required": true,
+        "description": "ID of the FAT period",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "IdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The unique identifier of the resource.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "ProjectNamePath": {
+        "name": "name",
+        "in": "path",
+        "required": true,
+        "description": "Name of the project",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ProjectPath": {
+        "name": "project",
+        "in": "path",
+        "required": true,
+        "description": "Name of the project",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RequirementGroupIdPath": {
+        "name": "requirementGroupId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the requirement group",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "SatBugIdPath": {
+        "name": "bugId",
+        "in": "path",
+        "required": true,
+        "description": "ID of the SAT bug",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad Request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ChatbotDisabled": {
+        "description": "Chatbot functionality is disabled on the server.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Chatbot functionality is currently disabled."
+                },
+                "reply": {
+                  "type": "string",
+                  "example": "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
+                }
+              }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict (e.g., resource already exists)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Internal Server Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

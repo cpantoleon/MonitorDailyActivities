@@ -1,0 +1,35 @@
+.main-content-area {
+    transition: margin-right 0.5s ease-in-out;
+    padding: 20px;
+}
+
+.main-content-area.sidebar-open {
+    margin-right: 250px;
+}
+
+.page-actions-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.delete-all-retro-items-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.delete-all-retro-items-button:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+.delete-all-retro-items-button:disabled {
+    background-color: #e2828b;
+    cursor: not-allowed;
+    opacity: 0.7;
+}

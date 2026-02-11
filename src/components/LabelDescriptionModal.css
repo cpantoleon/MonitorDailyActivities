@@ -1,0 +1,24 @@
+.label-descriptions-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0 10px;
+}
+
+.label-descriptions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.label-descriptions-table th,
+.label-descriptions-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.label-descriptions-table th {
+    background-color: #f2f2f2;
+    position: sticky;
+    top: 0;
+}

@@ -1,0 +1,58 @@
+// src/utils/dataHelpers.js
+
+export const getUniqueProjects = (requirements) => {
+  if (!requirements || !Array.isArray(requirements) || requirements.length === 0) {
+    return [];
+  }
+
+  const projectNames = requirements.map(req => {
+    if (req && req.project && typeof req.project === 'string') {
+      return req.project.trim();
+    }
+    return null;
+  }).filter(Boolean);
+
+  const uniqueNames = Array.from(new Set(projectNames)).sort((a, b) => a.localeCompare(b));
+  // console.log("[dataHelpers.js getUniqueProjects] Raw input requirements (project field only):", JSON.stringify(requirements.map(r => r.project))); // Optional: very verbose
+  console.log("[dataHelpers.js getUniqueProjects] Extracted project names (before Set):", projectNames); // <-- ADDED THIS LOG
+  console.log("[dataHelpers.js getUniqueProjects] Final unique sorted project names:", uniqueNames); // <-- ADDED THIS LOG
+  return uniqueNames;
+};
+
+export const getSprintsForProject = (requirements, projectName) => {
+  if (!requirements || !Array.isArray(requirements) || requirements.length === 0 || !projectName) {
+    return [];
+  }
+  const sprintSet = new Set();
+  requirements.forEach(req => {
+    if (req.project && typeof req.project === 'string' && req.project.trim() === projectName.trim()) {
+      if (req.currentStatusDetails && req.currentStatusDetails.sprint && typeof req.currentStatusDetails.sprint === 'string') {
+        sprintSet.add(req.currentStatusDetails.sprint.trim());
+      }
+    }
+  });
+
+  return Array.from(sprintSet).sort((a, b) => {
+    // Backlog always comes first
+    if (a === 'Backlog') return -1;
+    if (b === 'Backlog') return 1;
+
+    // Archived sprints always come last
+    const isA_Archive = a.startsWith('Archived_');
+    const isB_Archive = b.startsWith('Archived_');
+    if (isA_Archive && !isB_Archive) return 1;
+    if (!isA_Archive && isB_Archive) return -1;
+    if (isA_Archive && isB_Archive) return a.localeCompare(b); // Sort archives alphabetically
+
+    // Sort numbered sprints numerically
+    const numA = parseInt(a.match(/\d+/)?.[0]);
+    const numB = parseInt(b.match(/\d+/)?.[0]);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+        if (numA !== numB) return numA - numB;
+    }
+    
+    // Fallback for any other cases
+    return a.localeCompare(b);
+  });
+};

@@ -1,0 +1,78 @@
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+  min-width: 220px; /* Added to preserve layout */
+  font-family: inherit;
+}
+
+.custom-dropdown-button, .custom-dropdown-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #DEB887;
+  border-radius: 4px;
+  background-color: white;
+  color: #5C4033;
+  font-size: 0.95em;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.custom-dropdown-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.custom-dropdown-button:disabled, .custom-dropdown-input:disabled {
+  background-color: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.custom-dropdown-button::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #5C4033;
+  transition: transform 0.2s ease;
+}
+
+.custom-dropdown-button.open::after {
+  transform: rotate(180deg);
+}
+
+/* Updated styles for the portal-based options list */
+.custom-dropdown-options {
+  position: fixed; /* Use fixed positioning */
+  background-color: white;
+  border: 1px solid #D2B48C;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  z-index: 1080;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.custom-dropdown-option {
+  padding: 10px 15px;
+  cursor: pointer;
+  color: #5C4033;
+}
+
+.custom-dropdown-option:hover {
+  background-color: #F5DEB3;
+}
+
+.custom-dropdown-option.selected {
+  background-color: #8B4513;
+  color: white;
+  font-weight: 500;
+}

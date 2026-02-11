@@ -1,0 +1,90 @@
+.filter-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 250px;
+  height: 100%;
+  background-color: #FFF8DC;
+  box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+  padding: 20px;
+  z-index: 1000;
+  transform: translateX(0);
+  transition: transform 0.5s ease-in-out;
+  border-left: 2px solid #8B4513;
+  color: #5C4033;
+  overflow-y: auto;
+}
+
+.filter-sidebar.closed {
+  transform: translateX(100%);
+}
+
+.filter-sidebar h3 {
+  margin-top: 0;
+  color: #5C4033;
+  border-bottom: 1px solid #DEB887;
+  padding-bottom: 10px;
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.filter-option input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #8B4513;
+}
+
+.filter-option input[type="checkbox"]:disabled + label {
+  color: #a9a9a9;
+  cursor: not-allowed;
+}
+
+
+.filter-option label {
+  font-size: 1em;
+  color: #5C4033;
+  cursor: pointer;
+}
+
+.filter-option input[type="date"] {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-left: 5px;
+}
+
+.filter-option label[for^="date-"] {
+  width: 40px;
+}
+
+.clear-filters-button {
+  background-color: #8B4513;
+  color: white;
+  border: none;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin-top: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.clear-filters-button:hover {
+  background-color: #A0522D;
+}

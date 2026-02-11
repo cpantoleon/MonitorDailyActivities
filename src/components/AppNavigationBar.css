@@ -1,0 +1,30 @@
+/* src/components/AppNavigationBar.css */
+.app-navigation {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  background-color: #D2B48C; /* Tan background for the nav bar */
+  padding: 10px 0;
+  border-bottom: 1px solid #8B4513; /* Dark Brown border */
+  margin-bottom: 15px;
+}
+
+.nav-tab {
+  padding: 10px 20px;
+  margin: 0 5px;
+  text-decoration: none;
+  color: #5C4033; /* Darker brown text for inactive tabs */
+  font-weight: 500;
+  border-radius: 4px;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.nav-tab:hover {
+  background-color: #C8A679; /* Slightly darker Tan on hover */
+  color: #4A3B2A;
+}
+
+.nav-tab.active {
+  background-color: #8B4513; /* Dark Brown for active tab */
+  color: #FFF8DC; /* Cornsilk (light color) for text on active tab */
+}

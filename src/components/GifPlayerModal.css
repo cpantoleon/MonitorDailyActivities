@@ -1,0 +1,28 @@
+.gif-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5); /* 50% black transparency */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1080; /* Higher than other modals */
+  cursor: pointer;
+}
+
+.gif-modal-content {
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.gif-modal-content img {
+  display: block;
+  max-width: 90vw;   /* 90% of viewport width */
+  max-height: 90vh;  /* 90% of viewport height */
+  border-radius: 4px;
+}
