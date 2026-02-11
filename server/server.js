@@ -2167,7 +2167,7 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                                     const defectCreatedAt = normalizeToUTCDate(defect.created_at);
                                     if (defectCreatedAt) totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
                                 });
-                                const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
+                                const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 8) / totalFatDefects : 0;
 
                                 let totalRepairHours = 0;
                                 let fixedForMttrCount = 0;
@@ -2199,7 +2199,7 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                                         }
                                     }
                                 });
-                                const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
+                                const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 8) / fixedForMttrCount : 0;
 
                                 const insertKpiSql = `INSERT INTO fat_kpis (fat_period_id, dre, mttd, mttr) VALUES (?, ?, ?, ?)`;
                                 db.run(insertKpiSql, [fatPeriodId, dre.toFixed(2), mttdInDays.toFixed(2), mttrInDays.toFixed(2)], (kpiErr) => {

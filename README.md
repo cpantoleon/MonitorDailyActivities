@@ -89,7 +89,7 @@ The chatbot uses **LanceDB** (an embedded vector database) to store project data
 1.  In the `/server` directory, create a new file named `.env`.
 2.  Add the configuration based on your chosen method:
 
-    **For Local AI (Ollama):**
+    **Configuration:**
     ```env
     # Server Configuration
     PORT=3001
