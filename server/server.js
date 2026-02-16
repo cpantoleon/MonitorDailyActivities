@@ -2635,172 +2635,197 @@ app.put("/api/defects/:id", (req, res) => {
     const defectId = parseInt(req.params.id, 10);
     const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date } = req.body;
 
+    // 1. Fetch Basic Defect Info
     db.get("SELECT * FROM defects WHERE id = ?", [defectId], (err, currentDefect) => {
         if (err) return res.status(500).json({ error: "Error fetching current defect state." });
         if (!currentDefect) return res.status(404).json({ error: `Defect with id ${defectId} not found.` });
 
-        let updates = [];
-        let updateParamsList = [];
-        let changedFieldsForSummary = {};
-        
-        const addChange = (field, newValue, oldValue) => {
-            if (newValue === undefined) return; 
+        // 2. FIX: Explicitly fetch current links from the join table
+        const getLinksSql = "SELECT requirement_group_id FROM defect_requirement_links WHERE defect_id = ?";
+        db.all(getLinksSql, [defectId], (linkErr, linkRows) => {
+            if (linkErr) return res.status(500).json({ error: "Error fetching current links." });
 
-            const normalizedNewValue = (newValue === null) ? null : String(newValue).trim();
-            const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
-            if (normalizedNewValue !== normalizedOldValue) {
-                updates.push(`${field} = ?`);
-                updateParamsList.push(normalizedNewValue);
-                changedFieldsForSummary[field] = { old: normalizedOldValue, new: normalizedNewValue };
-            }
-        };
+            // Flatten the rows into an array of IDs
+            const currentLinks = linkRows.map(r => r.requirement_group_id);
+            const newLinks = linkedRequirementGroupIds || [];
 
-        addChange("title", title, currentDefect.title);
-        addChange("description", description, currentDefect.description);
-        addChange("area", area, currentDefect.area);
-        
-        // Calculate the target Fixed Date based on inputs and status changes
-        let targetFixedDate = currentDefect.fixed_date;
-        let fixedDateProvided = false;
-
-        if (fixed_date !== undefined) {
-            targetFixedDate = fixed_date === '' ? null : fixed_date;
-            fixedDateProvided = true;
-        }
-
-        if (status !== undefined && status !== currentDefect.status) {
-            addChange("status", status, currentDefect.status); 
-
-            // If moving to Done or Closed
-            if (status === 'Done' || status === 'Closed') {
-                // If date wasn't provided, OR if it was provided as null (e.g. sent from UI via object spread of an open defect)
-                // Then automatically set it to NOW.
-                if (!fixedDateProvided || targetFixedDate === null) {
-                    targetFixedDate = new Date().toISOString();
+            // 3. Determine if links have changed
+            let linksChanged = false;
+            if (linkedRequirementGroupIds !== undefined) {
+                // Check length difference
+                if (currentLinks.length !== newLinks.length) {
+                    linksChanged = true;
+                } else {
+                    // Check if every item in currentLinks exists in newLinks
+                    // We sort or use simple inclusion check. Since DB IDs are usually numbers/strings, standard check works.
+                    // (Using Set for safer comparison)
+                    const currentSet = new Set(currentLinks.map(String));
+                    const newSet = new Set(newLinks.map(String));
+                    for (let id of currentSet) {
+                        if (!newSet.has(id)) {
+                            linksChanged = true;
+                            break;
+                        }
+                    }
                 }
-            } 
-            // If moving back to active status (not Done/Closed) from a Done/Closed state
-            else if ((currentDefect.status === 'Done' || currentDefect.status === 'Closed') && status !== 'Done' && status !== 'Closed') {
-                targetFixedDate = null;
             }
-        }
 
-        // Apply the calculated fixed date change
-        // We use 'fixed_date' as the value passed to addChange logic, 
-        // passing our calculated target as the newValue.
-        // We check against currentDefect.fixed_date to ensure we record the change correctly.
-        const normalizedTarget = (targetFixedDate === null) ? null : String(targetFixedDate).trim();
-        const normalizedCurrent = (currentDefect.fixed_date === null) ? null : String(currentDefect.fixed_date).trim();
-        
-        if (normalizedTarget !== normalizedCurrent) {
-            updates.push(`fixed_date = ?`);
-            updateParamsList.push(normalizedTarget);
-            changedFieldsForSummary['fixed_date'] = { old: normalizedCurrent, new: normalizedTarget };
-        }
+            // 4. Calculate Field Changes
+            let updates = [];
+            let updateParamsList = [];
+            let changedFieldsForSummary = {};
+            
+            const addChange = (field, newValue, oldValue) => {
+                if (newValue === undefined) return; 
 
-        addChange("link", link, currentDefect.link);
+                const normalizedNewValue = (newValue === null) ? null : String(newValue).trim();
+                const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
+                if (normalizedNewValue !== normalizedOldValue) {
+                    updates.push(`${field} = ?`);
+                    updateParamsList.push(normalizedNewValue);
+                    changedFieldsForSummary[field] = { old: normalizedOldValue, new: normalizedNewValue };
+                }
+            };
 
-        if (created_date !== undefined) {
-            const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
-            if (newCreatedAt !== currentDefect.created_at) {
-                updates.push(`created_at = ?`);
-                updateParamsList.push(newCreatedAt);
-                changedFieldsForSummary['created_at'] = { old: currentDefect.created_at, new: newCreatedAt };
+            addChange("title", title, currentDefect.title);
+            addChange("description", description, currentDefect.description);
+            addChange("area", area, currentDefect.area);
+            
+            let targetFixedDate = currentDefect.fixed_date;
+            let fixedDateProvided = false;
+
+            if (fixed_date !== undefined) {
+                targetFixedDate = fixed_date === '' ? null : fixed_date;
+                fixedDateProvided = true;
             }
-        }
 
-        if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
-            updates.push(`is_fat_defect = ?`);
-            updateParamsList.push(is_fat_defect ? 1 : 0);
-            changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
-        }
+            if (status !== undefined && status !== currentDefect.status) {
+                addChange("status", status, currentDefect.status); 
 
-        const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
-        const hasComment = comment && comment.trim() !== "";
-        
-        const currentLinks = currentDefect.linkedRequirementGroupIds || [];
-        const newLinks = linkedRequirementGroupIds || [];
-        const linksChanged = linkedRequirementGroupIds !== undefined && (currentLinks.length !== newLinks.length || !currentLinks.every(id => newLinks.includes(id)));
+                if (status === 'Done' || status === 'Closed') {
+                    if (!fixedDateProvided || targetFixedDate === null) {
+                        targetFixedDate = new Date().toISOString();
+                    }
+                } 
+                else if ((currentDefect.status === 'Done' || currentDefect.status === 'Closed') && status !== 'Done' && status !== 'Closed') {
+                    targetFixedDate = null;
+                }
+            }
 
-        if (!hasFieldChanges && !hasComment && !linksChanged) {
-            return res.json({ message: "No changes detected.", defectId: defectId });
-        }
+            const normalizedTarget = (targetFixedDate === null) ? null : String(targetFixedDate).trim();
+            const normalizedCurrent = (currentDefect.fixed_date === null) ? null : String(currentDefect.fixed_date).trim();
+            
+            if (normalizedTarget !== normalizedCurrent) {
+                updates.push(`fixed_date = ?`);
+                updateParamsList.push(normalizedTarget);
+                changedFieldsForSummary['fixed_date'] = { old: normalizedCurrent, new: normalizedTarget };
+            }
 
-        db.serialize(() => {
-            db.run("BEGIN TRANSACTION", (beginErr) => {
-                if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
+            addChange("link", link, currentDefect.link);
 
-                const handleLinks = (callback) => {
-                    if (linksChanged) {
-                        db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
-                            if (deleteErr) return callback(deleteErr);
-                            if (newLinks.length > 0) {
-                                const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                                let completed = 0;
-                                newLinks.forEach(reqId => {
-                                    db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
-                                        if(insertErr) console.error("Error inserting link:", insertErr.message); 
-                                        completed++;
-                                        if (completed === newLinks.length) callback(null);
+            if (created_date !== undefined) {
+                const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
+                if (newCreatedAt !== currentDefect.created_at) {
+                    updates.push(`created_at = ?`);
+                    updateParamsList.push(newCreatedAt);
+                    changedFieldsForSummary['created_at'] = { old: currentDefect.created_at, new: newCreatedAt };
+                }
+            }
+
+            if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
+                updates.push(`is_fat_defect = ?`);
+                updateParamsList.push(is_fat_defect ? 1 : 0);
+                changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
+            }
+
+            const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
+            const hasComment = comment && comment.trim() !== "";
+            
+            if (!hasFieldChanges && !hasComment && !linksChanged) {
+                return res.json({ message: "No changes detected.", defectId: defectId });
+            }
+
+            // 5. Perform Updates Transaction
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION", (beginErr) => {
+                    if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
+
+                    const handleLinks = (callback) => {
+                        if (linksChanged) {
+                            // Always delete old links first
+                            db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
+                                if (deleteErr) return callback(deleteErr);
+                                
+                                // Then add new links if any exist
+                                if (newLinks.length > 0) {
+                                    const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
+                                    let completed = 0;
+                                    newLinks.forEach(reqId => {
+                                        db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
+                                            if(insertErr) console.error("Error inserting link:", insertErr.message); 
+                                            completed++;
+                                            if (completed === newLinks.length) callback(null);
+                                        });
                                     });
-                                });
-                            } else {
-                                callback(null);
-                            }
-                        });
-                    } else {
-                        callback(null);
-                    }
-                };
+                                } else {
+                                    // Payload was [], so we just stop here (links successfully cleared)
+                                    callback(null);
+                                }
+                            });
+                        } else {
+                            callback(null);
+                        }
+                    };
 
-                handleLinks((linkErr) => {
-                    if (linkErr) {
-                        db.run("ROLLBACK");
-                        return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
-                    }
+                    handleLinks((linkErr) => {
+                        if (linkErr) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
+                        }
 
-                    const historyComment = comment ? comment.trim() : null;
-                    if (hasFieldChanges || historyComment) {
-                        const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
-                        const nowUTC = new Date().toISOString();
-                        const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
-                        db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
-                            if (historyErr) {
-                                db.run("ROLLBACK");
-                                return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
-                            }
+                        const historyComment = comment ? comment.trim() : null;
+                        if (hasFieldChanges || historyComment) {
+                            const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
+                            const nowUTC = new Date().toISOString();
+                            const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
+                            db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
+                                if (historyErr) {
+                                    db.run("ROLLBACK");
+                                    return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
+                                }
+                                executeUpdate();
+                            });
+                        } else {
                             executeUpdate();
-                        });
-                    } else {
-                        executeUpdate();
-                    }
-                });
-
-                const executeUpdate = () => {
-                    if (hasFieldChanges) {
-                        updates.push("updated_at = ?");
-                        updateParamsList.push(new Date().toISOString());
-                        const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
-                        updateParamsList.push(defectId);
-                        db.run(sqlUpdate, updateParamsList, (updateErr) => {
-                            if (updateErr) {
-                                db.run("ROLLBACK");
-                                return res.status(500).json({ error: "Failed to update defect: " + updateErr.message });
-                            }
-                            commitTransaction();
-                        });
-                    } else {
-                        commitTransaction();
-                    }
-                };
-
-                const commitTransaction = () => {
-                    db.run("COMMIT", (commitErr) => {
-                        if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
-                        scheduleQdrantSync();
-                        res.json({ message: "Defect updated successfully.", defectId: defectId });
+                        }
                     });
-                };
+
+                    const executeUpdate = () => {
+                        if (hasFieldChanges) {
+                            updates.push("updated_at = ?");
+                            updateParamsList.push(new Date().toISOString());
+                            const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
+                            updateParamsList.push(defectId);
+                            db.run(sqlUpdate, updateParamsList, (updateErr) => {
+                                if (updateErr) {
+                                    db.run("ROLLBACK");
+                                    return res.status(500).json({ error: "Failed to update defect: " + updateErr.message });
+                                }
+                                commitTransaction();
+                            });
+                        } else {
+                            commitTransaction();
+                        }
+                    };
+
+                    const commitTransaction = () => {
+                        db.run("COMMIT", (commitErr) => {
+                            if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
+                            scheduleQdrantSync();
+                            res.json({ message: "Defect updated successfully.", defectId: defectId });
+                        });
+                    };
+                });
             });
         });
     });
@@ -3018,9 +3043,26 @@ app.post('/api/jira/import', async (req, res) => {
                     let currentGroupId = null;
 
                     if (existing) {
-                        // Skip existing items
+                        await new Promise((resolve, reject) => {
+                            const updateSql = `UPDATE activities SET 
+                                release_id = ?, 
+                                sprint = ?, 
+                                requirementUserIdentifier = ?, 
+                                link = ?, 
+                                updated_at = ? 
+                                WHERE id = ?`;
+                            
+                            db.run(updateSql, 
+                                [release_id || null, sprint, summary, webLink, timeForUpdatedAt, existing.id], 
+                                function(err) {
+                                    if (err) reject(err);
+                                    else resolve();
+                                }
+                            );
+                        });
+
                         skippedCount++;
-                        continue; 
+                        currentGroupId = existing.requirementGroupId;
                     } else {
                         // Insert new item with "To Do" status
                         await new Promise((resolve, reject) => {
