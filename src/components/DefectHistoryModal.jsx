@@ -1,14 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 
-const DefectHistoryModal = ({ isOpen, onClose, defect, history }) => {
+const DefectHistoryModal = ({ isOpen, onClose, defect, history, onSaveComment }) => {
   const modalRef = useClickOutside(onClose);
+  const [editingId, setEditingId] = useState(null);
+  const [editComment, setEditComment] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+        setEditingId(null);
+        setEditComment('');
+    }
+  }, [isOpen]);
 
   if (!isOpen || !defect) return null;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleEditClick = (entry) => {
+      setEditingId(entry.id);
+      setEditComment(entry.comment || '');
+  };
+
+  const handleCancelClick = () => {
+      setEditingId(null);
+      setEditComment('');
+  };
+
+  const handleSaveClick = (historyId) => {
+      if (onSaveComment) {
+          onSaveComment(historyId, editComment);
+      }
+      setEditingId(null);
   };
 
   const renderChangeSummary = (summaryString) => {
@@ -49,7 +75,7 @@ const DefectHistoryModal = ({ isOpen, onClose, defect, history }) => {
 
   return (
     <div id="history-modal-overlay-id" className="history-modal-overlay">
-      <div ref={modalRef} id={`history-modal-content-${defect.id}`} className="history-modal-content" style={{maxWidth: '800px'}}>
+      <div ref={modalRef} id={`history-modal-content-${defect.id}`} className="history-modal-content" style={{maxWidth: '900px'}}>
         <h2 id={`history-modal-title-${defect.id}`}>History for Defect: {defect.title}</h2>
         <button id="history-modal-close-button-id" onClick={onClose} className="history-modal-close-button">Close</button>
         {history.length === 0 ? (
@@ -58,19 +84,44 @@ const DefectHistoryModal = ({ isOpen, onClose, defect, history }) => {
           <table id={`history-modal-table-${defect.id}`} className="history-modal-table">
             <thead>
               <tr>
-                <th>Changed At</th>
+                <th style={{width: '180px'}}>Changed At</th>
                 <th>Changes Summary</th>
                 <th>Comment</th>
+                <th style={{width: '120px'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {history.slice().sort((a,b) => new Date(b.changed_at) - new Date(a.changed_at)).map(entry => (
-                <tr key={entry.id} id={`history-entry-row-${entry.id}`}>
-                  <td id={`history-entry-date-${entry.id}`}>{formatDate(entry.changed_at)}</td>
-                  <td id={`history-entry-summary-${entry.id}`}>{renderChangeSummary(entry.changes_summary)}</td>
-                  <td id={`history-entry-comment-${entry.id}`}>{entry.comment || '-'}</td>
-                </tr>
-              ))}
+              {history.slice().sort((a,b) => new Date(b.changed_at) - new Date(a.changed_at)).map(entry => {
+                const isEditing = editingId === entry.id;
+                return (
+                    <tr key={entry.id} id={`history-entry-row-${entry.id}`}>
+                    <td id={`history-entry-date-${entry.id}`}>{formatDate(entry.changed_at)}</td>
+                    <td id={`history-entry-summary-${entry.id}`}>{renderChangeSummary(entry.changes_summary)}</td>
+                    <td id={`history-entry-comment-${entry.id}`}>
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={editComment} 
+                                onChange={(e) => setEditComment(e.target.value)}
+                                autoFocus
+                            />
+                        ) : (
+                            entry.comment || '-'
+                        )}
+                    </td>
+                    <td id={`history-entry-actions-${entry.id}`}>
+                        {isEditing ? (
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <button onClick={() => handleSaveClick(entry.id)}>Save</button>
+                                <button onClick={handleCancelClick} style={{backgroundColor: '#f8d7da', color: '#842029', borderColor: '#f5c2c7'}}>Cancel</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => handleEditClick(entry)}>Edit</button>
+                        )}
+                    </td>
+                    </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

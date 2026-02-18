@@ -616,6 +616,33 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     finally { setIsLoading(false); }
   };
 
+  const handleUpdateHistoryComment = async (historyId, newComment) => {
+      try {
+          const response = await fetch(`${API_BASE_URL}/defects/history/${historyId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comment: newComment })
+          });
+          
+          if (!response.ok) throw new Error("Failed to update history comment.");
+          
+          showMessage("Comment updated successfully.", "success");
+          
+          // Refresh history data
+          if (defectForHistory) {
+              const histResponse = await fetch(`${API_BASE_URL}/defects/${defectForHistory.id}/history`);
+              const histResult = await histResponse.json();
+              setDefectHistory(histResult.data || []);
+          }
+
+          // Refresh the page behind the modal
+          await refreshDefectsState();
+          
+      } catch (error) {
+          showMessage(`Error: ${error.message}`, 'error');
+      }
+  };
+
   const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
     navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
   }, [navigate]);
@@ -1067,7 +1094,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
-      {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} />}
+      {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} onSaveComment={handleUpdateHistoryComment} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
       <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />

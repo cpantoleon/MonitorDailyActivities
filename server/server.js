@@ -2570,6 +2570,24 @@ app.get("/api/defects/:project/return-counts", async (req, res) => {
     }
 });
 
+app.put("/api/defects/history/:historyId", (req, res) => {
+    const historyId = req.params.historyId;
+    const { comment } = req.body;
+
+    if (comment === undefined) {
+        return res.status(400).json({ error: "Comment is required." });
+    }
+
+    const sql = "UPDATE defect_history SET comment = ? WHERE id = ?";
+    db.run(sql, [comment, historyId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: "History entry not found." });
+        
+        scheduleQdrantSync();
+        res.json({ message: "success", changes: this.changes });
+    });
+});
+
 app.post("/api/defects", async (req, res) => {
     let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect } = req.body;
     if (!project || !title || !area || !status || !created_date) {
