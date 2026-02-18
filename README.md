@@ -91,9 +91,6 @@ The chatbot uses **LanceDB** (an embedded vector database) to store project data
 
     **Configuration:**
     ```env
-    # Server Configuration
-    PORT=3001
-
     # Jira Integration (Required for Import features)
     JIRA_BASE_URL=https://jira.your-company-domain.com
 
