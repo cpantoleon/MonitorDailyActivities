@@ -3023,12 +3023,15 @@ app.post('/api/jira/import', async (req, res) => {
             // If it's Done, use the specific Done time found in changelog. If not, use Now.
             let timeForUpdatedAt = isJiraDone && lastDoneTime ? lastDoneTime : new Date().toISOString();
 
+            let isFromSubtask = false;
+
             if (fields.parent) {
                 if (fields.parent.fields && fields.parent.fields.issuetype) {
                     key = fields.parent.key;
                     summary = fields.parent.fields.summary ? fields.parent.fields.summary.trim() : summary;
                     issueType = fields.parent.fields.issuetype.name ? fields.parent.fields.issuetype.name.trim() : issueType;
                     rawJiraStatus = fields.parent.fields.status ? fields.parent.fields.status.name.trim() : rawJiraStatus;
+                    isFromSubtask = true;
                 } else {
                     continue; 
                 }
@@ -3061,23 +3064,25 @@ app.post('/api/jira/import', async (req, res) => {
                     let currentGroupId = null;
 
                     if (existing) {
-                        await new Promise((resolve, reject) => {
-                            const updateSql = `UPDATE activities SET 
-                                release_id = ?, 
-                                sprint = ?, 
-                                requirementUserIdentifier = ?, 
-                                link = ?, 
-                                updated_at = ? 
-                                WHERE id = ?`;
-                            
-                            db.run(updateSql, 
-                                [release_id || null, sprint, summary, webLink, timeForUpdatedAt, existing.id], 
-                                function(err) {
-                                    if (err) reject(err);
-                                    else resolve();
-                                }
-                            );
-                        });
+                        if (!isFromSubtask) {
+                            await new Promise((resolve, reject) => {
+                                const updateSql = `UPDATE activities SET 
+                                    release_id = ?, 
+                                    sprint = ?, 
+                                    requirementUserIdentifier = ?, 
+                                    link = ?, 
+                                    updated_at = ? 
+                                    WHERE id = ?`;
+                                
+                                db.run(updateSql, 
+                                    [release_id || null, sprint, summary, webLink, timeForUpdatedAt, existing.id], 
+                                    function(err) {
+                                        if (err) reject(err);
+                                        else resolve();
+                                    }
+                                );
+                            });
+                        }
 
                         skippedCount++;
                         currentGroupId = existing.requirementGroupId;
