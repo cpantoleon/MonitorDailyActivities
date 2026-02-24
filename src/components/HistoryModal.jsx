@@ -99,13 +99,12 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
 
   return (
     <div id="history-modal-wrapper-id">
-      <div id="history-modal-overlay-id" className="history-modal-overlay">
-        <div ref={modalRef} id={`history-modal-content-${requirement.id}`} className="history-modal-content">
-          <h2 id={`history-modal-title-${requirement.id}`}>History for: {requirement.requirementUserIdentifier}</h2>
-          <button id={`history-modal-close-button-${requirement.id}`} onClick={onClose} className="history-modal-close-button">Close</button>
+      <div className="history-modal-overlay">
+        <div ref={modalRef} className="history-modal-content">
+          <h2>History for: {requirement.requirementUserIdentifier}</h2>
           
-          <h3 id={`status-history-title-${requirement.id}`} style={{marginTop: '20px', marginBottom: '10px', fontSize: '1.2em', color: '#5C4033'}}>Status History</h3>
-          <table id={`status-history-table-${requirement.id}`} className="history-modal-table">
+          <h3 className="modal-section-title">Status History</h3>
+          <table className="modal-table">
             <thead>
               <tr><th>Status</th><th>Date</th><th>Sprint</th><th>Comment</th><th>Actions</th></tr>
             </thead>
@@ -113,9 +112,9 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
               {displayHistory.map((entry) => {
                 const isEditingThisRow = editingEntryId === entry.id;
                 return (
-                  <tr key={entry.id} id={`history-row-${entry.id}`}>
-                    <td id={`history-status-${entry.id}`}>{entry.status}</td>
-                    <td id={`history-date-${entry.id}`}>
+                  <tr key={entry.id}>
+                    <td>{entry.status}</td>
+                    <td>
                       {isEditingThisRow ? (
                         <DatePicker
                           selected={editFormDate}
@@ -128,24 +127,22 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
                         />
                       ) : ( formatDateForDisplayInternal(entry.date) )}
                     </td>
-                    <td id={`history-sprint-${entry.id}`} style={{ whiteSpace: 'nowrap' }}>{entry.sprint || 'N/A'}</td>
-                    <td id={`history-comment-${entry.id}`}>
+                    <td style={{ whiteSpace: 'nowrap' }}>{entry.sprint || 'N/A'}</td>
+                    <td>
                       {isEditingThisRow ? (
-                        <input ref={commentInputRef} type="text" id={`history-comment-input-${entry.id}`} name={`history-comment-${entry.id}`} value={editFormComment} onChange={e => setEditFormComment(e.target.value)} placeholder="Enter comment" />
+                        <input ref={commentInputRef} type="text" value={editFormComment} onChange={e => setEditFormComment(e.target.value)} placeholder="Enter comment" />
                       ) : ( entry.comment || 'N/A' )}
                     </td>
-                    <td id={`history-actions-${entry.id}`} style={{ whiteSpace: 'nowrap' }}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       {isEditingThisRow ? (
-                        <div id={`history-edit-actions-container-${entry.id}`}>
-                          <button id={`history-save-button-${entry.id}`} onClick={() => handleSaveEdit(entry)}>Save</button>
-                          <button id={`history-cancel-button-${entry.id}`} onClick={handleCancelEdit}>Cancel</button>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <button onClick={() => handleSaveEdit(entry)}>Save</button>
+                          <button onClick={handleCancelEdit}>Cancel</button>
                         </div>
                       ) : ( entry.activityId ? 
                         <button 
-                          id={`edit-history-button-${entry.id}`}
                           onClick={() => handleStartEdit(entry)}
                           title={`Edit history entry for status '${entry.status}' on ${formatDateForDisplayInternal(entry.date)}`}
-                          data-testid={`edit-history-button-${entry.id}`}
                         >
                           Edit
                         </button> : null 
@@ -157,11 +154,11 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
             </tbody>
           </table>
 
-          {isLoadingChanges && <p id={`loading-changes-message-${requirement.id}`}>Loading scope changes...</p>}
+          {isLoadingChanges && <p className="loading-message">Loading scope changes...</p>}
           {!isLoadingChanges && changeHistory.length > 0 && (
-            <div id={`scope-change-history-section-${requirement.id}`}>
-              <h3 id={`scope-change-history-title-${requirement.id}`} style={{marginTop: '30px', marginBottom: '10px', fontSize: '1.2em', color: '#5C4033'}}>Scope Change History</h3>
-              <table id={`scope-change-history-table-${requirement.id}`} className="history-modal-table">
+            <div>
+              <h3 className="modal-section-title">Scope Change History</h3>
+              <table className="modal-table">
                 <thead>
                     <tr>
                         <th style={{width: '30%'}}>Date of Change</th>
@@ -170,15 +167,19 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
                 </thead>
                 <tbody>
                     {changeHistory.map(change => (
-                        <tr key={change.id} id={`change-history-row-${change.id}`}>
-                            <td id={`change-history-date-${change.id}`}>{new Date(change.changed_at).toLocaleString()}</td>
-                            <td id={`change-history-reason-${change.id}`}>{change.reason || <span style={{fontStyle: 'italic', color: '#888'}}>No reason provided.</span>}</td>
+                        <tr key={change.id}>
+                            <td>{new Date(change.changed_at).toLocaleString()}</td>
+                            <td>{change.reason || <span style={{fontStyle: 'italic', opacity: 0.7}}>No reason provided.</span>}</td>
                         </tr>
                     ))}
                 </tbody>
               </table>
             </div>
           )}
+          
+          <div className="modal-actions">
+            <button onClick={onClose} className="modal-button-cancel">Close</button>
+          </div>
 
         </div>
       </div>

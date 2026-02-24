@@ -46,7 +46,7 @@ const DefectHistoryModal = ({ isOpen, onClose, defect, history, onSaveComment })
           {Object.entries(summary).map(([field, values]) => (
             <li key={field} id={`summary-item-${defect.id}-${field}`} style={{ marginBottom: '3px' }}>
               <strong>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> 
-              <span style={{ color: '#777', fontStyle: 'italic' }}>"{values.old || '-'}"</span> to <span style={{ fontWeight: '500' }}>"{values.new || '-'}"</span>
+              <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{values.old || '-'}"</span> to <span style={{ fontWeight: '500' }}>"{values.new || '-'}"</span>
             </li>
           ))}
         </ul>
@@ -76,6 +76,26 @@ const DefectHistoryModal = ({ isOpen, onClose, defect, history, onSaveComment })
   return (
     <div id="history-modal-overlay-id" className="history-modal-overlay">
       <div ref={modalRef} id={`history-modal-content-${defect.id}`} className="history-modal-content" style={{maxWidth: '900px'}}>
+        <style>{`
+          .history-modal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+          }
+          .history-modal-table th, .history-modal-table td {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+            color: var(--text-primary);
+          }
+          .history-modal-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+          }
+          .history-modal-table tr:nth-child(even) {
+            background-color: var(--bg-secondary);
+          }
+        `}</style>
         <h2 id={`history-modal-title-${defect.id}`}>History for Defect: {defect.title}</h2>
         <button id="history-modal-close-button-id" onClick={onClose} className="history-modal-close-button">Close</button>
         {history.length === 0 ? (
@@ -112,11 +132,11 @@ const DefectHistoryModal = ({ isOpen, onClose, defect, history, onSaveComment })
                     <td id={`history-entry-actions-${entry.id}`}>
                         {isEditing ? (
                             <div style={{ display: 'flex', gap: '5px' }}>
-                                <button onClick={() => handleSaveClick(entry.id)}>Save</button>
-                                <button onClick={handleCancelClick} style={{backgroundColor: '#f8d7da', color: '#842029', borderColor: '#f5c2c7'}}>Cancel</button>
+                                <button onClick={() => handleSaveClick(entry.id)} className="btn-primary" style={{padding: '4px 8px', fontSize: '0.8rem'}}>Save</button>
+                                <button onClick={handleCancelClick} className="modal-button-cancel" style={{padding: '4px 8px', fontSize: '0.8rem'}}>Cancel</button>
                             </div>
                         ) : (
-                            <button onClick={() => handleEditClick(entry)}>Edit</button>
+                            <button onClick={() => handleEditClick(entry)} className="defect-action-btn" style={{padding: '4px 8px'}}>Edit</button>
                         )}
                     </td>
                     </tr>

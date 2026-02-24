@@ -44,7 +44,7 @@ const SearchComponent = ({ query, onQueryChange, onSearch, onClear, onSuggestion
         <input
           type="text"
           id="main-search-input"
-          name="main-search"
+          name="main-search-no-autofill"
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -52,6 +52,10 @@ const SearchComponent = ({ query, onQueryChange, onSearch, onClear, onSuggestion
           placeholder={placeholder || "Search..."}
           className="search-input"
           autoComplete="off"
+          autoCorrect="off"
+          spellCheck="false"
+          data-1p-ignore="true" 
+          data-lpignore="true" 
         />
         <button 
           type="button" 

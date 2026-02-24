@@ -1,21 +1,23 @@
+/* src/components/CustomDropdown.css */
 .custom-dropdown {
   position: relative;
   width: 100%;
-  min-width: 220px; /* Added to preserve layout */
+  min-width: 220px;
   font-family: inherit;
 }
 
 .custom-dropdown-button, .custom-dropdown-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #DEB887;
-  border-radius: 4px;
-  background-color: white;
-  color: #5C4033;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 0.95em;
   text-align: left;
   cursor: pointer;
   box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .custom-dropdown-button {
@@ -24,20 +26,27 @@
   align-items: center;
 }
 
+.custom-dropdown-button:focus, .custom-dropdown-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.1); 
+}
+
 .custom-dropdown-button:disabled, .custom-dropdown-input:disabled {
-  background-color: #e9ecef;
-  color: #6c757d;
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
   cursor: not-allowed;
   opacity: 0.7;
 }
 
+/* The Arrow */
 .custom-dropdown-button::after {
   content: '';
   width: 0;
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #5C4033;
+  border-top: 5px solid var(--text-secondary);
   transition: transform 0.2s ease;
 }
 
@@ -45,34 +54,46 @@
   transform: rotate(180deg);
 }
 
-/* Updated styles for the portal-based options list */
+/* The Options Menu */
 .custom-dropdown-options {
-  position: fixed; /* Use fixed positioning */
-  background-color: white;
-  border: 1px solid #D2B48C;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  position: fixed; 
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
   z-index: 1080;
   list-style: none;
-  padding: 0;
+  padding: 6px;
   margin: 0;
-  max-height: 200px;
+  max-height: 250px;
   overflow-y: auto;
   box-sizing: border-box;
 }
 
 .custom-dropdown-option {
-  padding: 10px 15px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
   cursor: pointer;
-  color: #5C4033;
+  color: var(--text-primary);
+  border-radius: 6px;
+  /* Transparent border prevents layout jumping on hover */
+  border: 1px solid transparent; 
+  transition: all 0.15s ease;
 }
 
+.custom-dropdown-option:last-child {
+  margin-bottom: 0;
+}
+
+/* THE HOVER EFFECT YOU REQUESTED */
 .custom-dropdown-option:hover {
-  background-color: #F5DEB3;
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent-color); 
 }
 
 .custom-dropdown-option.selected {
-  background-color: #8B4513;
+  background-color: var(--accent-color);
   color: white;
   font-weight: 500;
+  border-color: var(--accent-color);
 }

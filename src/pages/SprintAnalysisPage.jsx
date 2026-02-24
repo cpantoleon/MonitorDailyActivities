@@ -12,7 +12,8 @@ const COLUMN_TYPES = [
   { value: 'improve', label: 'What Can We Improve?' },
 ];
 
-const SprintAnalysisPage = ({ projects, showMessage }) => {
+const SprintAnalysisPage = ({ showMessage }) => {
+  const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [retrospectiveItems, setRetrospectiveItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,12 +24,26 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
   const [isConfirmDeleteAllModalOpen, setIsConfirmDeleteAllModalOpen] = useState(false);
 
-
   useEffect(() => {
-    const savedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
-    if (savedProject) {
-        setSelectedProject(savedProject);
-    }
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/projects`);
+        const result = await response.json();
+        const fetchedProjects = result.data || [];
+        setProjects(fetchedProjects);
+
+        const savedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
+        if (savedProject) {
+            setSelectedProject(savedProject);
+        } else if (fetchedProjects.length > 0) {
+            setSelectedProject(fetchedProjects[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      }
+    };
+
+    fetchProjects();
   }, []);
 
   useEffect(() => {
@@ -184,26 +199,24 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
   };
 
   return (
-    <div id="main-content-area-id" className="main-content-area">
-      <div id="retrospective-controls-id" className="retrospective-controls">
-        <div id="selection-group-container-id" className="selection-group-container">
+    <div className="main-content-area">
+      <div className="selection-controls">
+        <div className="selection-group-container">
           <ProjectSelector
             projects={projects || []}
             selectedProject={selectedProject}
             onSelectProject={setSelectedProject}
           />
         </div>
-        <div id="page-actions-group-id" className="page-actions-group">
+        <div className="page-actions-group">
           <button
-            id="add-retro-item-button-id"
             onClick={() => handleOpenModal()}
-            className="add-retro-item-button"
+            className="btn-primary"
             disabled={!selectedProject}
           >
             + Add Retrospective Item
           </button>
           <button
-            id="delete-all-retro-items-button-id"
             onClick={() => setIsConfirmDeleteAllModalOpen(true)}
             className="delete-all-retro-items-button"
             disabled={!selectedProject || retrospectiveItems.length === 0}
@@ -213,11 +226,11 @@ const SprintAnalysisPage = ({ projects, showMessage }) => {
         </div>
       </div>
 
-      {isLoading && <p id="loading-message-retro-id" className="loading-message-retro">Loading items...</p>}
-      {!isLoading && !selectedProject && <p id="select-project-prompt-retro-id" className="select-project-prompt-retro">Please select a project to view retrospective items.</p>}
+      {isLoading && <p className="loading-message">Loading items...</p>}
+      {!isLoading && !selectedProject && <p className="empty-column-message">Please select a project to view retrospective items.</p>}
 
       {!isLoading && selectedProject && (
-        <div id="retrospective-board-id" className="retrospective-board">
+        <div className="retrospective-board">
           {COLUMN_TYPES.map(column => (
             <RetrospectiveColumn
               key={column.value}

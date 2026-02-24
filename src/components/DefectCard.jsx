@@ -54,117 +54,161 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
   return (
     <div 
       id={`defect-card-${defect.id}`}
-      className="defect-card"
+      className="defect-card kanban-card"
       draggable={isDraggable}
       onDragStart={(e) => handleDragStart(e, defect)}
       onDragEnd={handleDragEnd}
-      style={{ cursor: isDraggable ? 'grab' : 'default' }}
+      style={{ cursor: isDraggable ? 'grab' : 'default', position: 'relative' }}
     >
-      <h4 id={`defect-card-title-${defect.id}`} className="defect-card-title">
-        {defect.title}
-        {defect.is_fat_defect ? <span id={`fat-defect-badge-${defect.id}`} className="fat-defect-badge">FAT</span> : null}
-      </h4>
-      {defect.area !== 'Imported' && <p id={`defect-card-area-${defect.id}`} className="defect-card-area"><strong>Area:</strong> {defect.area}</p>}
-      {defect.description && <p id={`defect-card-description-${defect.id}`} className="defect-card-description"><strong>Description:</strong> {defect.description}</p>}
+      {!!defect.is_fat_defect && <div className="fat-bubble">FAT</div>}
       
-      {defect.lastComment && defect.lastComment.trim() !== '-' && defect.lastComment.trim() !== '' && (
-        <p id={`defect-card-comment-${defect.id}`} className="defect-card-comment">
-          <strong>Last Comment:</strong> {defect.lastComment}
-        </p>
-      )}
-
-      {defect.link && <p id={`defect-card-link-${defect.id}`} className="defect-card-link"><strong>Link:</strong> <a href={defect.link} target="_blank" rel="noopener noreferrer">{defect.link}</a></p>}
-      <p id={`defect-card-date-${defect.id}`} className="defect-card-date"><strong>Logged:</strong> {formatDate(defect.created_date)}</p>
-      
-      {(defect.status === 'Done' || defect.status === 'Closed') && (
-        <p 
-          id={`defect-card-fixed-date-container-${defect.id}`} 
-          className="defect-card-fixed-date"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
-        >
-            <strong>Fixed Date:</strong>
-            {isEditingDate ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <input 
-                        type="datetime-local" 
-                        value={tempDate} 
-                        onChange={(e) => setTempDate(e.target.value)}
-                        style={{ padding: '2px', fontSize: '0.9em', border: '1px solid #ccc', borderRadius: '3px' }}
-                    />
-                    <button 
-                        onClick={handleSaveDate} 
-                        title="Save"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'green', fontWeight: 'bold', padding: 0 }}
-                    >
-                        ✓
-                    </button>
-                    <button 
-                        onClick={handleCancelDate} 
-                        title="Cancel"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'red', fontWeight: 'bold', padding: 0 }}
-                    >
-                        ✕
-                    </button>
-                </span>
-            ) : (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {defect.fixed_date ? new Date(defect.fixed_date).toLocaleString() : 'N/A'}
-                    {defect.status === 'Done' && (
-                        <button 
-                            onClick={() => { setIsEditingDate(true); setTempDate(getLocalDateTime(defect.fixed_date)); }}
-                            title="Edit Fixed Date"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#007bff', padding: 0 }}
-                        >
-                            ✏️
-                        </button>
-                    )}
-                </span>
-            )}
-        </p>
-      )}
-
-      <p id={`defect-card-updated-${defect.id}`} className="defect-card-updated"><strong>Last Update:</strong> {new Date(defect.updated_at).toLocaleString()}</p>
-
-      {defect.linkedRequirements && defect.linkedRequirements.length > 0 && (
-        <div id={`card-detail-item-linked-reqs-${defect.id}`} className="card-detail-item">
-          <span id={`detail-label-linked-reqs-${defect.id}`} className="detail-label">Linked Requirements:</span>
-          <div id={`linked-items-container-${defect.id}`} className="linked-items-container">
-            {defect.linkedRequirements.map(req => (
-              <button 
-                id={`linked-req-tag-${req.groupId}`}
-                key={req.groupId} 
-                className="linked-item-tag requirement"
-                onClick={() => onNavigate(defect.project, req.sprint, req.groupId)}
-                title={`Go to requirement in Sprint: ${req.sprint}`}
-              >
-                {req.name}
-              </button>
-            ))}
-          </div>
+      {isDraggable && (
+        <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            cursor: 'grab',
+            color: 'var(--text-secondary)',
+            opacity: 0.4,
+            fontSize: '14px',
+            lineHeight: 1,
+            userSelect: 'none'
+        }} title="Drag to move">
+          ⋮⋮
         </div>
       )}
 
-      <div id={`defect-card-actions-${defect.id}`} className="defect-card-actions">
-        <button id={`defect-action-button-edit-${defect.id}`} onClick={() => onEdit(defect)} className="defect-action-button edit" title={`Edit defect: ${defect.title}`}>Edit</button>
-        <button id={`defect-action-button-history-${defect.id}`} onClick={() => onShowHistory(defect)} className="defect-action-button history" title={`View history for defect: ${defect.title}`}>History</button>
-        <button 
-          id={`defect-action-button-delete-${defect.id}`}
-          onClick={() => onDeleteRequest(defect)} 
-          className="defect-action-button delete"
-          title={`Delete defect: ${defect.title}`}
-        >
-          Delete
-        </button>
+      <div className="kanban-card-main-content" style={{ flexGrow: 1 }}>
+        <strong id={`defect-card-title-${defect.id}`} style={{ display: 'block', marginBottom: '12px', color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.05rem', wordBreak: 'break-word' }}>
+          {defect.title}
+        </strong>
+
+        <div className="kanban-card-details">
+          {defect.area !== 'Imported' && (
+            <div className="card-detail-item">
+              <span className="detail-label">Area:</span>
+              <span className="detail-value">{defect.area}</span>
+            </div>
+          )}
+
+          {defect.description && (
+            <div className="card-detail-item">
+              <span className="detail-label">Description:</span>
+              <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.description}</span>
+            </div>
+          )}
+          
+          {defect.lastComment && defect.lastComment.trim() !== '-' && defect.lastComment.trim() !== '' && (
+            <div className="card-detail-item">
+              <span className="detail-label">Last Comment:</span>
+              <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.lastComment}</span>
+            </div>
+          )}
+
+          {defect.link && (
+            <div className="card-detail-item">
+              <span className="detail-label">Link:</span>
+              <a href={defect.link} target="_blank" rel="noopener noreferrer" className="detail-value">{defect.link}</a>
+            </div>
+          )}
+
+          <div className="card-detail-item">
+            <span className="detail-label">Logged:</span>
+            <span className="detail-value">{formatDate(defect.created_date)}</span>
+          </div>
+          
+          {(defect.status === 'Done' || defect.status === 'Closed') && (
+            <div className="card-detail-item">
+                <span className="detail-label">Fixed Date:</span>
+                <span className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {isEditingDate ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <input 
+                                type="datetime-local" 
+                                value={tempDate} 
+                                onChange={(e) => setTempDate(e.target.value)}
+                                style={{ padding: '4px', fontSize: '0.9em', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                            />
+                            <button 
+                                onClick={handleSaveDate} 
+                                title="Save"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#28a745', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
+                            >
+                                ✓
+                            </button>
+                            <button 
+                                onClick={handleCancelDate} 
+                                title="Cancel"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
+                            >
+                                ✕
+                            </button>
+                        </span>
+                    ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {defect.fixed_date ? new Date(defect.fixed_date).toLocaleString() : 'N/A'}
+                            {defect.status === 'Done' && (
+                                <button 
+                                    onClick={() => { setIsEditingDate(true); setTempDate(getLocalDateTime(defect.fixed_date)); }}
+                                    title="Edit Fixed Date"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-color)', padding: 0 }}
+                                >
+                                    ✏️
+                                </button>
+                            )}
+                        </span>
+                    )}
+                </span>
+            </div>
+          )}
+
+          <div className="card-detail-item">
+            <span className="detail-label">Last Update:</span>
+            <span className="detail-value">{new Date(defect.updated_at).toLocaleString()}</span>
+          </div>
+
+          {defect.linkedRequirements && defect.linkedRequirements.length > 0 && (
+            <div className="card-detail-item" style={{ marginTop: '10px' }}>
+              <span className="detail-label" style={{ marginBottom: '5px' }}>Linked Requirements:</span>
+              <div className="linked-items-container">
+                {defect.linkedRequirements.map(req => (
+                  <button 
+                    id={`linked-req-tag-${req.groupId}`}
+                    key={req.groupId} 
+                    className="linked-item-tag"
+                    onClick={() => onNavigate(defect.project, req.sprint, req.groupId)}
+                    title={`Go to requirement in Sprint: ${req.sprint}`}
+                  >
+                    {req.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="defect-card-actions">
+        <button id={`defect-action-button-edit-${defect.id}`} onClick={() => onEdit(defect)} className="defect-action-btn edit" title={`Edit defect: ${defect.title}`}>Edit</button>
+        <button id={`defect-action-button-history-${defect.id}`} onClick={() => onShowHistory(defect)} className="defect-action-btn history" title={`View history for defect: ${defect.title}`}>History</button>
         {defect.status !== 'Closed' && (
             <button 
                 id={`defect-action-button-move-${defect.id}`}
                 onClick={() => onMoveToClosed(defect)} 
-                className="defect-action-button move"
+                className="defect-action-btn close-btn"
                 title="Move defect to Closed"
             >
-                Move to Closed
+                Close
             </button>
         )}
+        <button 
+          id={`defect-action-button-delete-${defect.id}`}
+          onClick={() => onDeleteRequest(defect)} 
+          className="defect-action-btn delete"
+          title={`Delete defect: ${defect.title}`}
+        >
+          Delete
+        </button>
       </div>
     </div>
   );

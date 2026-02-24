@@ -1,0 +1,179 @@
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--bg-sidebar);
+  color: var(--text-sidebar);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  border-right: 1px solid var(--border-color);
+  z-index: 1000;
+  transition: width 0.3s ease;
+  overflow-y: auto; /* Allow scrolling inside sidebar if height is small */
+  overflow-x: hidden;
+}
+
+/* MOBILE SIDEBAR BEHAVIOR */
+@media (max-width: 768px) {
+  .sidebar {
+    /* On mobile, if expanded, it acts as an overlay */
+    box-shadow: 5px 0 15px rgba(0,0,0,0.3);
+  }
+  
+  /* When collapsed on mobile, it's just the icon bar */
+  .sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+    box-shadow: none;
+  }
+  
+  /* Note: The width is controlled by the JS variable --sidebar-width, 
+     which toggles between 260px and 80px. 
+     The index.css media query ensures content doesn't get pushed. */
+}
+
+.sidebar-header {
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 20px 10px;
+  flex-direction: column;
+}
+
+.sidebar.collapsed .logo-text {
+  display: none;
+}
+
+.logo-icon {
+  background: var(--accent-color);
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+}
+
+.logo-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-sidebar);
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  margin-left: auto;
+  transition: background 0.2s;
+}
+
+.collapse-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.sidebar.collapsed .collapse-btn {
+  margin-left: 0;
+  margin-top: 10px;
+}
+
+.project-status {
+  padding: 20px 25px;
+  background: rgba(255,255,255,0.05);
+  margin: 15px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-status small {
+  opacity: 0.7;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.sidebar-nav {
+  flex-grow: 1;
+  padding: 10px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  color: var(--text-sidebar);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+  opacity: 0.8;
+}
+
+/* Adjust icon size for better touch targets on mobile */
+@media (max-width: 768px) {
+  .nav-item { padding: 15px; }
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 15px;
+}
+
+.nav-item:hover {
+  background-color: rgba(255,255,255,0.1);
+  opacity: 1;
+  transform: translateX(5px);
+}
+
+.nav-item.active {
+  background-color: var(--accent-color);
+  color: white;
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.sidebar.collapsed .nav-item.active {
+  box-shadow: none;
+} 
+
+.sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.theme-toggle {
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--text-sidebar);
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.1);
+}

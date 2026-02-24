@@ -1,0 +1,104 @@
+/* src/pages/SprintBoardPage.css */
+
+/* -----------------------------------------
+   SELECTION CONTROLS (Top Bar of Board)
+----------------------------------------- */
+.selection-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* Aligns inputs to the bottom so labels stay on top */
+  flex-wrap: wrap;
+  gap: 20px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: var(--card-shadow);
+}
+
+.selection-group-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  flex-wrap: wrap;
+  flex-grow: 1;
+}
+
+/* Constrain dropdown widths so they sit side by side */
+.selection-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+  max-width: 300px;
+  flex: 1;
+}
+
+.dropdown-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Make Search take up remaining middle space */
+.search-container {
+  flex: 2;
+  min-width: 250px;
+  max-width: 400px;
+}
+
+/* Align buttons and checkboxes to match input heights */
+.filter-toggle-button {
+  height: 42px; /* Matches standard input height */
+  margin-bottom: 0;
+}
+
+.show-archived-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 5px;
+}
+
+.show-archived-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.show-archived-container label {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Ensure the right-side actions align properly */
+.page-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 42px;
+}
+
+.page-actions-group .btn-primary {
+  height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+/* -----------------------------------------
+   DISABLED STATE
+----------------------------------------- */
+.btn-primary:disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  border-color: var(--border-color);
+  transform: none;
+  opacity: 0.7;
+}

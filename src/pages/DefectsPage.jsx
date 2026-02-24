@@ -156,29 +156,50 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     };
   }, [isFilterSidebarOpen]);
 
-  useEffect(() => {
-    const savedProject = sessionStorage.getItem('defectsPageSelectedProject');
-    if (savedProject) {
-        setSelectedProject(savedProject);
-    }
-  }, []);
-
-  useEffect(() => {
-      if (selectedProject) {
-          sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
-      } else {
-          sessionStorage.removeItem('defectsPageSelectedProject');
-      }
-  }, [selectedProject]);
-
-  const onSelectProject = useCallback((project) => {
+  // Handle Manual Project Selection with URL Update
+  const handleManualProjectSelect = useCallback((project) => {
       setSelectedProject(project);
       setIsSearching(false);
       setDefectQuery('');
       setSearchResults([]);
       setSearchSuggestions([]);
       setSelectedReleases([]);
-  }, []);
+      
+      if (project) {
+          navigate(`/defects?project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
+      } else {
+          navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
+      }
+  }, [navigate, showClosedView]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const projectParam = params.get('project');
+    const viewParam = params.get('view');
+    const highlightId = params.get('highlight');
+    let needsReplace = false;
+
+    if (projectParam && projectParam !== selectedProject) {
+      setSelectedProject(projectParam);
+    }
+    
+    if (viewParam === 'closed' && !showClosedView) {
+        setShowClosedView(true);
+    } else if (viewParam !== 'closed' && showClosedView) {
+        setShowClosedView(false);
+    }
+    
+    if (highlightId) {
+      setHighlightedDefectId(highlightId);
+      params.delete('highlight');
+      needsReplace = true;
+    }
+
+    if (needsReplace) {
+      const newSearch = params.toString() ? `?${params.toString()}` : '';
+      navigate(`${location.pathname}${newSearch}`, { replace: true });
+    }
+  }, [location.search, navigate]);
 
   const defectChartTooltipContent = (
     <div id="defect-chart-tooltip-content-id">
@@ -265,29 +286,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       return () => clearTimeout(timer);
     }
   }, [highlightedDefectId, activeDefects, closedDefects, selectedProject]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const projectParam = params.get('project');
-    const viewParam = params.get('view');
-    const highlightId = params.get('highlight');
-    let urlWasChanged = false;
-
-    if (projectParam && projects.includes(projectParam)) {
-      onSelectProject(projectParam);
-      setShowClosedView(viewParam === 'closed');
-      urlWasChanged = true;
-    }
-    
-    if (highlightId) {
-      setHighlightedDefectId(highlightId);
-      urlWasChanged = true;
-    }
-
-    if (urlWasChanged) {
-      navigate(location.pathname, { replace: true });
-    }
-  }, [location.search, navigate, projects, onSelectProject]);
 
   const filteredDefects = useMemo(() => {
     let defectsToFilter = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
@@ -538,7 +536,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     } else {
         setReturnToDevChartData(null);
     }
-}, [selectedProject, showClosedView, showMessage]);
+  }, [selectedProject, showClosedView, showMessage]);
 
   useEffect(() => {
     if (showAreaChart) {
@@ -576,8 +574,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'create'} defect`);
+      
       showMessage(`Defect ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
       await refreshDefectsState();
+      handleManualProjectSelect(projectForSubmit);
       handleCloseModal();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
@@ -628,14 +628,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
           
           showMessage("Comment updated successfully.", "success");
           
-          // Refresh history data
           if (defectForHistory) {
               const histResponse = await fetch(`${API_BASE_URL}/defects/${defectForHistory.id}/history`);
               const histResult = await histResponse.json();
               setDefectHistory(histResult.data || []);
           }
 
-          // Refresh the page behind the modal
           await refreshDefectsState();
           
       } catch (error) {
@@ -644,7 +642,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   };
 
   const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
-    navigate(`/?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
+    navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}&highlight=${requirementId}`);
   }, [navigate]);
 
   const handleOpenImportModal = useCallback(() => setIsImportDefectsModalOpen(true), []);
@@ -654,8 +652,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const handleCloseJiraImportModal = useCallback(() => setIsJiraImportModalOpen(false), []);
   const handleJiraImportSuccess = useCallback(async (project) => {
       await refreshDefectsState();
-      if (project) onSelectProject(project);
-  }, [refreshDefectsState, onSelectProject]);
+      if (project) handleManualProjectSelect(project);
+  }, [refreshDefectsState, handleManualProjectSelect]);
 
   const executeDefectImport = useCallback(async (file, project, importMode = 'all') => {
     const formData = new FormData();
@@ -668,13 +666,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         if (!response.ok) throw new Error(result.error || 'Failed to import defects.');
         showMessage(result.message, 'success');
         await refreshDefectsState();
-        onSelectProject(project);
+        handleManualProjectSelect(project);
     } catch (error) {
         showMessage(`Import Error: ${error.message}`, 'error');
     } finally {
         handleCloseImportModal();
     }
-  }, [refreshDefectsState, showMessage, handleCloseImportModal, onSelectProject]);
+  }, [refreshDefectsState, showMessage, handleCloseImportModal, handleManualProjectSelect]);
 
   const handleValidateDefectImport = useCallback(async (file, project) => {
     const formData = new FormData();
@@ -977,7 +975,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {
       return (
-        <div id="defects-board-container-closed-view-id" className="defects-board-container">
+        <div className="defects-board-container">
           <DefectColumn 
             title="Closed" 
             defects={defectsToDisplay} 
@@ -991,7 +989,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       );
     }
     return (
-      <div id="defects-board-container-active-view-id" className="defects-board-container">
+      <div className="defects-board-container">
         {DEFECT_STATUS_COLUMNS.map(column => (
           <DefectColumn 
             key={column.status} 
@@ -1030,11 +1028,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   }, [showClosedView, projectReleases, archivedReleases]);
 
   return (
-    <div id="defects-page-main-content-area-id" className="main-content-area">
-
-      <div id="defects-page-selection-controls-id" className="selection-controls">
-        <div id="defects-page-selection-group-container-id" className="selection-group-container">
-            <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={onSelectProject} />
+    <div className="main-content-area">
+      <div className="selection-controls">
+        <div className="selection-group-container">
+            <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={handleManualProjectSelect} />
             <SearchComponent
               query={defectQuery}
               onQueryChange={handleDefectQueryChange}
@@ -1046,20 +1043,20 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             />
             <button
               ref={filterButtonRef}
-              className="defect-action-button defects-filter-toggle-button"
+              className="btn-primary filter-toggle-button"
               disabled={!selectedProject}
             >
                 Filter
             </button>
         </div>
-        <div id="defects-page-actions-group-id" className="page-actions-group">
-            <div id="charts-actions-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="page-actions-group">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <Tooltip content={defectChartTooltipContent} position="bottom" />
-                <button onClick={handleToggleCharts} className="defect-action-button" disabled={!selectedProject || filteredDefects.length === 0}>
+                <button onClick={handleToggleCharts} className="btn-primary" disabled={!selectedProject || filteredDefects.length === 0}>
                     {showAreaChart ? 'Hide' : 'Show'} Charts
                 </button>
             </div>
-            <button onClick={() => setShowClosedView(p => !p)} className="defect-action-button" disabled={isLoading || closedDefects.length === 0} style={{backgroundColor: '#E0D3B6', borderColor: '#C8BBA2'}}>
+            <button onClick={() => setShowClosedView(p => !p)} className="btn-primary btn-toggle-closed" disabled={isLoading || closedDefects.length === 0}>
                 {showClosedView ? 'Show Active Defects' : 'Show Closed Defects'}
             </button>
             <DefectOptionsMenu
@@ -1070,27 +1067,27 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         </div>
       </div>
 
-      {isLoading && <p id="loading-message-defects-id" className="loading-message-defects">Loading defects...</p>}
-      {!isLoading && !isSearching && !selectedProject && <p id="select-project-prompt-defects-id" className="select-project-prompt-defects">Please select a project to view defects, or use the search bar for all projects.</p>}
+      {isLoading && <p className="loading-message">Loading defects...</p>}
+      {!isLoading && !isSearching && !selectedProject && <p className="empty-column-message">Please select a project to view defects, or use the search bar for all projects.</p>}
       
       {showAreaChart && selectedProject && (
-        <div id="defects-charts-wrapper-id" className="charts-wrapper">
+        <div className="charts-wrapper">
           {doneNotDoneChartData && !showClosedView && (
-            <div id="done-not-done-chart-container-id" className="chart-container">
+            <div className="chart-container">
               <Pie data={doneNotDoneChartData} options={doneNotDonePieChartOptions} />
             </div>
           )}
-          {areaChartData && <div id="area-chart-container-id" className="chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
-          {returnToDevChartData && <div id="return-to-dev-chart-container-id" className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
+          {areaChartData && <div className="chart-container"><Pie data={areaChartData} options={pieChartOptions} /></div>}
+          {returnToDevChartData && <div className="chart-container"><Bar data={returnToDevChartData} options={returnToDevChartOptions} /></div>}
           {!areaChartData && !returnToDevChartData && (showClosedView || !doneNotDoneChartData) && !isLoading && (
-            <div id="no-chart-data-container-id" className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
+            <div className="chart-container" style={{ flexBasis: '100%', height: 'auto' }}>
               <p>No chart data available for the selected project and filters.</p>
             </div>
           )}
         </div>
       )}
 
-      {!isLoading && (isSearching ? (filteredDefects.length > 0 ? renderBoard(filteredDefects) : <div id="no-search-results-message-id" className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(filteredDefects) : null))}
+      {!isLoading && (isSearching ? (filteredDefects.length > 0 ? renderBoard(filteredDefects) : <div className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(filteredDefects) : null))}
 
       <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
@@ -1099,25 +1096,26 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
       <JiraImportModal isOpen={isJiraImportModalOpen} onClose={handleCloseJiraImportModal} onImportSuccess={handleJiraImportSuccess} projects={projects || []} releases={projectReleases} currentProject={selectedProject} importType="defects" showMessage={showMessage} />
+      
       {isImportConfirmModalOpen && importConfirmData && (
-          <div id="import-defect-confirm-overlay-id" className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
-              <div id="import-defect-confirm-content-id" className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
-                  <h3 id="import-defect-confirm-title-id">Confirm Defect Import</h3>
-                  <p id="import-defect-confirm-message-id">
+          <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
+              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+                  <h3>Confirm Defect Import</h3>
+                  <p>
                       The file contains {importConfirmData.newCount} new defect(s) and {importConfirmData.duplicateCount} duplicate(s).
                       {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
                   </p>
-                  <p id="import-defect-confirm-prompt-id">How would you like to proceed?</p>
-                  <div id="import-defect-confirm-actions-id" className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
-                      <button id="import-defect-all-button-id" onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                  <p>How would you like to proceed?</p>
+                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+                      <button onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
                           Import All
                       </button>
                       {importConfirmData.newCount > 0 && (
-                          <button id="import-defect-new-only-button-id" onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                          <button onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
                               Import New Only
                           </button>
                       )}
-                      <button id="import-defect-cancel-button-id" onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
                           Cancel
                       </button>
                   </div>

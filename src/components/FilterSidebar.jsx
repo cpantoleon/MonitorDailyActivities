@@ -1,5 +1,6 @@
 import React from 'react';
 import useClickOutside from '../hooks/useClickOutside';
+import './FilterSidebar.css';
 
 const FilterSidebar = ({
   isOpen,
@@ -21,7 +22,6 @@ const FilterSidebar = ({
   onDateFromChange,
   onDateToChange,
   onClearFilters,
-  // Add the new props for the FAT Defect filter
   fatDefectFilter,
   onFatDefectChange,
   isFatDefectYesEnabled,
@@ -30,7 +30,14 @@ const FilterSidebar = ({
   const sidebarRef = useClickOutside(onClose);
 
   return (
-    <div id="filter-sidebar-id" className={`filter-sidebar ${!isOpen ? 'closed' : ''}`} ref={sidebarRef}>
+    <>
+      {isOpen && (
+        <div 
+          className="filter-sidebar-overlay"
+          onClick={onClose}
+        />
+      )}
+      <div id="filter-sidebar-id" className={`filter-sidebar ${!isOpen ? 'closed' : ''}`} ref={sidebarRef} style={{ zIndex: 999 }}>
       {types && onTypeChange && (
         <>
           <h3 id="filter-by-type-heading-id">Filter by Type</h3>
@@ -106,7 +113,6 @@ const FilterSidebar = ({
         </div>
       )}
 
-      {/* Add the new FAT Defect filter section here */}
       {onFatDefectChange && (
         <>
           <h3 id="fat-defect-heading-id">FAT Defect</h3>
@@ -166,6 +172,7 @@ const FilterSidebar = ({
       </button>
       <div id="filter-sidebar-spacer-id" style={{ height: '40px' }}></div>
     </div>
+    </>
   );
 };
 

@@ -40,7 +40,7 @@ const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteReq
   return (
     <div 
       id={`defect-kanban-column-${safeTitleId}-id`}
-      className={`defect-kanban-column ${isDraggedOver ? 'drag-over' : ''}`}
+      className={`defect-column ${isDraggedOver ? 'drag-over' : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

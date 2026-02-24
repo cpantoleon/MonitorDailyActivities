@@ -18,6 +18,21 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
+const useTheme = () => {
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    useEffect(() => {
+        const checkTheme = () => {
+            const theme = document.documentElement.getAttribute('data-theme');
+            setIsDarkMode(theme === 'dark');
+        };
+        checkTheme();
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        return () => observer.disconnect();
+    }, []);
+    return isDarkMode;
+};
+
 const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isViewingStored }) => {
     const [kpis, setKpis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -297,6 +312,8 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
     const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
     const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
     const [isFatReportModalOpen, setIsFatReportModalOpen] = useState(false);
+    const isDarkMode = useTheme();
+    const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
 
     useEffect(() => {
         if (fatPeriod?.id) {
@@ -311,7 +328,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
 
     const totalRequirements = details.requirements.length;
 
-    const getFatChartConfig = (fat_report) => {
+    const getFatChartConfig = (fat_report, borderColor) => {
         if (!fat_report) return { data: null, legendItems: [] };
 
         const allLabels = ['Passed', 'Failed', 'Blocked', 'Caution', 'Not Run'];
@@ -338,13 +355,13 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
         return {
             data: {
                 labels,
-                datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+                datasets: [{ data, backgroundColor, borderColor: borderColor, borderWidth: 2 }]
             },
             legendItems
         };
     };
     
-    const { data: fatChartData, legendItems: fatLegendItems } = getFatChartConfig(fatPeriod.fat_report);
+    const { data: fatChartData, legendItems: fatLegendItems } = getFatChartConfig(fatPeriod.fat_report, chartBorderColor);
     const totalReported = fatPeriod.fat_report ? Object.values(fatPeriod.fat_report).reduce((a, b) => a + b, 0) : 0;
 
     const filteredDefects = useMemo(() => {
@@ -392,7 +409,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                     <span><strong>Started:</strong> {new Date(fatPeriod.start_date).toLocaleString()}</span>
                 </div>
 
-                <div id="fat-report-button-container-id" style={{ padding: '20px 0', borderBottom: '1px solid #E3C9A6', borderTop: '1px solid #E3C9A6', margin: '20px 0' }}>
+                <div id="fat-report-button-container-id" style={{ padding: '20px 0', borderBottom: '1px solid var(--border-color)', borderTop: '1px solid var(--border-color)', margin: '20px 0' }}>
                     <button onClick={() => setIsFatReportModalOpen(true)} className="button-edit" disabled={isLoading}>
                         {fatPeriod.fat_report ? 'Update FAT Results' : 'Add FAT Results'}
                     </button>
@@ -656,7 +673,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
     );
 };
 
-const getSatChartConfig = (sat_report) => {
+const getSatChartConfig = (sat_report, borderColor = '#FFFAF0') => {
     if (!sat_report) return { data: null, legendItems: [] };
 
     const allLabels = ['Passed', 'Failed', 'Blocked', 'Pending', 'Executing', 'Aborted'];
@@ -683,13 +700,13 @@ const getSatChartConfig = (sat_report) => {
     return {
         data: {
             labels,
-            datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+            datasets: [{ data, backgroundColor, borderColor: borderColor, borderWidth: 2 }]
         },
         legendItems
     };
 };
 
-const getFatExecutionChartConfig = (fat_report) => {
+const getFatExecutionChartConfig = (fat_report, borderColor = '#FFFAF0') => {
     if (!fat_report) return { data: null, legendItems: [] };
 
     const allLabels = ['Passed', 'Failed', 'Blocked', 'Caution', 'Not Run'];
@@ -716,7 +733,7 @@ const getFatExecutionChartConfig = (fat_report) => {
     return {
         data: {
             labels,
-            datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+            datasets: [{ data, backgroundColor, borderColor: borderColor, borderWidth: 2 }]
         },
         legendItems
     };
@@ -785,6 +802,8 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     
     const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
     const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
+    const isDarkMode = useTheme();
+    const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
 
     const reqChartRef = useRef(null);
     const defectChartRef = useRef(null);
@@ -822,7 +841,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
 
     const { chartData, chartTitle, chartAriaLabel, legendItems } = useMemo(() => {
         if (release.fat_execution_report) {
-            const { data, legendItems } = getFatExecutionChartConfig(release.fat_execution_report);
+            const { data, legendItems } = getFatExecutionChartConfig(release.fat_execution_report, chartBorderColor);
             return {
                 chartData: data,
                 chartTitle: 'FAT Execution Results',
@@ -847,7 +866,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
 
         const data = {
             labels: ['Done', 'Not Done'],
-            datasets: [{ data: [done, notDone], backgroundColor: ['#4CAF50', '#F44336'], borderColor: ['#ffffff'], borderWidth: 1 }],
+            datasets: [{ data: [done, notDone], backgroundColor: ['#4CAF50', '#F44336'], borderColor: [chartBorderColor], borderWidth: 1 }],
         };
         
         const dynamicLegendItems = [];
@@ -860,7 +879,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             chartAriaLabel: `Pie chart showing requirement progress for release ${release.name}. ${done} items are done and ${notDone} items are not done.`,
             legendItems: dynamicLegendItems
         };
-    }, [release.fat_execution_report, filteredRequirements, release.name]);
+    }, [release.fat_execution_report, filteredRequirements, release.name, chartBorderColor]);
 
     const defectChartData = useMemo(() => {
         if (!displayDefects || displayDefects.length === 0) return null;
@@ -873,9 +892,9 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         if (done === 0 && notDone === 0 && closed === 0) return null;
         return {
             labels: ['Done', 'Not Done', 'Closed'],
-            datasets: [{ data: [done, notDone, closed], backgroundColor: ['#4CAF50', '#F44336', '#808080'], borderColor: ['#ffffff'], borderWidth: 1 }],
+            datasets: [{ data: [done, notDone, closed], backgroundColor: ['#4CAF50', '#F44336', '#808080'], borderColor: [chartBorderColor], borderWidth: 1 }],
         };
-    }, [displayDefects]);
+    }, [displayDefects, chartBorderColor]);
 
     const handlePdfExport = async () => {
         if (!reqChartRef.current) {
@@ -1190,6 +1209,8 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     const [isSatBugModalOpen, setIsSatBugModalOpen] = useState(false);
     const [bugToEdit, setBugToEdit] = useState(null);
     const [bugToDelete, setBugToDelete] = useState(null);
+    const isDarkMode = useTheme();
+    const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
 
     const metricsChartRef = useRef(null);
     const satChartRef = useRef(null);
@@ -1290,14 +1311,14 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         }
     };
     
-    const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
+    const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report, chartBorderColor);
 
     const ourMetricsChartData = {
         labels: ['Done', 'Not Done'],
         datasets: [{
             data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
             backgroundColor: ['#28a745', '#dc3545'],
-            borderColor: '#FFFAF0',
+            borderColor: chartBorderColor,
             borderWidth: 2,
         }],
     };
@@ -1314,7 +1335,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     const primaryChartLegendItems = archive.fat_execution_report ? fatExecutionLegendItems : ourMetricsLegendItems;
     const primaryChartTitle = archive.fat_execution_report ? 'FAT Execution Results' : 'Our Final Metrics';
 
-    const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
+    const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report, chartBorderColor);
     
     const getBugLabelsChartConfig = (bugs) => {
         if (!bugs || bugs.length === 0) return { data: null, legendItems: [] };
@@ -1353,7 +1374,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         return {
             data: {
                 labels,
-                datasets: [{ data, backgroundColor, borderColor: '#FFFAF0', borderWidth: 2 }]
+                datasets: [{ data, backgroundColor, borderColor: chartBorderColor, borderWidth: 2 }]
             },
             legendItems
         };
@@ -1657,6 +1678,8 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
     const [detailedArchives, setDetailedArchives] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isPdfExporting, setIsPdfExporting] = useState(false);
+    const isDarkMode = useTheme();
+    const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
     
     const chartRefs = useRef({});
 
@@ -1913,8 +1936,8 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                 {Array.from({ length: Math.ceil(detailedArchives.length / 3) }).map((_, rowIndex) => (
                     <div key={rowIndex} id={`comparison-row-${rowIndex}-id`} className="comparison-row">
                         {detailedArchives.slice(rowIndex * 3, rowIndex * 3 + 3).map(archive => {
-                            const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report);
-                            const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report);
+                            const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report, chartBorderColor);
+                            const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report, chartBorderColor);
                             const totalRequirements = archive.metrics.doneCount + archive.metrics.notDoneCount;
 
                             const metricsLegendItems = [];
@@ -1965,7 +1988,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                                                                 datasets: [{
                                                                     data: [archive.metrics.doneCount, archive.metrics.notDoneCount],
                                                                     backgroundColor: ['#28a745', '#dc3545'],
-                                                                    borderColor: '#FFFAF0',
+                                                                    borderColor: chartBorderColor,
                                                                     borderWidth: 2,
                                                                 }],
                                                             }}

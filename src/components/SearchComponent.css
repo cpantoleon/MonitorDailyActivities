@@ -1,3 +1,4 @@
+/* src/components/SearchComponent.css */
 .search-container {
   position: relative;
   display: flex;
@@ -13,76 +14,72 @@
 .search-input {
   flex-grow: 1;
   padding: 10px 12px;
-  font-size: 1em;
-  border: 1px solid #DEB887;
-  border-radius: 4px 0 0 4px;
-  background-color: white;
-  color: #5C4033;
+  font-size: 0.95em;
+  border: 1px solid var(--border-color);
+  border-radius: 6px 0 0 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .search-button,
 .search-clear-button {
   padding: 10px 15px;
-  border: 1px solid #DEB887;
+  border: 1px solid var(--border-color);
   cursor: pointer;
   font-weight: 500;
   transition: background-color 0.2s ease;
-  margin-left: 6px;
 }
 
 .search-button {
-  background-color: #A0522D;
+  background-color: var(--accent-color);
   color: white;
   border-left: none;
 }
 
-.search-button:hover {
-  background-color: #8B4513;
+.search-button:hover:not(:disabled) {
+  background-color: var(--accent-hover);
 }
 
 .search-button:disabled {
-  background-color: #ab987a;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
   cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.search-button:disabled:hover {
-  background-color: #ab987a;
 }
 
 .search-clear-button {
-  background-color: #f0f0f0;
-  color: #5C4033;
-  border-radius: 4px 4px 4px 4px;
-  margin-left: 6px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 0 6px 6px 0;
+  border-left: none;
 }
 
 .search-clear-button:hover {
-  background-color: #e0e0e0;
+  background-color: var(--border-color);
 }
 
+/* Suggestions Dropdown */
 .suggestions-list {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 5px);
   left: 0;
   right: 0;
-  background-color: white;
-  border: 1px solid #DEB887;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 5px 0;
   z-index: 1000;
   max-height: 200px;
   overflow-y: auto;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: var(--card-shadow);
 }
 
 .suggestion-item {
   padding: 10px 15px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .suggestion-item:last-child {
@@ -90,11 +87,11 @@
 }
 
 .suggestion-item:hover {
-  background-color: #F5DEB3;
+  background-color: var(--bg-tertiary);
 }
 
 .suggestion-context {
   font-size: 0.85em;
-  color: #777;
+  color: var(--text-secondary);
   margin-left: 8px;
 }

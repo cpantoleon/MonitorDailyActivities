@@ -45,7 +45,7 @@ const KanbanCard = React.memo(({
       case 'Done':
         return 'done';
       default:
-        return '';
+        return 'open';
     }
   };
 
@@ -56,7 +56,21 @@ const KanbanCard = React.memo(({
       draggable="true"
       onDragStart={(e) => handleDragStart(e, requirement)}
       onDragEnd={handleDragEnd}
+      style={{ position: 'relative' }}
     >
+      <div style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          cursor: 'grab',
+          color: 'var(--text-secondary)',
+          opacity: 0.4,
+          fontSize: '14px',
+          lineHeight: 1,
+          userSelect: 'none'
+      }} title="Drag to move">
+        ⋮⋮
+      </div>
       <div id={`kanban-card-main-content-${requirement.id}`} className="kanban-card-main-content">
         <strong id={`requirement-identifier-${requirement.id}`}>{requirement.requirementUserIdentifier}</strong>
 

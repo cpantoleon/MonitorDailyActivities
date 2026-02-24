@@ -10,11 +10,12 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
     const [selectedProject, setSelectedProject] = useState('');
     const [selectedReleaseId, setSelectedReleaseId] = useState('');
     
-    // Νέα states για Sprint selection
     const [targetSprint, setTargetSprint] = useState('1');
     const [isBacklog, setIsBacklog] = useState(false);
 
     const [jqlQuery, setJqlQuery] = useState('');
+    const [initialJql, setInitialJql] = useState(''); // Added to track initial DB value
+    
     const [saveToken, setSaveToken] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
@@ -23,11 +24,11 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
         if (isOpen) {
             setSelectedProject(currentProject || '');
             setSelectedReleaseId('');
-            // Reset Sprint defaults
             setTargetSprint('1');
             setIsBacklog(false);
             
             setJqlQuery('');
+            setInitialJql('');
             setToken('');
             setSaveToken(true);
             checkTokenExistence();
@@ -57,8 +58,10 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                 const data = await response.json();
                 if (data.jql) {
                     setJqlQuery(data.jql);
+                    setInitialJql(data.jql); // Set initial so we know if user changed it
                 } else {
                     setJqlQuery('');
+                    setInitialJql('');
                 }
             }
         } catch (error) {
@@ -76,7 +79,6 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
             }));
     }, [selectedProject, releases]);
 
-    // Generate Sprint Options 1-20
     const sprintNumberOptions = useMemo(() => {
         return Array.from({ length: 20 }, (_, i) => ({
             value: `${i + 1}`,
@@ -85,8 +87,9 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
     }, []);
 
     const hasUnsavedChanges = useMemo(() => {
-        return token !== '' || jqlQuery !== '';
-    }, [token, jqlQuery]);
+        // Compare with initialJql instead of just empty string
+        return token !== '' || jqlQuery !== initialJql;
+    }, [token, jqlQuery, initialJql]);
 
     const handleCloseRequest = () => {
         if (hasUnsavedChanges) {
@@ -110,7 +113,6 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
 
         setIsLoading(true);
         try {
-            // Υπολογισμός του Sprint string
             const sprintValue = isBacklog ? 'Backlog' : `Sprint ${targetSprint}`;
 
             const payload = {
@@ -118,7 +120,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                 jql: jqlQuery,
                 importType: importType,
                 release_id: selectedReleaseId || null,
-                sprint: sprintValue, // Στέλνουμε το Sprint στο backend
+                sprint: sprintValue,
                 token: token || null, 
                 saveToken: saveToken
             };
@@ -170,12 +172,20 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
 
                     <div className="form-group">
                         <label htmlFor="jiraToken">Personal Access Token:</label>
+                        {/* Hidden input to absorb autofill usernames to protect the Search bar */}
+                        <input type="text" name="fakeUsername" style={{display: 'none'}} aria-hidden="true" autoComplete="username" />
+                        
+                        {/* Changed autoComplete to "new-password" to trick autofill managers */}
                         <input 
                             type="password" 
                             id="jiraToken" 
+                            name="jiraTokenPassword"
                             value={token} 
                             onChange={(e) => setToken(e.target.value)} 
                             placeholder={hasSavedToken ? "****************" : "Enter JIRA Token"} 
+                            autoComplete="new-password"
+                            data-1p-ignore="true" 
+                            data-lpignore="true"
                         />
                         <div className="new-project-toggle" style={{marginTop: '5px'}}>
                             <input 
@@ -200,7 +210,6 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                         />
                     </div>
 
-                    {/* Sprint & Release selection only for Requirements */}
                     {importType === 'requirements' && (
                         <>
                             <div className="form-group">

@@ -4,9 +4,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import ConfirmationModal from '../components/ConfirmationModal';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-import DailyInfoWidget from '../components/DailyInfoWidget';
-import WeatherWidget from '../components/WeatherWidget';
-import '../components/DailyInfoWidget.css';
 import CustomDropdown from '../components/CustomDropdown';
 import ToggleSwitch from '../components/ToggleSwitch';
 
@@ -278,7 +275,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       }
     }
     return (
-      <div id={`day-content-${formatDateKey(date)}-id`} style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="calendar-day-container" id={`day-content-${formatDateKey(date)}-id`} style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {dayOfMonth}
         {noteInfo && <span id={`note-dot-${formatDateKey(date)}-id`} className={dotClassName}></span>}
       </div>
@@ -302,44 +299,137 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const projectOptions = [{ value: 'General', label: 'General' }, ...projects.map(p => ({ value: p, label: p }))];
 
   return (
-    <div id="notes-page-container-id" className="notes-page-container with-sidebar">
-      <div id="notes-main-column-id" className="notes-main-column">
+    <div id="notes-page-main-content-id" className="main-content-area">
         <style>{`
           .ck-editor__editable_inline {
-              min-height: 250px;
-              max-height: 350px;
+              min-height: 400px;
+              max-height: 600px;
               overflow-y: auto;
           }
-          .ck-content .image {
-              max-width: 200px;
-              height: auto;
+          /* CKEditor Theme Overrides */
+          .ck.ck-editor__main > .ck-editor__editable {
+              background: var(--bg-primary) !important;
+              color: var(--text-primary) !important;
           }
-          .ck-content .image-inline {
-              max-width: 200px;
-              height: auto;
+          .ck.ck-toolbar {
+              background: var(--bg-secondary) !important;
+              border: 1px solid var(--border-color) !important;
+              border-bottom: none !important;
+              border-top-left-radius: 12px !important;
+              border-top-right-radius: 12px !important;
           }
+          .ck.ck-button {
+              color: var(--text-primary) !important;
+              cursor: pointer !important;
+          }
+          .ck.ck-button:hover {
+              background: var(--bg-tertiary) !important;
+          }
+          .ck.ck-button.ck-on {
+              background: var(--accent-color) !important;
+              color: #fff !important;
+          }
+
           .today-button {
-            padding: 8px 12px;
-            border: 1px solid #DEB887;
-            border-radius: 4px;
-            background-color: #F5DEB3;
+            padding: 0 16px;
+            height: 42px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-tertiary);
             cursor: pointer;
-            font-size: 0.9em;
-            color: #5C4033;
-            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .today-button:hover:not(:disabled) {
+            background-color: var(--accent-color);
+            color: #ffffff;
+            border-color: var(--accent-color);
           }
 
           .today-button:disabled {
-            background-color: #E9ECEF;
-            color: #6C757D;
+            background-color: var(--bg-primary);
+            color: var(--text-secondary);
             cursor: not-allowed;
-            opacity: 0.7;
+            opacity: 0.6;
+          }
+
+          /* DatePicker overrides */
+          .react-datepicker-wrapper { width: 100%; }
+          .react-datepicker__input-container input {
+              background-color: var(--bg-primary);
+              color: var(--text-primary);
+              border: 1px solid var(--border-color);
+              border-radius: 6px;
+              padding: 0 12px;
+              height: 42px;
+              width: 100%;
+              font-size: 0.95rem;
+          }
+
+          /* Calendar Dots */
+          .note-dot {
+            height: 10px;
+            width: 10px;
+            background-color: var(--text-secondary, #ccc);
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+          }
+
+          /* Specific styling for dots inside the calendar cells */
+          .calendar-day-container .note-dot {
+            height: 6px;
+            width: 6px;
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+          }
+
+          .note-dot-release { background-color: #e53e3e !important; }
+          .note-dot-project { background-color: #3182ce !important; }
+          .note-dot-fat { background-color: #d69e2e !important; }
+          .note-dot-regression { background-color: #805ad5 !important; }
+          .note-dot-security { background-color: #38a169 !important; }
+          .note-dot-demo { background-color: #00b5d8 !important; }
+          .note-dot-event { background-color: #d53f8c !important; }
+          .note-dot-call { background-color: #dd6b20 !important; }
+
+          .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+          }
+
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .spinner {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 2px solid #fff;
+            width: 14px;
+            height: 14px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
           }
         `}</style>
-        <h2 id="daily-notes-title-id">Daily Notes</h2>
-        <div id="notes-controls-id" className="notes-controls">
-          <div id="notes-project-selector-container-id">
-            <label id="note-project-label" htmlFor="note-project-button">Project:</label>
+
+        <div className="selection-controls">
+          <div className="selection-group-container">
+            <div className="selection-group">
+            <label className="dropdown-label" htmlFor="note-project">Project</label>
             <CustomDropdown
               id="note-project"
               name="noteProject"
@@ -349,10 +439,14 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               placeholder="-- Select Project --"
               disabled={projectOptions.length === 0}
             />
-          </div>
-          <div id="notes-date-selector-container-id">
-          <label htmlFor="note-date">{isGeneralMode ? (dateSelectionMode === 'month' ? 'Month:' : 'Date:') : 'Date:'}</label>
-            <div id="notes-datepicker-wrapper-id" style={{ position: 'relative', display: 'inline-block' }}>
+            </div>
+
+            <div className="selection-group" style={{ minWidth: '300px' }}>
+              <label className="dropdown-label" htmlFor="note-date">
+                {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: '100%' }}>
+              <div style={{ flexGrow: 1 }}>
               <DatePicker
                 id="note-date"
                 name="noteDate"
@@ -363,8 +457,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 className="notes-datepicker"
                 renderDayContents={renderDayContents}
               />
+              </div>
               {isGeneralMode ? (
-                <div id="general-mode-controls-id" style={{ position: 'absolute', left: '100%', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ToggleSwitch
                     id="date-selection-mode"
                     checked={dateSelectionMode === 'month'}
@@ -375,11 +470,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   />
                   {dateSelectionMode === 'date' && (
                     <button 
-                      id="today-button-general-mode-id"
                       onClick={() => setSelectedDate(new Date())} 
                       disabled={isToday(selectedDate)}
                       className="today-button"
-                      style={{ marginLeft: '10px' }}
                     >
                       Today
                     </button>
@@ -387,20 +480,25 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 </div>
               ) : (
                 <button 
-                  id="today-button-project-mode-id"
                   onClick={() => setSelectedDate(new Date())} 
                   disabled={isToday(selectedDate)}
                   className="today-button"
-                  style={{ position: 'absolute', right: '-85px', top: '50%', transform: 'translateY(-50%)' }}
                 >
                   Today
                 </button>
               )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div id="notes-legend-id" className="notes-legend">
+        <div id="notes-legend-id" className="notes-legend" style={{ 
+            marginBottom: '20px', 
+            backgroundColor: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)', 
+            borderRadius: '8px', 
+            padding: '10px 15px' 
+        }}>
           <div id="legend-title-id" className="legend-title clickable" onClick={toggleLegend}>
             Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
           </div>
@@ -421,7 +519,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         </div>
 
         {selectedProject ? (
-          <div id="notes-editor-area-id" className="notes-editor-area">
+          <div id="notes-editor-area-id" className="notes-editor-area" style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '20px',
+              boxShadow: 'var(--card-shadow)'
+          }}>
             <h3 id="notes-editor-label">
               Notes for {selectedProject} on {isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}
             </h3>
@@ -457,19 +561,26 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   disabled={!selectedProject}
               />
             </div>
-            <div id="notes-actions-container-id" className="notes-actions-container">
+            <div id="notes-actions-container-id" className="notes-actions-container" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
                 id="save-note-button-id"
                 onClick={() => handleSaveNote(noteText)}
-                className="save-note-button"
+                className="btn-primary"
                 disabled={isLoadingNotes || !selectedProject}
               >
-                {isLoadingNotes ? 'Saving...' : 'Save Note'}
+                {isLoadingNotes ? (
+                  <>
+                    <span className="spinner"></span> Saving...
+                  </>
+                ) : (
+                  'Save Note'
+                )}
               </button>
               <button
                 id="clear-note-button-id"
                 onClick={handleClearRequest}
-                className="clear-note-button"
+                className="delete-card-button"
+                style={{ height: '42px', display: 'flex', alignItems: 'center' }}
                 disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
               >
                 Clear Note
@@ -477,14 +588,8 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             </div>
           </div>
         ) : (
-          <p id="select-project-prompt-id" className="select-project-prompt">Please select a project to view or add notes.</p>
+          <div id="select-project-prompt-id" className="empty-column-message">Please select a project to view or add notes.</div>
         )}
-      </div>
-
-      <div id="notes-sidebar-column-id" className="notes-sidebar-column">
-        <WeatherWidget showMessage={showMessage} />
-        <DailyInfoWidget />
-      </div>
 
       <ConfirmationModal
         isOpen={isConfirmClearOpen}

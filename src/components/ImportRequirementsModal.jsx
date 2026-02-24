@@ -98,8 +98,8 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
 
   const tooltipContent = (
     <div id="import-reqs-tooltip-content-id">
-      <strong>Excel File Format Guide:</strong>
-      <ul>
+      <strong style={{ color: 'var(--text-primary)' }}>Excel File Format Guide:</strong>
+      <ul style={{ paddingLeft: '20px', margin: '5px 0 0 0', color: 'var(--text-secondary)' }}>
         <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story', 'Incident'.</li>
         <li>The 'Summary' column is required and will become the requirement's title.</li>
         <li>The 'Key' column (e.g., 'PROJ-123') is used for JIRA links and duplicate checking.</li>
@@ -115,20 +115,31 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
   return (
     <div id="import-requirements-modal-wrapper-id">
       <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
-        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
-          <div id="modal-header-with-tooltip-id" className="modal-header-with-tooltip">
-            <div id="modal-header-content-id">
-              <h2 id="import-requirements-title-id">Import Requirements from Excel</h2>
-              <span id="how-to-export-link-id" className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
+        <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '650px' }}>
+          
+          {/* UPDATED HEADER: Flexbox prevents wrapping and uses theme variables */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', marginBottom: '20px', gap: '15px' }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.5em', flexGrow: 1 }}>
+              Import Requirements
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span 
+                onClick={() => setIsGifModalOpen(true)}
+                style={{ cursor: 'pointer', color: 'var(--accent-color)', textDecoration: 'underline', fontSize: '0.9em', fontWeight: '500' }}
+              >
                 How to Export from JIRA?
               </span>
+              <Tooltip content={tooltipContent} position="bottom" />
             </div>
-            <Tooltip content={tooltipContent} position="bottom" />
           </div>
-          {error && <p id="error-message-modal-id" className="error-message-modal">{error}</p>}
+
+          {/* UPDATED ERROR MESSAGE */}
+          {error && <p id="error-message-modal-id" className="error-message-modal" style={{ color: 'var(--danger-color)', marginBottom: '15px', fontWeight: '500' }}>{error}</p>}
+          
           <div id="form-group-file-id" className="form-group">
             <label htmlFor="importReqFile">Excel File (.xlsx, .xls):</label>
-            <input type="file" id="importReqFile" name="importReqFile" accept=".xlsx, .xls" onChange={handleFileChange} />
+            {/* UPDATED INPUT FILE COLOR */}
+            <input type="file" id="importReqFile" name="importReqFile" accept=".xlsx, .xls" onChange={handleFileChange} style={{ color: 'var(--text-primary)' }} />
           </div>
           <div id="form-group-project-id" className="form-group">
             <label id="importReqProject-label" htmlFor="importReqProject-button">Target Project:</label>
@@ -168,12 +179,15 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
               placeholder={!state.targetProject ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
             />
           </div>
+          
           <div id="modal-actions-id" className="modal-actions">
+            {/* MATCHING BUTTON CLASSES */}
             <button id="import-button-id" onClick={handleImport} className="modal-button-save">Import</button>
             <button id="cancel-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         </div>
       </div>
+      
       <ConfirmationModal
         isOpen={isCloseConfirmOpen}
         onClose={() => setIsCloseConfirmOpen(false)}

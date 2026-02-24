@@ -11,6 +11,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const [changeReason, setChangeReason] = useState('');
   const [isLogChangeVisible, setIsLogChangeVisible] = useState(false);
   const [acknowledgeDefects, setAcknowledgeDefects] = useState(false);
+  const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
 
   const openDefects = useMemo(() => {
     if (!requirement || formData.status !== 'Done') return [];
@@ -18,7 +19,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       (defect) => defect.status === 'Assigned to Developer' || defect.status === 'Assigned to Tester'
     ) || [];
   }, [requirement, formData.status]);
-
 
   useEffect(() => {
     if (requirement && isOpen) {
@@ -45,7 +45,8 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       setInitialFormData(initialData);
       setChangeReason('');
       setIsLogChangeVisible(false);
-      setAcknowledgeDefects(false); 
+      setAcknowledgeDefects(false);
+      setActiveTab('core'); // Reset to first tab
     }
   }, [requirement, isOpen]);
 
@@ -72,6 +73,14 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // If on Core tab, just go to Tracking
+    if (activeTab === 'core') {
+      setActiveTab('tracking');
+      return;
+    }
+
+    // If on Tracking tab, perform validation and save
     if (openDefects.length > 0 && !acknowledgeDefects) {
       showMessage('Please acknowledge the open defects before proceeding.', 'error');
       return;
@@ -98,69 +107,67 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const releaseOptions = releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }));
 
   const releaseTooltipContent = (
-    <div id="release-tooltip-content-edit-req-id">
+    <div>
       <strong>Assign to a Release</strong>
       <p>Associate this requirement with a release. The release marked '(Current)' is the one actively designated for the project.</p>
     </div>
   );
 
   return (
-    <div id="edit-requirement-modal-wrapper-id">
-      <div id="edit-req-modal-overlay-id" className="add-new-modal-overlay">
-        <div ref={modalRef} id="edit-req-modal-content-id" className="add-new-modal-content" style={{maxWidth: '600px'}}>
-          <h2>Edit Requirement</h2>
-          <form id="edit-req-form-id" onSubmit={handleSubmit}>
-            <div id="form-group-name-id" className="form-group">
+    <div className="add-new-modal-overlay">
+      <div ref={modalRef} className="add-new-modal-content">
+        <h2>Edit Requirement</h2>
+
+        {/* TAB NAVIGATION */}
+        <div className="modal-tabs">
+            <button 
+              type="button" 
+              className={`modal-tab-button ${activeTab === 'core' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('core')}
+            >
+                Core Details
+            </button>
+            <button 
+              type="button" 
+              className={`modal-tab-button ${activeTab === 'tracking' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('tracking')}
+            >
+                Tracking & Links
+            </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          
+          {/* TAB 1: CORE DETAILS */}
+          <div style={{ display: activeTab === 'core' ? 'block' : 'none' }}>
+            <div className="form-group">
               <label htmlFor="editReqName">Requirement Name:</label>
               <input type="text" id="editReqName" name="name" value={formData.name || ''} onChange={handleChange} required />
             </div>
-            <div id="form-group-type-id" className="form-group">
-              <label id="editReqType-label" htmlFor="editReqType-button" className="optional-label">Type:</label>
-              <CustomDropdown
-                id="editReqType"
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                options={typeOptions}
-                placeholder="-- Select Type --"
-              />
+            <div className="form-group">
+              <label className="optional-label">Type:</label>
+              <CustomDropdown name="type" value={formData.type} onChange={handleChange} options={typeOptions} placeholder="-- Select Type --" />
             </div>
-            <div id="form-group-comment-id" className="form-group">
+            <div className="form-group">
               <label htmlFor="editReqComment" className="optional-label">Current Comment:</label>
-              <textarea id="editReqComment" name="comment" value={formData.comment || ''} onChange={handleChange} rows="4" placeholder="Enter a comment for the current status" />
+              <textarea id="editReqComment" name="comment" value={formData.comment || ''} onChange={handleChange} rows="3" placeholder="Enter a comment for the current status" />
             </div>
-            <div id="form-group-sprint-id" className="form-group">
-              <label id="editReqSprint-label" htmlFor="editReqSprint-button">Sprint:</label>
-              <CustomDropdown
-                id="editReqSprint"
-                name="sprint"
-                value={formData.sprint}
-                onChange={handleChange}
-                options={sprintNumberOptions}
-                disabled={formData.isBacklog}
-              />
-            </div>
-            <div id="form-group-backlog-toggle-id" className="form-group new-project-toggle">
-              <input type="checkbox" id="isBacklogCheckboxEdit" name="isBacklog" checked={formData.isBacklog || false} onChange={handleChange} />
-              <label htmlFor="isBacklogCheckboxEdit" className="checkbox-label optional-label">Assign to Backlog</label>
-            </div>
-            <div id="form-group-status-id" className="form-group">
-              <label id="editReqStatus-label" htmlFor="editReqStatus-button">Status:</label>
-              <CustomDropdown
-                id="editReqStatus"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                options={statusOptions}
-              />
+          </div>
+
+          {/* TAB 2: TRACKING & LINKS */}
+          <div style={{ display: activeTab === 'tracking' ? 'block' : 'none' }}>
+            <div className="form-group">
+              <label>Status:</label>
+              <CustomDropdown name="status" value={formData.status} onChange={handleChange} options={statusOptions} />
             </div>
 
+            {/* DEFECT WARNING (Only shown in Tracking Tab) */}
             {openDefects.length > 0 && (
-              <div id="open-defects-warning-container-id" className="form-group" style={{ marginTop: '15px', backgroundColor: '#FFF8DC', padding: '10px', borderRadius: '4px' }}>
-                <p id="open-defects-warning-text-id" style={{ marginTop: 0, color: '#8B4513', fontSize: '0.9em' }}>
+              <div className="warning-box" style={{marginBottom: '15px'}}>
+                <p className="warning-text">
                   <strong>Warning:</strong> This item has {openDefects.length} open defect(s).
                 </p>
-                <div id="acknowledge-defects-toggle-id" className="new-project-toggle">
+                <div className="new-project-toggle" style={{marginBottom: 0}}>
                   <input
                     type="checkbox"
                     id="editAcknowledgeDefectsCheckbox"
@@ -174,13 +181,21 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </div>
             )}
 
-            <div id="form-group-release-id" className="form-group">
-              <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <label id="editReqRelease-label" htmlFor="editReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
+            <div className="form-group">
+              <label>Sprint:</label>
+              <CustomDropdown name="sprint" value={formData.sprint} onChange={handleChange} options={sprintNumberOptions} disabled={formData.isBacklog} />
+            </div>
+            <div className="form-group new-project-toggle">
+              <input type="checkbox" id="isBacklogCheckboxEdit" name="isBacklog" checked={formData.isBacklog || false} onChange={handleChange} />
+              <label htmlFor="isBacklogCheckboxEdit" className="checkbox-label optional-label">Assign to Backlog</label>
+            </div>
+
+            <div className="form-group">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <label className="optional-label" style={{marginBottom: 0}}>Release:</label>
                 <Tooltip content={releaseTooltipContent} className="release" />
               </div>
               <CustomDropdown
-                id="editReqRelease"
                 name="release_id"
                 value={formData.release_id}
                 onChange={handleChange}
@@ -189,67 +204,73 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
                 placeholder={releases.length === 0 ? "-- No releases for this project --" : "-- Select a Release --"}
               />
             </div>
-            <div id="form-group-tags-id" className="form-group">
+            <div className="form-group">
               <label htmlFor="editReqTags" className="optional-label">Tags:</label>
               <input type="text" id="editReqTags" name="tags" value={formData.tags || ''} onChange={handleChange} placeholder="e.g., Sprint 4, PreA Tools" />
             </div>
-            <div id="form-group-link-id" className="form-group">
+            <div className="form-group">
               <label htmlFor="editReqLink" className="optional-label">Link (e.g., JIRA):</label>
               <input type="url" id="editReqLink" name="link" value={formData.link || ''} onChange={handleChange} placeholder="https://example.com/issue/123" />
             </div>
-            <div id="edit-req-modal-actions-id" className="modal-actions">
-              <button 
-                type="submit" 
-                className="modal-button-save"
-              >
-                Save Changes
-              </button>
-              <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
-            </div>
-          </form>
-
-          <div id="log-scope-change-section-id" style={{ borderTop: '2px solid #D2B48C', marginTop: '25px', paddingTop: '20px' }}>
-            <div id="log-scope-change-header-id" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3 id="log-scope-change-title-id" style={{ margin: 0, color: '#5C4033', fontSize: '1.2em' }}>Log Scope Change</h3>
-                <div id="log-scope-change-controls-id" style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                     <Tooltip content="Click to show/hide the section for logging a scope change. This is for tracking significant changes made during a sprint." />
-                     <button id="toggle-log-scope-change-button-id" type="button" onClick={() => setIsLogChangeVisible(p => !p)} className="modal-button-cancel" style={{padding: '5px 15px'}}>
-                         {isLogChangeVisible ? 'Hide' : 'Show'}
-                     </button>
-                </div>
-            </div>
-            {isLogChangeVisible && (
-              <div id="log-scope-change-content-id">
-                <p id="log-scope-change-description-id" style={{fontSize: '0.9em', color: '#704214', marginTop: 0, marginBottom: '15px'}}>
-                  Use this section to record a significant change in the requirement's scope during the sprint. This action is logged separately from saving other edits.
-                </p>
-                <div id="form-group-change-reason-id" className="form-group">
-                  <label htmlFor="changeReason" className="optional-label">Reason for Change:</label>
-                  <textarea 
-                    id="changeReason" 
-                    name="changeReason" 
-                    value={changeReason} 
-                    onChange={(e) => setChangeReason(e.target.value)} 
-                    rows="3" 
-                    placeholder="e.g., Added new validation rule for user input." 
-                  />
-                </div>
-                <div id="log-change-button-container-id" style={{display: 'flex', justifyContent: 'flex-end'}}>
-                    <button 
-                        id="log-change-button-id"
-                        type="button" 
-                        onClick={handleLogChangeClick} 
-                        className="modal-button-save"
-                        style={{backgroundColor: '#A0522D'}}
-                        disabled={!changeReason.trim()}
-                    >
-                        Log Change
-                    </button>
-                </div>
-              </div>
-            )}
           </div>
 
+          <div className="modal-actions">
+            {activeTab === 'tracking' && (
+               <button 
+                  type="button" 
+                  onClick={() => setActiveTab('core')} 
+                  className="modal-button-cancel" 
+                  style={{marginRight: 'auto'}}
+               >
+                   Back
+               </button>
+            )}
+            <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+            <button type="submit" className="modal-button-save">
+                {activeTab === 'core' ? 'Next: Tracking & Links' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+
+        {/* LOG SCOPE CHANGE SECTION (Always visible at bottom or restricted to Tracking tab? Keeping visible for easy access) */}
+        <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="modal-section-title" style={{borderBottom: 'none', margin: 0, paddingBottom: 0}}>Log Scope Change</h3>
+              <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                   <Tooltip content="Click to show/hide the section for logging a scope change. This is for tracking significant changes made during a sprint." />
+                   <button type="button" onClick={() => setIsLogChangeVisible(p => !p)} className="modal-button-cancel" style={{padding: '5px 15px', fontSize: '0.85em'}}>
+                       {isLogChangeVisible ? 'Hide' : 'Show'}
+                   </button>
+              </div>
+          </div>
+          {isLogChangeVisible && (
+            <div style={{marginTop: '15px'}}>
+              <p className="modal-section-desc">
+                Use this section to record a significant change in the requirement's scope. This log is separate from saving the form above.
+              </p>
+              <div className="form-group">
+                <label htmlFor="changeReason" className="optional-label">Reason for Change:</label>
+                <textarea 
+                  id="changeReason" 
+                  name="changeReason" 
+                  value={changeReason} 
+                  onChange={(e) => setChangeReason(e.target.value)} 
+                  rows="3" 
+                  placeholder="e.g., Added new validation rule for user input." 
+                />
+              </div>
+              <div style={{display: 'flex', justifyContent: 'flex-end'}}>
+                  <button 
+                      type="button" 
+                      onClick={handleLogChangeClick} 
+                      className="modal-button-save"
+                      disabled={!changeReason.trim()}
+                  >
+                      Log Change
+                  </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <ConfirmationModal

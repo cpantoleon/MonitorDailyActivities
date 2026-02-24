@@ -2,7 +2,7 @@
 
 This is a full-stack Kanban-style application designed to help QA teams and developers monitor project requirements, track defects, manage releases, and maintain daily project notes.
 
-It features a powerful, integrated **AI Chatbot** that acts as a project assistant. You can choose to run the AI entirely locally using **Ollama** or via the cloud using **Google Gemini**. The chatbot can answer questions about your project data, provide daily information like weather and namedays, and even tell you a joke.
+It features a powerful, integrated **AI Chatbot** that acts as a project assistant. You can choose to run the AI entirely locally using **Ollama** or via the cloud using **Google Gemini**. The chatbot can answer questions about your project data, provide daily information like weather and namedays, and even tell you a joke. Additionally, the UI supports **Dark Mode**.
 
 ## Getting Started
 
@@ -59,8 +59,9 @@ This application supports importing Requirements and Defects directly from Jira 
 3.  Paste your **Personal Access Token** into the field provided.
     *   *Note: You can check "Save Token" to store it securely in the local database for future use.*
 4.  Select the **Target Project**.
-5.  Enter your **JQL Query** (e.g., `project = "MYPROJ" AND sprint in openSprints()`).
-6.  Click **Fetch & Import**.
+5.  (Requirements Only) Select a **Target Release** or choose to assign to **Backlog**.
+6.  Enter your **JQL Query** (e.g., `project = "MYPROJ" AND sprint in openSprints()`).
+7.  Click **Fetch & Import**.
 
 ---
 
@@ -150,17 +151,22 @@ Once synced, you can start asking questions! For a full list of example commands
 
 ## Application Pages & Functionality
 
-#### 1. Sprint Activities
+#### 1. Dashboard
+-   **Project Overview:** Centralized hub displaying high-level metrics and project health.
+-   **Charts:** Aggregated visualizations for Sprint progress and Defect statistics.
+-   **Quick Stats:** Immediate insight into open defects, active sprint status, and upcoming releases.
+
+#### 2. Sprint Activities
 -   **Kanban Board:** View requirements (To Do, Scenarios created, Under testing, Done).
--   **Jira Import:** Import requirements directly via JQL using a Personal Access Token.
+-   **Jira Import:** Import requirements directly via JQL (supports assigning to Releases/Backlog).
 -   **Smart Sprint Selection:** Automatically selects the latest sprint.
 -   **Scope Change Tracking:** Log and visualize significant scope changes.
 -   **Release Management:** Assign requirements to active releases.
 -   **Charts:** Visual summaries of sprint status and scope changes.
--   **Excel Import:** Bulk import from Excel files.
+-   **Excel Import:** Bulk import from Excel files (includes in-app "How-to" guides).
 -   **Jira Import:** Import defects directly via JQL.
 
-#### 2. Defects
+#### 3. Defects
 -   **Kanban Board:** Track defects (Assigned to Developer, Assigned to Tester, Done).
 -   **Excel Import:** Bulk import from Excel files.
 -   **Jira Import:** Import defects directly via JQL.
@@ -168,17 +174,17 @@ Once synced, you can start asking questions! For a full list of example commands
 -   **FAT Defects:** Flag specific defects as "FAT" (Factory Acceptance Testing) related.
 -   **Charts:** View distribution by area, status, and "Return to Developer" counts.
 
-#### 3. Releases
+#### 4. Releases
 -   **Active Releases:** Track real-time progress. Export reports to PDF/Excel.
 -   **FAT Dashboard:** Manage Factory Acceptance Testing periods, select specific releases/requirements, and calculate KPIs (DRE, MTTD, MTTR).
 -   **Archived Releases:** Permanent snapshots of completed releases.
 -   **SAT Reporting:** Log System Acceptance Testing results and track specific SAT bugs.
 -   **Comparison:** Compare metrics between multiple archived releases.
 
-#### 4. Key Findings
+#### 5. Key Findings
 -   Log sprint retrospective items (Went Well, Went Wrong, Improvements).
 
-#### 5. Notes
+#### 6. Notes
 -   Rich text editor for daily project notes.
 -   **Keywords:** Highlights dates based on keywords (e.g., 'release date', 'FAT').
 -   **Integrations:** Sidebar with Weather widget and Nameday calendar.

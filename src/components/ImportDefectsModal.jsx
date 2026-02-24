@@ -71,8 +71,8 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
 
   const tooltipContent = (
     <div id="import-defects-tooltip-content-id">
-      <strong>Excel File Format Guide:</strong>
-      <ul>
+      <strong style={{ color: 'var(--text-primary)' }}>Excel File Format Guide:</strong>
+      <ul style={{ paddingLeft: '20px', margin: '5px 0 0 0', color: 'var(--text-secondary)' }}>
         <li>Only rows with the type 'Defect' in the 'T' column will be imported.</li>
         <li>The 'Summary' column is required and will become the defect's title.</li>
         <li>The 'Key' column (e.g., 'PROJ-123') is used to create a JIRA link and check for duplicates.</li>
@@ -88,19 +88,28 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
     <div id="import-defects-modal-wrapper-id">
       <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
         <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
-          <div id="modal-header-with-tooltip-id" className="modal-header-with-tooltip">
-            <div id="modal-header-content-id">
-              <h2 id="import-defects-title-id">Import Defects from Excel</h2>
-              <span id="how-to-export-link-id" className="how-to-export-link" onClick={() => setIsGifModalOpen(true)}>
+          
+          {/* UPDATED HEADER: Flexbox prevents wrapping and overlapping */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', marginBottom: '20px', gap: '15px' }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.5em', flexGrow: 1 }}>
+              Import Defects
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span 
+                onClick={() => setIsGifModalOpen(true)}
+                style={{ cursor: 'pointer', color: 'var(--accent-color)', textDecoration: 'underline', fontSize: '0.9em', fontWeight: '500' }}
+              >
                 How to Export from JIRA?
               </span>
+              <Tooltip content={tooltipContent} position="bottom" />
             </div>
-            <Tooltip content={tooltipContent} position="bottom" />
           </div>
-          {error && <p id="error-message-modal-id" className="error-message-modal">{error}</p>}
+
+          {error && <p id="error-message-modal-id" className="error-message-modal" style={{ color: 'var(--danger-color)', marginBottom: '15px' }}>{error}</p>}
+          
           <div id="form-group-file-id" className="form-group">
             <label htmlFor="importDefectFile">Excel File (.xlsx, .xls):</label>
-            <input type="file" id="importDefectFile" name="importDefectFile" accept=".xlsx, .xls" onChange={handleFileChange} />
+            <input type="file" id="importDefectFile" name="importDefectFile" accept=".xlsx, .xls" onChange={handleFileChange} style={{ color: 'var(--text-primary)' }}/>
           </div>
           <div id="form-group-project-id" className="form-group">
             <label id="importDefectProject-label" htmlFor="importDefectProject-button">Target Project:</label>
@@ -114,7 +123,7 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
             />
           </div>
           <div id="modal-actions-id" className="modal-actions">
-            <button id="import-button-id" onClick={handleImport} className="modal-button-save">Import</button>
+            <button id="import-button-id" onClick={handleImport} className="btn-primary">Import</button>
             <button id="cancel-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
           </div>
         </div>
