@@ -454,6 +454,69 @@ input:focus, select:focus, textarea:focus {
   background-color: var(--bg-tertiary) !important; 
 }
 
+.date-picker-wrapper {
+    width: 100%;
+    display: block;
+}
+
+/* Ensure the datepicker popup appears above the modal overlay (z-index 1060) */
+.react-datepicker-popper {
+    z-index: 2000 !important;
+}
+
+/* Optional: Tweaks to make the calendar look better in Dark Mode/Your Theme */
+.react-datepicker {
+    font-family: inherit !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--card-shadow) !important;
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.react-datepicker__header {
+    background-color: var(--bg-tertiary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.react-datepicker__current-month, 
+.react-datepicker__day-name,
+.react-datepicker__day {
+    color: var(--text-primary) !important;
+}
+
+.react-datepicker__day:hover {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.react-datepicker__day--selected {
+    background-color: var(--accent-color) !important;
+    color: #fff !important;
+}
+
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+    display: block !important;
+    width: 100% !important;
+    position: relative;
+}
+
+.react-datepicker__input-container input {
+    width: 100% !important;
+    padding: 10px 12px !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    font-size: 0.95em !important;
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    box-sizing: border-box !important;
+    height: 42px !important; /* Match standard input height */
+}
+
+/* 3. High Z-Index to sit on top of Modals (Modals are usually 1000-1100) */
+.react-datepicker-popper {
+    z-index: 9999 !important; 
+}
+
 /* -----------------------------------------
    MISC MESSAGES & SPINNERS
 ----------------------------------------- */

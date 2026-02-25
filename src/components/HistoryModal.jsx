@@ -123,7 +123,10 @@ const HistoryModal = ({ requirement, isOpen, onClose, onSaveHistoryEntry, apiBas
                           className="notes-datepicker"
                           wrapperClassName="date-picker-wrapper"
                           popperPlacement="top-start"
-                          portalId="root" 
+                          portalId="root"                 // <--- ADD THIS
+                          popperProps={{
+                             strategy: "fixed" 
+                          }}
                         />
                       ) : ( formatDateForDisplayInternal(entry.date) )}
                     </td>

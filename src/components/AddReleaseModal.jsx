@@ -98,8 +98,14 @@ const AddReleaseModal = ({ isOpen, onClose, onAdd, projects, currentProject }) =
                 onChange={handleDateChange} 
                 dateFormat="MM/dd/yyyy" 
                 className="notes-datepicker" 
-                wrapperClassName="date-picker-wrapper" 
-                popperPlacement="top-start" 
+                wrapperClassName="date-picker-wrapper"
+                // CHANGE HERE
+                popperPlacement="top-start"
+                portalId="root"
+                popperProps={{
+                   strategy: "fixed" 
+                }}
+                autoComplete="off"
               />
             </div>
             <div id="form-group-is-current-toggle-id" className="form-group new-project-toggle">

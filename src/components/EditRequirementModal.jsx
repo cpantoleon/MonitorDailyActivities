@@ -104,8 +104,11 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const sprintNumberOptions = Array.from({ length: 20 }, (_, i) => ({ value: `${i + 1}`, label: `${i + 1}` }));
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
   const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'].map(t => ({ value: t, label: t }));
-  const releaseOptions = releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }));
-
+  const releaseOptions = [
+    { value: '', label: '-- None (Clear Release) --' },
+    ...releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }))
+  ];
+  
   const releaseTooltipContent = (
     <div>
       <strong>Assign to a Release</strong>
@@ -197,7 +200,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </div>
               <CustomDropdown
                 name="release_id"
-                value={formData.release_id}
+                value={formData.release_id || ''}
                 onChange={handleChange}
                 options={releaseOptions}
                 disabled={releases.length === 0}

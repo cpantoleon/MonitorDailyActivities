@@ -456,6 +456,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 showMonthYearPicker={isGeneralMode && dateSelectionMode === 'month'}
                 className="notes-datepicker"
                 renderDayContents={renderDayContents}
+                wrapperClassName="date-picker-wrapper"
+                popperPlacement="bottom-start"
+                portalId="root"
+                popperProps={{
+                   strategy: "fixed" 
+                }}
+                autoComplete="off"
               />
               </div>
               {isGeneralMode ? (

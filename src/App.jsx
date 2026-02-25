@@ -424,7 +424,7 @@ function App() {
   const handleCloseUpdateStatusModal = () => { setIsUpdateStatusModalOpen(false); setStatusUpdateInfo({ requirement: null, newStatus: '' }); };
 
   const handleNavigateToRequirement = (req) => { navigate(`/sprint-board?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`); };
-  const handleNavigateToDefect = (defect, isClosed = false) => { navigate(`/defects?project=${encodeURIComponent(defect.project)}&highlight=${defect.id}${isClosed ? '&view=closed' : ''}`); };
+  const handleNavigateToDefect = (defect, isClosed = false) => { navigate(`/defects?d_project=${encodeURIComponent(defect.project)}&highlight=${defect.id}${isClosed ? '&view=closed' : ''}`); };
 
   const handleConfirmStatusUpdate = async (comment) => {
     const { requirement, newStatus } = statusUpdateInfo;

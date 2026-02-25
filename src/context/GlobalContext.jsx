@@ -3,10 +3,12 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 const GlobalContext = createContext();
 
 export const GlobalProvider = ({ children }) => {
-  // Use localStorage to remember settings forever (acts like a cookie)
+  // UI Settings (Theme/Sidebar) -> Keep in localStorage (Persist forever)
   const [theme, setTheme] = useState(() => localStorage.getItem('appTheme') || 'light');
-  const [globalProject, setGlobalProject] = useState(() => localStorage.getItem('globalProject') || '');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+
+  // Global Project Selection -> Change to sessionStorage (Clear on browser close)
+  const [globalProject, setGlobalProject] = useState(() => sessionStorage.getItem('globalProject') || '');
 
   // Apply theme to document body automatically
   useEffect(() => {
@@ -14,17 +16,21 @@ export const GlobalProvider = ({ children }) => {
     localStorage.setItem('appTheme', theme);
   }, [theme]);
 
-  // Persist project selection
-  useEffect(() => {
-    localStorage.setItem('globalProject', globalProject);
-  }, [globalProject]);
-
   // Handle Sidebar Collapse State
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
     const width = sidebarCollapsed ? '80px' : '260px';
     document.documentElement.style.setProperty('--sidebar-width', width);
   }, [sidebarCollapsed]);
+
+  // Persist project selection to Session Storage (Clears when browser closes)
+  useEffect(() => {
+    if (globalProject) {
+      sessionStorage.setItem('globalProject', globalProject);
+    } else {
+      sessionStorage.removeItem('globalProject');
+    }
+  }, [globalProject]);
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));

@@ -380,7 +380,22 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               </div>
               <div id="form-group-date-logged-id" className="form-group">
                 <label htmlFor="defect-created-date">Date Logged:</label>
-                <DatePicker id="defect-created-date" name="created_date" selected={formData.created_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" popperPlacement="top-start" />
+                <DatePicker 
+                    id="defect-created-date" 
+                    name="created_date" 
+                    selected={formData.created_date} 
+                    onChange={handleDateChange} 
+                    dateFormat="MM/dd/yyyy" 
+                    className="notes-datepicker" 
+                    wrapperClassName="date-picker-wrapper" 
+                    // CHANGE HERE: Add portalId, strategy, and set to top
+                    popperPlacement="top-start" 
+                    portalId="root"
+                    popperProps={{
+                       strategy: "fixed" 
+                    }}
+                    autoComplete="off"
+                />
               </div>
               <div id="form-group-linked-requirements-id" className="form-group">
                 <fieldset id="linked-requirements-fieldset-id" style={{ border: 'none', padding: 0, margin: 0 }}>

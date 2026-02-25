@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom'; // 1. Add Imports
 import ProjectSelector from '../components/ProjectSelector';
 import RetrospectiveColumn from '../components/RetrospectiveColumn';
 import RetrospectiveItemModal from '../components/RetrospectiveItemModal';
@@ -24,6 +25,11 @@ const SprintAnalysisPage = ({ showMessage }) => {
   const [itemToDeleteId, setItemToDeleteId] = useState(null);
   const [isConfirmDeleteAllModalOpen, setIsConfirmDeleteAllModalOpen] = useState(false);
 
+  // 2. Hooks
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // 3. Fetch Projects (Logic cleanup: removed session reading from here)
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -31,13 +37,6 @@ const SprintAnalysisPage = ({ showMessage }) => {
         const result = await response.json();
         const fetchedProjects = result.data || [];
         setProjects(fetchedProjects);
-
-        const savedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
-        if (savedProject) {
-            setSelectedProject(savedProject);
-        } else if (fetchedProjects.length > 0) {
-            setSelectedProject(fetchedProjects[0]);
-        }
       } catch (error) {
         console.error("Error fetching projects:", error);
       }
@@ -46,13 +45,58 @@ const SprintAnalysisPage = ({ showMessage }) => {
     fetchProjects();
   }, []);
 
+  // 4. Persistence Effect (Save to Session Storage)
   useEffect(() => {
       if (selectedProject) {
           sessionStorage.setItem('sprintAnalysisPageSelectedProject', selectedProject);
-      } else {
-          sessionStorage.removeItem('sprintAnalysisPageSelectedProject');
       }
   }, [selectedProject]);
+
+  // 5. URL & Session Restoration Effect (The Logic from DefectsPage)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    
+    // Check for 'sa_project' (Sprint Analysis Project)
+    let projectParam = params.get('sa_project'); 
+    let needsReplace = false;
+
+    // If no URL param, check storage
+    if (!projectParam) {
+      const storedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
+      if (storedProject) {
+        projectParam = storedProject;
+        // Update URL to match storage
+        params.set('sa_project', storedProject);
+        needsReplace = true;
+      }
+    }
+
+    // Update State
+    if (projectParam && projectParam !== selectedProject) {
+      setSelectedProject(projectParam);
+    }
+
+    // Update URL if needed (restoring from session)
+    if (needsReplace) {
+      const newSearch = params.toString() ? `?${params.toString()}` : '';
+      navigate(`${location.pathname}${newSearch}`, { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  // 6. Handle Manual Project Selection
+  const handleManualProjectSelect = (project) => {
+    setSelectedProject(project);
+    
+    // Update URL with 'sa_project'
+    const params = new URLSearchParams(location.search);
+    if (project) {
+        params.set('sa_project', project);
+    } else {
+        params.delete('sa_project');
+    }
+    const newSearch = params.toString() ? `?${params.toString()}` : '';
+    navigate(`${location.pathname}${newSearch}`, { replace: true });
+  };
 
   const fetchRetrospectiveItems = useCallback(async (project) => {
     if (!project) {
@@ -205,7 +249,7 @@ const SprintAnalysisPage = ({ showMessage }) => {
           <ProjectSelector
             projects={projects || []}
             selectedProject={selectedProject}
-            onSelectProject={setSelectedProject}
+            onSelectProject={handleManualProjectSelect} // 7. Use new handler
           />
         </div>
         <div className="page-actions-group">

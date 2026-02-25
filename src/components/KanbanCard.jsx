@@ -12,7 +12,7 @@ const KanbanCard = React.memo(({
   const navigate = useNavigate();
 
   const handleDefectClick = (project, defect) => {
-    let url = `/defects?project=${encodeURIComponent(project)}&highlight=${defect.id}`;
+    let url = `/defects?d_project=${encodeURIComponent(project)}&highlight=${defect.id}`;
     if (defect.status === 'Closed') {
       url += '&view=closed';
     }

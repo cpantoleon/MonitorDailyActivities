@@ -166,18 +166,35 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       setSelectedReleases([]);
       
       if (project) {
-          navigate(`/defects?project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
+          navigate(`/defects?d_project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
       } else {
           navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
       }
   }, [navigate, showClosedView]);
+  useEffect(() => {
+    if (selectedProject) {
+      sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
+    }
+  }, [selectedProject]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const projectParam = params.get('project');
+    
+    // CHANGED: Read 'd_project' instead of 'project'
+    let projectParam = params.get('d_project'); 
     const viewParam = params.get('view');
     const highlightId = params.get('highlight');
     let needsReplace = false;
+
+    if (!projectParam) {
+      const storedProject = sessionStorage.getItem('defectsPageSelectedProject');
+      if (storedProject) {
+        projectParam = storedProject;
+        // CHANGED: Set 'd_project' instead of 'project'
+        params.set('d_project', storedProject);
+        needsReplace = true;
+      }
+    }
 
     if (projectParam && projectParam !== selectedProject) {
       setSelectedProject(projectParam);

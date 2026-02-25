@@ -159,7 +159,22 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
             </div>
             <div id="form-group-release-date-id" className="form-group">
               <label htmlFor="edit-release-date">Release Date:</label>
-              <DatePicker id="edit-release-date" name="release_date" selected={formData.release_date} onChange={handleDateChange} dateFormat="MM/dd/yyyy" className="notes-datepicker" wrapperClassName="date-picker-wrapper" popperPlacement="top-start" />
+              <DatePicker 
+                id="edit-release-date" 
+                name="release_date" 
+                selected={formData.release_date} 
+                onChange={handleDateChange} 
+                dateFormat="MM/dd/yyyy" 
+                className="notes-datepicker" 
+                wrapperClassName="date-picker-wrapper"
+                // CHANGE HERE: 'top-start' makes it open above
+                popperPlacement="top-start" 
+                portalId="root"
+                popperProps={{
+                   strategy: "fixed" 
+                }}
+                autoComplete="off"
+              />
             </div>
             <div id="form-group-is-current-toggle-id" className="form-group new-project-toggle">
               <input type="checkbox" id="edit-release-is-current" name="is_current" checked={formData.is_current} onChange={handleChange} />
