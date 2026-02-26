@@ -2992,15 +2992,12 @@ app.post('/api/jira/import', async (req, res) => {
             let issueType = fields.issuetype ? fields.issuetype.name.trim() : "Unknown";
             let rawJiraStatus = fields.status ? fields.status.name.trim() : "To Do";
             
-            // 1. Get Creation Time (Standard)
             const jiraCreatedTime = fields.created ? new Date(fields.created).toISOString() : new Date().toISOString();
 
-            // 2. Find "Last Time Set as Done" from Changelog
             let lastDoneTime = null;
             const isJiraDone = DONE_STATUSES.includes(rawJiraStatus.toUpperCase());
 
             if (isJiraDone && issue.changelog && issue.changelog.histories) {
-                // Sort histories: Newest first
                 const histories = issue.changelog.histories.sort((a, b) => new Date(b.created) - new Date(a.created));
                 
                 for (const history of histories) {
@@ -3019,8 +3016,6 @@ app.post('/api/jira/import', async (req, res) => {
                 }
             }
 
-            // Logic for what timestamp to use in DB `updated_at`
-            // If it's Done, use the specific Done time found in changelog. If not, use Now.
             let timeForUpdatedAt = isJiraDone && lastDoneTime ? lastDoneTime : new Date().toISOString();
 
             let isFromSubtask = false;
@@ -3042,7 +3037,6 @@ app.post('/api/jira/import', async (req, res) => {
             const webLink = `${jiraDomain}/browse/${key}`;
             let isMatch = false;
 
-            // --- REQUIREMENTS IMPORT ---
             if (importType === 'requirements') {
                 if (REQUIREMENT_TYPES.includes(issueType)) {
                     isMatch = true;
@@ -3059,7 +3053,6 @@ app.post('/api/jira/import', async (req, res) => {
                         });
                     }
 
-                    // Changed Logic: Force "To Do" for new items, Skip existing items
                     let localStatus = "To Do"; 
                     let currentGroupId = null;
 
@@ -3087,7 +3080,6 @@ app.post('/api/jira/import', async (req, res) => {
                         skippedCount++;
                         currentGroupId = existing.requirementGroupId;
                     } else {
-                        // Insert new item with "To Do" status
                         await new Promise((resolve, reject) => {
                             const insertSql = `INSERT INTO activities (
                                 project_id, requirementUserIdentifier, key, status, statusDate, 
@@ -3131,34 +3123,44 @@ app.post('/api/jira/import', async (req, res) => {
                     }
                 }
             } 
-            // --- DEFECTS IMPORT ---
             else if (importType === 'defects') {
                 if (DEFECT_TYPES.includes(issueType)) {
                     isMatch = true;
                     processedKeysInBatch.add(key);
 
                     const existing = await new Promise((resolve) => {
-                        db.get("SELECT id, status FROM defects WHERE title = ? AND project_id = (SELECT id FROM projects WHERE name = ?)", [summary, project], (err, row) => resolve(row));
+                        db.get("SELECT id, status, fixed_date FROM defects WHERE title = ? AND project_id = (SELECT id FROM projects WHERE name = ?)", [summary, project], (err, row) => resolve(row));
                     });
 
                     let localDefectStatus = "Assigned to Developer"; 
                     let currentDefectId = null;
-
                     let fixedDateValue = null;
+
                     if (isJiraDone) {
                         localDefectStatus = "Done";
                         fixedDateValue = lastDoneTime || jiraCreatedTime; 
                     } else {
-                        if (rawJiraStatus.toLowerCase().includes('test')) localDefectStatus = "Assigned to Tester";
-                        else localDefectStatus = "Assigned to Developer";
+                        if (rawJiraStatus.toLowerCase().includes('test')) {
+                            localDefectStatus = "Assigned to Tester";
+                        } else {
+                            localDefectStatus = "Assigned to Developer";
+                        }
                     }
 
                     const now = new Date().toISOString();
 
                     if (existing) {
+                        let statusToUpdate = localDefectStatus;
+                        let fixedDateToUpdate = fixedDateValue;
+
+                        if (localDefectStatus !== 'Done') {
+                            statusToUpdate = existing.status; 
+                            fixedDateToUpdate = existing.fixed_date;
+                        } 
+                        
                         await new Promise((resolve) => {
                             db.run(`UPDATE defects SET status = ?, link = ?, created_date = ?, created_at = ?, fixed_date = ?, updated_at = ? WHERE id = ?`, 
-                                [localDefectStatus, webLink, jiraCreatedTime, jiraCreatedTime, fixedDateValue, now, existing.id], 
+                                [statusToUpdate, webLink, jiraCreatedTime, jiraCreatedTime, fixedDateToUpdate, now, existing.id], 
                                 () => resolve()
                             );
                         });

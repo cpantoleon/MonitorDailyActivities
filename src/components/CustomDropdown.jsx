@@ -11,7 +11,8 @@ const CustomDropdown = ({
   name,
   placeholder,
   disabled = false,
-  isComboBox = false
+  isComboBox = false,
+  placement = 'bottom' // <--- ADD THIS DEFAULT PROP
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({});
@@ -29,11 +30,24 @@ const CustomDropdown = ({
     const updatePosition = () => {
       if (isOpen && inputRef.current) {
         const rect = inputRef.current.getBoundingClientRect();
-        setCoords({
-          top: rect.bottom,
+        
+        const newCoords = {
           left: rect.left,
           width: rect.width,
-        });
+        };
+
+        // LOGIC FOR PLACEMENT
+        if (placement === 'top') {
+            // Calculate distance from bottom of screen to top of element
+            newCoords.bottom = window.innerHeight - rect.top;
+            newCoords.top = 'auto'; // Reset top
+        } else {
+            // Standard bottom placement
+            newCoords.top = rect.bottom;
+            newCoords.bottom = 'auto'; // Reset bottom
+        }
+
+        setCoords(newCoords);
       }
     };
 
@@ -47,7 +61,7 @@ const CustomDropdown = ({
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [isOpen]);
+  }, [isOpen, placement]); // Add placement to dependencies
 
   const handleSelect = (optionValue) => {
     const event = {
@@ -129,7 +143,9 @@ const CustomDropdown = ({
         <ul
           className="custom-dropdown-options"
           style={{
-            top: `${coords.top}px`,
+            // USE UPDATED COORDS HERE
+            top: coords.top !== 'auto' ? `${coords.top}px` : 'auto',
+            bottom: coords.bottom !== 'auto' ? `${coords.bottom}px` : 'auto',
             left: `${coords.left}px`,
             width: `${coords.width}px`,
           }}

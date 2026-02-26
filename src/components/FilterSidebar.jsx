@@ -17,6 +17,7 @@ const FilterSidebar = ({
   selectedReleases,
   onReleaseChange,
   enabledReleases,
+  hasNoReleaseItems,
   dateFrom,
   dateTo,
   onDateFromChange,
@@ -87,7 +88,7 @@ const FilterSidebar = ({
         </>
       )}
 
-      {releases && onReleaseChange && releases.length > 0 && (
+      {releases && onReleaseChange && (releases.length > 0 || hasNoReleaseItems) && (
         <div id="releases-filter-section-id">
           <h3 id="releases-heading-id">Releases</h3>
           <div id="filter-options-releases-id" className="filter-options">
@@ -100,7 +101,7 @@ const FilterSidebar = ({
                   checked={selectedReleases.includes(release.id)}
                   onChange={() => onReleaseChange(release.id)}
                   disabled={
-                    releases.length === 1 ||
+                    (releases.length === 0 && !hasNoReleaseItems) ||
                     (!enabledReleases.includes(release.id) && !selectedReleases.includes(release.id))
                   }
                 />
@@ -109,6 +110,19 @@ const FilterSidebar = ({
                 </label>
               </div>
             ))}
+            <div id="filter-option-release-none-id" className="filter-option">
+                <input
+                  type="checkbox"
+                  id="release-none"
+                  value="no-release"
+                  checked={selectedReleases.includes('no-release')}
+                  onChange={() => onReleaseChange('no-release')}
+                  disabled={!hasNoReleaseItems && !selectedReleases.includes('no-release')}
+                />
+                <label htmlFor="release-none">
+                  No Release
+                </label>
+            </div>
           </div>
         </div>
       )}

@@ -353,6 +353,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                     onChange={handleChange}
                     options={areaOptions}
                     placeholder="-- Select Area --"
+                    placement="top"
                   />
                 )}
               </div>

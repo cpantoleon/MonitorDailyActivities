@@ -84,7 +84,14 @@ function App() {
   const [linkedDefectsFilter, setLinkedDefectsFilter] = useState(null);
   const [selectedReleases, setSelectedReleases] = useState([]);
   const [showArchivedSprints, setShowArchivedSprints] = useState(false);
-  const [filterOptions, setFilterOptions] = useState({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
+
+const [filterOptions, setFilterOptions] = useState({ 
+    enabledTypes: [], 
+    enabledReleases: [], 
+    isLinkedDefectsYesEnabled: false, 
+    isLinkedDefectsNoEnabled: false,
+    hasNoReleaseItems: false
+  });
 
   const hasFetched = useRef(false);
   const location = useLocation();
@@ -305,10 +312,15 @@ function App() {
       const releaseIds = new Set();
       let hasLinkedDefects = false;
       let hasNoLinkedDefects = false;
+      let hasNoReleaseItems = false;
   
       baseReqs.forEach(req => {
         if (req.currentStatusDetails?.type) types.add(req.currentStatusDetails.type);
-        if (req.currentStatusDetails?.releaseId) releaseIds.add(req.currentStatusDetails.releaseId);
+        if (req.currentStatusDetails?.releaseId) {
+            releaseIds.add(req.currentStatusDetails.releaseId);
+        } else {
+            hasNoReleaseItems = true;
+        }
         if (Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0) hasLinkedDefects = true
         else hasNoLinkedDefects = true;
       });
@@ -317,7 +329,8 @@ function App() {
         enabledTypes: Array.from(types),
         enabledReleases: Array.from(releaseIds),
         isLinkedDefectsYesEnabled: hasLinkedDefects,
-        isLinkedDefectsNoEnabled: hasNoLinkedDefects
+        isLinkedDefectsNoEnabled: hasNoLinkedDefects,
+        hasNoReleaseItems: hasNoReleaseItems 
        });
       } else {
         setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
@@ -333,7 +346,15 @@ function App() {
         if (linkedDefectsFilter === 'yes') filteredRequirements = filteredRequirements.filter(req => Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0);
         else filteredRequirements = filteredRequirements.filter(req => !Array.isArray(req.linkedDefects) || req.linkedDefects.length === 0);
       }
-      if (selectedReleases.length > 0) filteredRequirements = filteredRequirements.filter(req => selectedReleases.includes(req.currentStatusDetails.releaseId));
+      if (selectedReleases.length > 0) {
+          filteredRequirements = filteredRequirements.filter(req => {
+              const rId = req.currentStatusDetails.releaseId;
+              // If req has no release ID, keep it ONLY if 'no-release' is selected
+              if (!rId) return selectedReleases.includes('no-release');
+              // Otherwise check if the ID is in the list
+              return selectedReleases.includes(rId);
+          });
+      }
       if (dateFrom) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) >= new Date(dateFrom));
       if (dateTo) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) <= new Date(dateTo));
       setDisplayableRequirements(filteredRequirements);
@@ -803,7 +824,28 @@ if (isLoading) {
         <EditProjectModal isOpen={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} onSave={handleEditProject} onDelete={(project) => handleDeleteRequest('project', project)} projects={projects} currentProject={selectedProject} />
         <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} />
         <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} showMessage={showMainMessage} />
-        <FilterSidebar isOpen={isFilterSidebarOpen} onClose={() => setIsFilterSidebarOpen(false)} types={availableTypes} selectedTypes={selectedTypes} onTypeChange={handleTypeChange} enabledTypes={filterOptions.enabledTypes} linkedDefectsFilter={linkedDefectsFilter} onLinkedDefectsChange={handleLinkedDefectsChange} isLinkedDefectsYesEnabled={filterOptions.isLinkedDefectsYesEnabled} isLinkedDefectsNoEnabled={filterOptions.isLinkedDefectsNoEnabled} releases={projectReleases} selectedReleases={selectedReleases} onReleaseChange={handleReleaseChange} enabledReleases={filterOptions.enabledReleases} dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} onClearFilters={handleClearFilters} />
+        <FilterSidebar 
+            isOpen={isFilterSidebarOpen} 
+            onClose={() => setIsFilterSidebarOpen(false)} 
+            types={availableTypes} 
+            selectedTypes={selectedTypes} 
+            onTypeChange={handleTypeChange} 
+            enabledTypes={filterOptions.enabledTypes} 
+            linkedDefectsFilter={linkedDefectsFilter} 
+            onLinkedDefectsChange={handleLinkedDefectsChange} 
+            isLinkedDefectsYesEnabled={filterOptions.isLinkedDefectsYesEnabled} 
+            isLinkedDefectsNoEnabled={filterOptions.isLinkedDefectsNoEnabled} 
+            releases={projectReleases} 
+            selectedReleases={selectedReleases} 
+            onReleaseChange={handleReleaseChange} 
+            enabledReleases={filterOptions.enabledReleases} 
+            hasNoReleaseItems={filterOptions.hasNoReleaseItems} // <--- PASS PROP HERE
+            dateFrom={dateFrom} 
+            dateTo={dateTo} 
+            onDateFromChange={setDateFrom} 
+            onDateToChange={setDateTo} 
+            onClearFilters={handleClearFilters} 
+        />
         
         {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>

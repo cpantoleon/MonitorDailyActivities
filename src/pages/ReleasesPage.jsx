@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -213,6 +214,98 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
             <div id="start-fat-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
                 <button type="button" onClick={handleStart} className="modal-button-save" disabled={isLoading || !selectedReleaseId}>Start Period</button>
+            </div>
+        </Modal>
+    );
+};
+
+const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }) => {
+    const initialData = useMemo(() => ({
+        passed: archive?.sat_report?.passed || 0,
+        failed: archive?.sat_report?.failed || 0,
+        blocked: archive?.sat_report?.blocked || 0,
+        pending: archive?.sat_report?.pending || 0,
+        executing: archive?.sat_report?.executing || 0,
+        aborted: archive?.sat_report?.aborted || 0,
+    }), [archive]);
+
+    const [satData, setSatData] = useState(initialData);
+
+    useEffect(() => {
+        setSatData(initialData);
+    }, [initialData, isOpen]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setSatData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleReset = () => {
+        setSatData({ passed: 0, failed: 0, blocked: 0, pending: 0, executing: 0, aborted: 0 });
+    };
+
+    const total = useMemo(() => Object.values(satData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0), [satData]);
+    const isTotalValid = useMemo(() => Math.abs(total - 100) < 0.01 || total === 0, [total]);
+
+    const handleSave = async () => {
+        if (!isTotalValid) {
+            showMainMessage('Total must be exactly 100% or 0% to clear the report.', 'error');
+            return;
+        }
+        try {
+            const payload = {
+                passed: parseFloat(satData.passed) || 0,
+                failed: parseFloat(satData.failed) || 0,
+                blocked: parseFloat(satData.blocked) || 0,
+                pending: parseFloat(satData.pending) || 0,
+                executing: parseFloat(satData.executing) || 0,
+                aborted: parseFloat(satData.aborted) || 0,
+            };
+
+            const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/sat-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
+            showMainMessage(result.message, 'success');
+            onSave();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const fields = ['passed', 'failed', 'blocked', 'pending', 'executing', 'aborted'];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`SAT Results for ${archive?.name}`}>
+            <div id="sat-report-modal-grid-id" className="sat-modal-grid">
+                {fields.map(field => (
+                    <div className="form-group" key={field} id={`sat-report-form-group-${field}-id`}>
+                        <label htmlFor={field}>{field.charAt(0).toUpperCase() + field.slice(1)} (%)</label>
+                        <input
+                            type="number"
+                            id={field}
+                            name={field}
+                            value={satData[field]}
+                            onChange={handleChange}
+                            onFocus={e => e.target.select()}
+                            min="0"
+                            max="100"
+                            step="0.1" 
+                        />
+                    </div>
+                ))}
+            </div>
+            <div id="sat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
+                Total: {Number(total).toFixed(1).replace(/\.0$/, '')}%
+                {!isTotalValid && <div id="sat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
+            </div>
+            <div id="sat-report-modal-actions-id" className="modal-actions">
+                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
+                <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
+                <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
             </div>
         </Modal>
     );
@@ -497,7 +590,6 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
         </div>
     );
 };
-
 
 const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToRequirement, allProcessedRequirements, onDataRefresh }) => {
     const [activeFatPeriod, setActiveFatPeriod] = useState(null);
@@ -1421,7 +1513,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 </div>
             )}
             <div id={`archived-details-header-${archive.id}`} className="details-header">
-                <button type="button" onClick={onBack} className="back-button">Back to Archives</button>
+                <button type="button" onClick={onBack} className="back-button">&#8592; Back to Archives</button>
                 <h2>Archived Release Details</h2>
             </div>
             <div id={`archived-release-card-${archive.id}`} className="release-card">
@@ -1573,104 +1665,6 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 message={`Are you sure you want to delete the SAT bug "${bugToDelete?.title}"?`}
             />
         </div>
-    );
-};
-
-const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }) => {
-    // Define initialData based on the archive prop
-    const initialData = useMemo(() => ({
-        passed: archive?.sat_report?.passed || 0,
-        failed: archive?.sat_report?.failed || 0,
-        blocked: archive?.sat_report?.blocked || 0,
-        pending: archive?.sat_report?.pending || 0,
-        executing: archive?.sat_report?.executing || 0,
-        aborted: archive?.sat_report?.aborted || 0,
-    }), [archive]);
-
-    const [satData, setSatData] = useState(initialData);
-
-    useEffect(() => {
-        setSatData(initialData);
-    }, [initialData, isOpen]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        // Store raw value to allow typing decimals (e.g. "9.")
-        setSatData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleReset = () => {
-        setSatData({ passed: 0, failed: 0, blocked: 0, pending: 0, executing: 0, aborted: 0 });
-    };
-
-    // Calculate total using parseFloat to handle decimals
-    const total = useMemo(() => Object.values(satData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0), [satData]);
-    
-    // Validate using epsilon for float precision (allow slight rounding errors)
-    const isTotalValid = useMemo(() => Math.abs(total - 100) < 0.01 || total === 0, [total]);
-
-    const handleSave = async () => {
-        if (!isTotalValid) {
-            showMainMessage('Total must be exactly 100% or 0% to clear the report.', 'error');
-            return;
-        }
-        try {
-            // Ensure values are sent as numbers
-            const payload = {
-                passed: parseFloat(satData.passed) || 0,
-                failed: parseFloat(satData.failed) || 0,
-                blocked: parseFloat(satData.blocked) || 0,
-                pending: parseFloat(satData.pending) || 0,
-                executing: parseFloat(satData.executing) || 0,
-                aborted: parseFloat(satData.aborted) || 0,
-            };
-
-            const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/sat-report`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
-            showMainMessage(result.message, 'success');
-            onSave();
-        } catch (error) {
-            showMainMessage(error.message, 'error');
-        }
-    };
-
-    const fields = ['passed', 'failed', 'blocked', 'pending', 'executing', 'aborted'];
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`SAT Results for ${archive?.name}`}>
-            <div id="sat-report-modal-grid-id" className="sat-modal-grid">
-                {fields.map(field => (
-                    <div className="form-group" key={field} id={`sat-report-form-group-${field}-id`}>
-                        <label htmlFor={field}>{field.charAt(0).toUpperCase() + field.slice(1)} (%)</label>
-                        <input
-                            type="number"
-                            id={field}
-                            name={field}
-                            value={satData[field]}
-                            onChange={handleChange}
-                            onFocus={e => e.target.select()}
-                            min="0"
-                            max="100"
-                            step="0.1" 
-                        />
-                    </div>
-                ))}
-            </div>
-            <div id="sat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
-                Total: {Number(total).toFixed(1).replace(/\.0$/, '')}%
-                {!isTotalValid && <div id="sat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
-            </div>
-            <div id="sat-report-modal-actions-id" className="modal-actions">
-                <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
-                <button type="button" onClick={handleReset} className="modal-button-reset">Reset</button>
-                <button type="button" onClick={handleSave} disabled={!isTotalValid} className="modal-button-save">Save Report</button>
-            </div>
-        </Modal>
     );
 };
 
@@ -2030,6 +2024,9 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
 };
 
 const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onNavigateToRequirement, onNavigateToDefect, onEditRelease, onDeleteRelease, onDeleteArchivedRelease, fetchData }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const [selectedProject, setSelectedProject] = useState('');
     const [view, setView] = useState('active');
     const [activeReleases, setActiveReleases] = useState([]);
@@ -2049,18 +2046,78 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [isFatFinalizeConfirmOpen, setIsFatFinalizeConfirmOpen] = useState(false);
     const [finalizeAction, setFinalizeAction] = useState(null);
 
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        let projectParam = params.get('project');
+        let viewParam = params.get('view') || 'active';
+        let archiveIdParam = params.get('archiveId');
+        let needsReplace = false;
+
+        if (!projectParam) {
+            const storedProject = sessionStorage.getItem('releasePageSelectedProject');
+            if (storedProject) {
+                projectParam = storedProject;
+                params.set('project', storedProject);
+                needsReplace = true;
+            }
+        }
+
+        setSelectedProject(prev => {
+            if (projectParam && projectParam !== prev) {
+                sessionStorage.setItem('releasePageSelectedProject', projectParam);
+                return projectParam;
+            } else if (!projectParam && prev) {
+                sessionStorage.removeItem('releasePageSelectedProject');
+                return '';
+            }
+            return prev;
+        });
+
+        setView(prev => viewParam !== prev ? viewParam : prev);
+
+        if (!archiveIdParam) {
+            setSelectedArchive(null);
+        }
+
+        if (needsReplace) {
+            navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+        }
+    }, [location.search, navigate]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const archiveIdParam = params.get('archiveId');
+        if (archiveIdParam && archivedReleases.length > 0) {
+            const id = parseInt(archiveIdParam, 10);
+            const arch = archivedReleases.find(a => a.id === id);
+            setSelectedArchive(prev => {
+                 if (arch && (!prev || prev.id !== id)) {
+                     return arch;
+                 }
+                 return prev;
+            });
+        }
+    }, [location.search, archivedReleases]);
+
     const handleCompleteRelease = async (archive) => {
         try {
             const response = await fetch(`${API_BASE_URL}/archives/${archive.id}/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to complete release.');
-            showMainMessage(result.message, 'success');
-            fetchData();
-            fetchArchivedReleases();
-            setSelectedArchive(null);
+            
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || 'Failed to complete release.');
+            }
+            
+            // Παίρνουμε το τρέχον URL και βγάζουμε το archiveId
+            const params = new URLSearchParams(window.location.search);
+            params.delete('archiveId');
+            
+            // Hard Refresh: Μας πάει πίσω στη λίστα και φορτώνει τα νέα δεδομένα από το 0!
+            window.location.href = `${window.location.pathname}?${params.toString()}`;
+            
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -2131,8 +2188,8 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
             showMainMessage(result.message, 'success');
-            fetchData(); 
-            fetchActiveReleases();
+            await fetchData(); 
+            await fetchActiveReleases();
         } catch (error) {
             showMainMessage(error.message, 'error');
         } finally {
@@ -2168,27 +2225,43 @@ const releasesPageTooltipContent = (
     </div>
 );
 
-    useEffect(() => {
-        const savedProject = sessionStorage.getItem('releasePageSelectedProject');
-        if (savedProject) {
-            setSelectedProject(savedProject);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (selectedProject) {
-            sessionStorage.setItem('releasePageSelectedProject', selectedProject);
+    const onSelectProject = (project) => {
+        const params = new URLSearchParams(location.search);
+        if (project) {
+            params.set('project', project);
+            sessionStorage.setItem('releasePageSelectedProject', project);
         } else {
+            params.delete('project');
             sessionStorage.removeItem('releasePageSelectedProject');
         }
-    }, [selectedProject]);
-
-    const onSelectProject = (project) => {
-        setSelectedProject(project);
+        params.delete('archiveId');
+        params.set('view', 'active');
+        navigate(`${location.pathname}?${params.toString()}`);
+        
         setComparisonList([]);
         setIsComparing(false);
-        setSelectedArchive(null);
-        setView('active');
+    };
+
+    const handleViewChange = (newView) => {
+        const params = new URLSearchParams(location.search);
+        params.set('view', newView);
+        params.delete('archiveId');
+        navigate(`${location.pathname}?${params.toString()}`);
+        
+        setComparisonList([]);
+        setIsComparing(false);
+    };
+
+    const handleViewArchiveDetails = (archive) => {
+        const params = new URLSearchParams(location.search);
+        params.set('archiveId', archive.id);
+        navigate(`${location.pathname}?${params.toString()}`);
+    };
+
+    const handleBackToArchives = () => {
+        const params = new URLSearchParams(location.search);
+        params.delete('archiveId');
+        navigate(`${location.pathname}?${params.toString()}`);
     };
     
     const fetchActiveReleases = useCallback(async () => {
@@ -2281,11 +2354,7 @@ const releasesPageTooltipContent = (
 
     const handleSaveSatReport = async () => {
         setIsSatModalOpen(false);
-        const updatedReleases = await fetchArchivedReleases();
-        if (selectedArchive) {
-            const updatedArchive = updatedReleases.find(ar => ar.id === selectedArchive.id);
-            setSelectedArchive(updatedArchive || null);
-        }
+        await fetchArchivedReleases();
     };
     
     const handleToggleComparison = (archiveId) => {
@@ -3234,7 +3303,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
         if (selectedArchive) {
             return <ArchivedReleaseDetails 
                 archive={selectedArchive} 
-                onBack={() => setSelectedArchive(null)} 
+                onBack={handleBackToArchives} 
                 onNavigateToRequirement={onNavigateToRequirement} 
                 onNavigateToDefect={onNavigateToDefect} 
                 allProcessedRequirements={allProcessedRequirements}
@@ -3277,7 +3346,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                                 </div>
                             </div>
                             <div id={`archived-card-actions-${archive.id}`} className="release-card-actions">
-                                <button type="button" onClick={() => setSelectedArchive(archive)} className="button-view-details">View Details</button>
+                                <button type="button" onClick={() => handleViewArchiveDetails(archive)} className="button-view-details">View Details</button>
                                 <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">Delete</button>
                             </div>
                         </div>
@@ -3315,9 +3384,9 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                     <div id="releases-page-view-toggle-buttons-id" className="view-toggle-buttons">
                         <Tooltip content={releasesPageTooltipContent} position="bottom" />
                         <ReleaseCountdown activeReleases={activeReleases} />
-                        <button type="button" onClick={() => setView('active')} className={view === 'active' ? 'active' : ''}>Active</button>
-                        <button type="button" onClick={() => setView('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
-                        <button type="button" onClick={() => setView('fat')} className={view === 'fat' ? 'active' : ''}>FAT</button>
+                        <button type="button" onClick={() => handleViewChange('active')} className={view === 'active' ? 'active' : ''}>Active</button>
+                        <button type="button" onClick={() => handleViewChange('archived')} className={view === 'archived' ? 'active' : ''}>Archived</button>
+                        <button type="button" onClick={() => handleViewChange('fat')} className={view === 'fat' ? 'active' : ''}>FAT</button>
                     </div>
                 )}
             </div>
