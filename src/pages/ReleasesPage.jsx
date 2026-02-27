@@ -270,7 +270,13 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
             showMainMessage(result.message, 'success');
-            onSave();
+            onClose(); // Κλείνει το modal αμέσως
+            
+            // Κάνει refresh μετά από 500ms για να προλάβεις να δεις το πράσινο μήνυμα
+            setTimeout(() => {
+                window.location.reload(); 
+            }, 500);
+
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -311,7 +317,7 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
     );
 };
 
-const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequirements, showMainMessage }) => {
+const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, project, totalRequirements, showMainMessage }) => {
     const initialData = {
         passed: fatPeriod?.fat_report?.passed || 0,
         failed: fatPeriod?.fat_report?.failed || 0,
@@ -359,7 +365,12 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequiremen
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to save FAT report.');
             showMainMessage(result.message, 'success');
-            onSave();
+            onClose(); // Κλείνει το modal
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -368,7 +379,7 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, totalRequiremen
     const fields = ['passed', 'failed', 'blocked', 'caution', 'not_run'];
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`FAT Results for ${fatPeriod?.project}`}>
+        <Modal isOpen={isOpen} onClose={onClose} title={`FAT Results for ${project}`}>
             <div id="fat-report-modal-grid-id" className="sat-modal-grid">
                 {fields.map(field => (
                     <div className="form-group" key={field} id={`fat-report-form-group-${field}-id`}>
@@ -579,11 +590,9 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
             <AddFatReportModal
                 isOpen={isFatReportModalOpen}
                 onClose={() => setIsFatReportModalOpen(false)}
-                onSave={() => {
-                    onSaveFatReport();
-                    setIsFatReportModalOpen(false);
-                }}
+                onSave={() => setIsFatReportModalOpen(false)}
                 fatPeriod={fatPeriod}
+                project={project}
                 totalRequirements={totalRequirements}
                 showMainMessage={showMainMessage}
             />
@@ -632,9 +641,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
-            showMainMessage(result.message, 'success');
-            setIsStartModalOpen(false);
-            fetchFatData();
+            window.location.reload();
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -654,11 +661,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
-            showMainMessage(result.message, 'success');
-            fetchFatData();
-            if (onDataRefresh) {
-                onDataRefresh();
-            }
+            window.location.reload();
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -676,8 +679,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
-            showMainMessage(result.message, 'success');
-            fetchFatData();
+            window.location.reload();
         } catch (error) {
             showMainMessage(error.message, 'error');
         } finally {
@@ -2046,6 +2048,10 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [isFatFinalizeConfirmOpen, setIsFatFinalizeConfirmOpen] = useState(false);
     const [finalizeAction, setFinalizeAction] = useState(null);
 
+    // ✅ ΠΡΟΣΘΕΣΕ ΤΙΣ ΔΥΟ ΓΡΑΜΜΕΣ ΑΚΡΙΒΩΣ ΕΔΩ:
+    const [isArchiveDeleteConfirmOpen, setIsArchiveDeleteConfirmOpen] = useState(false);
+    const [archiveToDelete, setArchiveToDelete] = useState(null);
+
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         let projectParam = params.get('project');
@@ -2341,10 +2347,22 @@ const releasesPageTooltipContent = (
         setIsDeleteConfirmOpen(true);
     };
 
-    const handleConfirmDelete = () => {
-        onDeleteRelease(releaseToEdit);
-        setIsDeleteConfirmOpen(false);
-        setIsEditModalOpen(false);
+    const handleConfirmDelete = async () => {
+        await onDeleteRelease(releaseToEdit);
+        window.location.reload();
+    };
+
+    const handleDeleteArchivedReleaseWrapper = (archive) => {
+        setArchiveToDelete(archive);
+        setIsArchiveDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmArchiveDelete = async () => {
+        if (!archiveToDelete) return;
+        await onDeleteArchivedRelease(archiveToDelete);
+        setIsArchiveDeleteConfirmOpen(false);
+        setArchiveToDelete(null);
+        window.location.reload(); // Added page refresh upon confirmation
     };
 
     const handleOpenSatModal = (archive) => {
@@ -2352,9 +2370,8 @@ const releasesPageTooltipContent = (
         setIsSatModalOpen(true);
     };
 
-    const handleSaveSatReport = async () => {
+    const handleSaveSatReport = () => {
         setIsSatModalOpen(false);
-        await fetchArchivedReleases();
     };
     
     const handleToggleComparison = (archiveId) => {
@@ -3347,7 +3364,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                             </div>
                             <div id={`archived-card-actions-${archive.id}`} className="release-card-actions">
                                 <button type="button" onClick={() => handleViewArchiveDetails(archive)} className="button-view-details">View Details</button>
-                                <button type="button" onClick={() => onDeleteArchivedRelease(archive)} className="button-delete">Delete</button>
+                                <button type="button" onClick={() => handleDeleteArchivedReleaseWrapper(archive)} className="button-delete">Delete</button>
                             </div>
                         </div>
                     ))}
@@ -3428,6 +3445,14 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 onConfirm={handleConfirmDelete}
                 title="Confirm Delete Release"
                 message={`Are you sure you want to delete the release "${releaseToEdit?.name}"? This action is permanent.`}
+            />
+
+            <ConfirmationModal
+                isOpen={isArchiveDeleteConfirmOpen}
+                onClose={() => setIsArchiveDeleteConfirmOpen(false)}
+                onConfirm={handleConfirmArchiveDelete}
+                title="Confirm Delete Archived Release"
+                message={`Are you sure you want to permanently delete the archived release "${archiveToDelete?.name}"?`}
             />
 
             <ConfirmationModal

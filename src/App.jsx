@@ -101,20 +101,49 @@ const [filterOptions, setFilterOptions] = useState({
   // 1. Ενημέρωση state από το URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const projectParam = params.get('project');
-    const sprintParam = params.get('sprint');
+    let projectParam = params.get('project');
+    let sprintParam = params.get('sprint');
     const highlightId = params.get('highlight');
     let needsReplace = false;
 
-    if (sprintParam && sprintParam.startsWith('Archived_')) {
-      setShowArchivedSprints(true);
+    if (location.pathname === '/sprint-board') {
+        // Restore URL from session storage if returning to the board without parameters
+        if (!projectParam) {
+            const storedProject = sessionStorage.getItem('sprintBoardProject');
+            const storedSprint = sessionStorage.getItem('sprintBoardSprint');
+            if (storedProject) {
+                projectParam = storedProject;
+                params.set('project', storedProject);
+                needsReplace = true;
+                
+                if (storedSprint) {
+                    sprintParam = storedSprint;
+                    params.set('sprint', storedSprint);
+                }
+            }
+        }
+
+        // Sync state from URL (or restored session)
+        if ((projectParam || '') !== selectedProject) {
+            setSelectedProject(projectParam || '');
+            if (projectParam) sessionStorage.setItem('sprintBoardProject', projectParam);
+            else sessionStorage.removeItem('sprintBoardProject');
+        }
+        
+        if ((sprintParam || '') !== selectedSprint) {
+            setSelectedSprint(sprintParam || '');
+            if (sprintParam) sessionStorage.setItem('sprintBoardSprint', sprintParam);
+            else sessionStorage.removeItem('sprintBoardSprint');
+        }
+    } else {
+        // If we are on another route (like /releases) that uses 'project', we still sync state
+        if (projectParam !== null && projectParam !== selectedProject) {
+            setSelectedProject(projectParam);
+        }
     }
 
-    if (projectParam && projectParam !== selectedProject) {
-      setSelectedProject(projectParam);
-    }
-    if (sprintParam && sprintParam !== selectedSprint) {
-      setSelectedSprint(sprintParam);
+    if (sprintParam && sprintParam.startsWith('Archived_')) {
+      setShowArchivedSprints(true);
     }
     
     if (highlightId) {
@@ -127,7 +156,7 @@ const [filterOptions, setFilterOptions] = useState({
       const newSearch = params.toString() ? `?${params.toString()}` : '';
       navigate(`${location.pathname}${newSearch}`, { replace: true });
     }
-  }, [location.search, navigate]);
+  }, [location.pathname, location.search, navigate, selectedProject, selectedSprint]);
 
   // 2. Υπολογισμός διαθέσιμων Sprints
   useEffect(() => {
@@ -148,11 +177,14 @@ const [filterOptions, setFilterOptions] = useState({
             const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
             if (nonArchivedSprints.length > 0) {
                 setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
+                sessionStorage.setItem('sprintBoardSprint', nonArchivedSprints[nonArchivedSprints.length - 1]);
             } else {
                 setSelectedSprint(visibleSprints[0]);
+                sessionStorage.setItem('sprintBoardSprint', visibleSprints[0]);
             }
         } else {
             setSelectedSprint('');
+            sessionStorage.removeItem('sprintBoardSprint');
         }
     }
   }, [selectedProject, allProcessedRequirements, showArchivedSprints]); 
@@ -165,9 +197,13 @@ const [filterOptions, setFilterOptions] = useState({
 
     if (!project) {
         setSelectedSprint('');
+        sessionStorage.removeItem('sprintBoardProject');
+        sessionStorage.removeItem('sprintBoardSprint');
         navigate(`/sprint-board`, { replace: true });
         return;
     }
+
+    sessionStorage.setItem('sprintBoardProject', project);
 
     const sprintsForProject = getSprintsForProject(allProcessedRequirements, project);
     const visibleSprints = showArchivedSprints
@@ -185,6 +221,11 @@ const [filterOptions, setFilterOptions] = useState({
     }
 
     setSelectedSprint(sprintToSelect);
+    if (sprintToSelect) {
+        sessionStorage.setItem('sprintBoardSprint', sprintToSelect);
+    } else {
+        sessionStorage.removeItem('sprintBoardSprint');
+    }
 
     const newUrl = `/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprintToSelect)}`;
     navigate(newUrl, { replace: true });
@@ -194,6 +235,12 @@ const [filterOptions, setFilterOptions] = useState({
   // Όταν ο χρήστης αλλάζει χειροκίνητα Sprint
   const handleManualSprintSelect = useCallback((sprint) => {
     setSelectedSprint(sprint);
+    if (sprint) {
+        sessionStorage.setItem('sprintBoardSprint', sprint);
+    } else {
+        sessionStorage.removeItem('sprintBoardSprint');
+    }
+    
     if (selectedProject) {
         const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprint)}`;
         navigate(newUrl, { replace: true });
@@ -375,16 +422,58 @@ const [filterOptions, setFilterOptions] = useState({
     if (results.length > 0) {
       const uniqueProjects = [...new Set(results.map(r => r.project))];
       if (uniqueProjects.length === 1) {
-        setSelectedProject(uniqueProjects[0]);
+        const proj = uniqueProjects[0];
+        setSelectedProject(proj);
+        sessionStorage.setItem('sprintBoardProject', proj);
+        
         const uniqueSprints = [...new Set(results.map(r => r.currentStatusDetails.sprint))];
-        if (uniqueSprints.length === 1) setSelectedSprint(uniqueSprints[0]);
-        else setSelectedSprint('');
-      } else { setSelectedProject(''); setSelectedSprint(''); }
-    } else { setSelectedProject(''); setSelectedSprint(''); }
-    setTimeout(() => { isSearchUpdate.current = false; }, 0);
+        if (uniqueSprints.length === 1) {
+            const sp = uniqueSprints[0];
+            setSelectedSprint(sp);
+            sessionStorage.setItem('sprintBoardSprint', sp);
+            navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
+        }
+        else {
+            setSelectedSprint('');
+            sessionStorage.removeItem('sprintBoardSprint');
+            navigate(`/sprint-board?project=${encodeURIComponent(proj)}`, { replace: true });
+        }
+      } else { 
+        setSelectedProject(''); 
+        setSelectedSprint(''); 
+        sessionStorage.removeItem('sprintBoardProject');
+        sessionStorage.removeItem('sprintBoardSprint');
+        navigate(`/sprint-board`, { replace: true });
+      }
+    } else { 
+        setSelectedProject(''); 
+        setSelectedSprint(''); 
+        sessionStorage.removeItem('sprintBoardProject');
+        sessionStorage.removeItem('sprintBoardSprint');
+        navigate(`/sprint-board`, { replace: true });
+    }
+    setTimeout(() => { isSearchUpdate.current = false; }, 100);
   };
 
-  const handleClearRequirementSearch = () => { setIsSearching(false); setRequirementQuery(''); setSearchSuggestions([]); setSelectedProject(''); setSelectedSprint(''); setDisplayableRequirements([]); setSelectedTypes([]); setLinkedDefectsFilter(null); setSelectedReleases([]); setDateFrom(''); setDateTo(''); };
+  const handleClearRequirementSearch = () => { 
+      setIsSearching(false); 
+      setRequirementQuery(''); 
+      setSearchSuggestions([]); 
+      setSelectedProject(''); 
+      setSelectedSprint(''); 
+      setDisplayableRequirements([]); 
+      setSelectedTypes([]); 
+      setLinkedDefectsFilter(null); 
+      setSelectedReleases([]); 
+      setDateFrom(''); 
+      setDateTo(''); 
+      
+      sessionStorage.removeItem('sprintBoardProject');
+      sessionStorage.removeItem('sprintBoardSprint');
+      
+      navigate('/sprint-board', { replace: true }); 
+  };
+
   const resetSearch = () => { setIsSearching(false); setRequirementQuery(''); setSearchSuggestions([]); };
   const handleClearFilters = () => { setSelectedTypes([]); setLinkedDefectsFilter(null); setSelectedReleases([]); setDateFrom(''); setDateTo(''); };
   
@@ -402,9 +491,22 @@ const [filterOptions, setFilterOptions] = useState({
   const handleRequirementSuggestionSelect = (suggestion) => {
     setRequirementQuery(suggestion.name); setSearchSuggestions([]); isSearchUpdate.current = true;
     const selectedReq = allProcessedRequirements.find(req => req.id === suggestion.id);
-    if (selectedReq) { setDisplayableRequirements([selectedReq]); setSelectedProject(selectedReq.project); setSelectedSprint(selectedReq.currentStatusDetails.sprint); setIsSearching(true); } 
+    if (selectedReq) { 
+        setDisplayableRequirements([selectedReq]); 
+        
+        const proj = selectedReq.project;
+        const sp = selectedReq.currentStatusDetails.sprint;
+        
+        setSelectedProject(proj); 
+        setSelectedSprint(sp); 
+        sessionStorage.setItem('sprintBoardProject', proj);
+        sessionStorage.setItem('sprintBoardSprint', sp);
+        
+        setIsSearching(true); 
+        navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
+    } 
     else { handleRequirementSearch(suggestion.name); }
-    setTimeout(() => { isSearchUpdate.current = false; }, 0);
+    setTimeout(() => { isSearchUpdate.current = false; }, 100);
   };
 
   const handleShowHistory = useCallback((req) => { setRequirementForHistory(req); setIsHistoryModalOpen(true); }, []);
@@ -800,7 +902,7 @@ if (isLoading) {
             <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} />} />
             <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
             <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
-            <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />
+            <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMainMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />            
             
             <Route path="/:projectName" element={
               <DashboardPage 
