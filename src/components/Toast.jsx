@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Toast.css';
 
-const Toast = ({ message, type = 'success', duration = 3000, onDismiss }) => {
+const Toast = ({ message, type = 'success', duration = 4000, onDismiss }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -13,7 +13,7 @@ const Toast = ({ message, type = 'success', duration = 3000, onDismiss }) => {
 
       const dismissTimer = setTimeout(() => {
         onDismiss();
-      }, duration + 400); // Wait for CSS animation to finish before removing from DOM
+      }, duration + 400); 
 
       return () => {
         clearTimeout(timer);
@@ -24,25 +24,24 @@ const Toast = ({ message, type = 'success', duration = 3000, onDismiss }) => {
     }
   }, [message, type, duration, onDismiss]);
 
-  if (!message) {
-    return null;
-  }
+  if (!message) return null;
 
-  // Determine which icon to show based on the type
   const getIcon = () => {
     switch (type) {
       case 'error': return '❌';
       case 'warning': return '⚠️';
       case 'info': return 'ℹ️';
-      case 'success': 
-      default: return '✅';
+      case 'success': default: return '✅';
     }
   };
 
   return (
     <div id="toast-container-id" className={`toast toast-${type} ${isVisible ? 'show' : ''}`}>
-      <span className="toast-icon">{getIcon()}</span>
-      <span className="toast-message">{message}</span>
+      <div className="toast-content">
+        <span className="toast-icon">{getIcon()}</span>
+        <span className="toast-message">{message}</span>
+      </div>
+      <div className="toast-progress-bar" style={{ animationDuration: `${duration}ms` }}></div>
     </div>
   );
 };

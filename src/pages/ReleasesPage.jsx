@@ -271,11 +271,7 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
             if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
             showMainMessage(result.message, 'success');
             onClose(); // Κλείνει το modal αμέσως
-            
-            // Κάνει refresh μετά από 500ms για να προλάβεις να δεις το πράσινο μήνυμα
-            setTimeout(() => {
-                window.location.reload(); 
-            }, 500);
+            window.location.reload(); 
 
         } catch (error) {
             showMainMessage(error.message, 'error');
@@ -366,10 +362,7 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, project, totalR
             if (!response.ok) throw new Error(result.error || 'Failed to save FAT report.');
             showMainMessage(result.message, 'success');
             onClose(); // Κλείνει το modal
-            
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+            window.location.reload();
 
         } catch (error) {
             showMainMessage(error.message, 'error');

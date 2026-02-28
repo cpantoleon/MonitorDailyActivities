@@ -1,35 +1,54 @@
 /* src/components/Toast.css */
 .toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  transform: translateY(-150px);
-  padding: 12px 20px;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  bottom: 30px; /* Moved from Top to Bottom for modern feel */
+  right: 30px;
+  transform: translateX(120%);
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   font-size: 0.95em;
-  font-weight: 500;
+  font-weight: 600;
   z-index: 2000;
   opacity: 0;
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-  min-width: 250px;
-  text-align: center;
+  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 280px;
   max-width: 400px;
+  overflow: hidden;
+  border-left: 6px solid var(--accent-color);
 }
 
 .toast.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 
-.toast-success {
-  background-color: #d1e7dd;
-  color: #0f5132;
-  border: 1px solid #badbcc;
+.toast-content {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
 }
 
-.toast-error {
-  background-color: #f8d7da;
-  color: #842029;
-  border: 1px solid #f5c2c7;
+.toast-icon { font-size: 1.2rem; }
+
+/* The Animated Timer Bar */
+.toast-progress-bar {
+  height: 4px;
+  background-color: var(--accent-color);
+  width: 100%;
+  transform-origin: left;
+  animation: shrinkBar linear forwards;
 }
+
+@keyframes shrinkBar {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.toast-error { border-left-color: var(--danger-color); }
+.toast-error .toast-progress-bar { background-color: var(--danger-color); }
+
+.toast-success { border-left-color: #28a745; }
+.toast-success .toast-progress-bar { background-color: #28a745; }
