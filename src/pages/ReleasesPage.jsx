@@ -192,25 +192,27 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
                     onChange={(e) => setStartDate(e.target.value)}
                 />
             </div>
-            <div id="form-group-fat-release-select-id" className="form-group">
-                <label>Select a Release to Include:</label>
+            <fieldset id="form-group-fat-release-select-id" className="form-group" style={{ border: 'none', padding: 0, margin: 0 }}>
+                <legend style={{ marginBottom: '6px', color: 'var(--accent-color)', fontWeight: '500', fontSize: '0.9em' }}>Select a Release to Include:</legend>
                 {isLoading ? <LoadingSpinner /> : (
-                    <div id="fat-release-selection-list-id" className="fat-release-selection-list">
+                    <div id="fat-release-selection-list-id" className="fat-release-selection-list" role="radiogroup" aria-label="Available Releases">
                         {selectableReleases.length > 0 ? selectableReleases.map(release => (
                             <label key={`${release.type}-${release.id}`} id={`fat-release-selection-item-${release.id}-id`} className="fat-release-selection-item">
                                 <input
                                     type="radio"
                                     name="fat-release-selection"
+                                    value={release.id}
                                     checked={selectedReleaseId === release.id}
                                     onChange={() => setSelectedReleaseId(release.id)}
+                                    aria-label={`${release.name}, Status: ${release.type}`}
                                 />
                                 <span className="fat-release-name">{release.name}</span>
                                 <span className={`fat-release-type-badge type-${release.type}`}>{release.type}</span>
                             </label>
-                        )) : <p id="no-selectable-releases-message-id">No active releases found for this project.</p>}
+                        )) : <p id="no-selectable-releases-message-id" role="status">No active releases found for this project.</p>}
                     </div>
                 )}
-            </div>
+            </fieldset>
             <div id="start-fat-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
                 <button type="button" onClick={handleStart} className="modal-button-save" disabled={isLoading || !selectedReleaseId}>Start Period</button>

@@ -957,9 +957,17 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.fat-release-selection-item input[type="checkbox"] {
+.fat-release-selection-item input[type="radio"] {
     margin-right: 10px;
     transform: scale(1.2);
+    cursor: pointer;
+}
+
+/* Οπτική ένδειξη για πλοήγηση με πληκτρολόγιο (Accessibility) */
+.fat-release-selection-item input[type="radio"]:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 3px;
+    border-radius: 50%;
 }
 
 .fat-release-type-badge {

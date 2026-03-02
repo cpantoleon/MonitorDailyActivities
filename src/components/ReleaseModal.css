@@ -107,7 +107,7 @@
 .form-group label {
     display: block;
     margin-bottom: 6px;
-    color: #704214;
+    color: var(--accent-color); /* Αλλαγή από #704214 σε var(--accent-color) */
     font-weight: 500;
     font-size: 0.9em;
 }
