@@ -2310,6 +2310,57 @@
         }
       }
     },
+    "/defects/history/{historyId}": {
+      "put": {
+        "summary": "Update comment of a defect history entry",
+        "tags": [
+          "Defects"
+        ],
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "required": true,
+            "description": "ID of the defect history entry",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "comment"
+                ],
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "History comment updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/settings/weather-location": {
       "get": {
         "summary": "Get the saved weather location",
@@ -2815,6 +2866,11 @@
             "type": "string",
             "format": "date-time"
           },
+          "fixed_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "is_fat_defect": {
             "type": "integer",
             "description": "1 if it's a FAT defect, 0 otherwise."
@@ -2950,6 +3006,11 @@
           "created_date": {
             "type": "string",
             "format": "date"
+          },
+          "fixed_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "comment": {
             "type": "string",
