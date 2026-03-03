@@ -4,6 +4,7 @@ import { useGlobal } from '../context/GlobalContext';
 import ProjectSelector from '../components/ProjectSelector';
 import WeatherWidget from '../components/WeatherWidget';
 import DailyInfoWidget from '../components/DailyInfoWidget';
+import DashboardCalendarWidget from '../components/DashboardCalendarWidget';
 import './DashboardPage.css';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
@@ -19,8 +20,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   const [allDefects, setAllDefects] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // NEW: State to track which chart segment is clicked for filtering
-  const [chartFilter, setChartFilter] = useState(null); // null defaults to 'Pending'
+  const [chartFilter, setChartFilter] = useState(null);
 
   useEffect(() => {
     const checkTheme = () => {
@@ -56,7 +56,6 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     }
   }, [projectName, globalProject, setGlobalProject]); 
 
-  // NEW: Reset the chart filter back to default when switching projects
   useEffect(() => {
     setChartFilter(null);
   }, [globalProject]);
@@ -83,7 +82,6 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     return allReleases.find(r => r.project === globalProject && r.is_current);
   }, [allReleases, globalProject]);
 
-  // UPDATED: Now filters based on the chart selection (Done vs Pending)
   const currentProjectFilteredReqsList = useMemo(() => {
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
     return allProcessedRequirements.filter(r => {
@@ -95,7 +93,6 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       if (chartFilter === 'Done') {
         return isDone;
       } else {
-        // null or 'Not Done' -> show pending
         return !isDone;
       }
     });
@@ -173,14 +170,10 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     };
   };
 
-  // NEW: Handle clicks on the pie chart to toggle filters
   const handleChartClick = (event, elements) => {
     if (elements.length > 0) {
       const elementIndex = elements[0].index;
-      // Index 0 is 'Done', Index 1 is 'To Be Tested' (Not Done) based on activeReleaseChartData
       const selectedLabel = elementIndex === 0 ? 'Done' : 'Not Done';
-      
-      // Toggle off if already selected
       setChartFilter(prev => prev === selectedLabel ? null : selectedLabel);
     }
   };
@@ -211,7 +204,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       <div className={`bento-grid ${globalProject ? 'project-focused' : 'global-view'}`}>
         
         <div className="grid-main-area">
-          <div className="card">
+          <div className="card overview-card">
             <h3>{globalProject ? 'Current Status' : 'Project Overview'}</h3>
             
             {globalProject ? (
@@ -222,7 +215,6 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                       <span className="stat-number text-danger" style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}>{currentProjectDefectList.length}</span>
                     </div>
                     <div className="stat-box">
-                      {/* UPDATED: Dynamic Stat Label based on Chart Filter */}
                       <span className="stat-label">
                         {chartFilter === 'Done' ? 'Completed Requirements' : 'Pending Requirements'}
                       </span>
@@ -270,7 +262,6 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                       </div>
                       
                       <div className="detail-column">
-                          {/* UPDATED: Dynamic Title and Clear Filter Button */}
                           <h4 style={{ display: 'flex', alignItems: 'center' }}>
                               {chartFilter === 'Done' ? 'Completed Requirements' : 'Pending Requirements'}
                               {chartFilter && (
@@ -347,71 +338,81 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
             )}
           </div>
 
-          <div className="card timeline-card">
-            <h3>Upcoming Roadmaps</h3>
-            {upcomingRoadmaps.length > 0 ? (
-              <ul className="dashboard-release-list">
-                {upcomingRoadmaps.map(r => (
-                  <li key={r.id}>
-                    <div className="release-info-basic">
-                      <strong>{r.name}</strong>
-                      {!globalProject && <small className="project-tag">{r.project}</small>}
-                    </div>
-                    <span className="due-badge">
-                      {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="placeholder-text">No active releases upcoming.</p>
-            )}
+          <div className="dashboard-bottom-row">
+            <div className="card timeline-card">
+              <h3>Upcoming Roadmaps</h3>
+              {upcomingRoadmaps.length > 0 ? (
+                <ul className="dashboard-release-list">
+                  {upcomingRoadmaps.map(r => (
+                    <li key={r.id}>
+                      <div className="release-info-basic">
+                        <strong>{r.name}</strong>
+                        {!globalProject && <small className="project-tag">{r.project}</small>}
+                      </div>
+                      <span className="due-badge">
+                        {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="placeholder-text">No active releases upcoming.</p>
+              )}
 
-            {globalProject && activeReleaseChartData && (
-              <div className="dashboard-release-chart-wrapper">
-                <h4 className="dashboard-release-chart-title">Current Release Progress</h4>
-                <div className="dashboard-release-chart-container">
-                  <Pie 
-                    data={activeReleaseChartData} 
-                    options={{ 
-                      responsive: true, 
-                      maintainAspectRatio: false, 
-                      onClick: handleChartClick, // NEW: Bind the click event
-                      onHover: (event, chartElement) => { // NEW: Add pointer cursor on hover
-                        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-                      },
-                      plugins: { 
-                        legend: { 
-                          position: 'right',
-                          labels: { 
-                            color: chartTextColor,
-                            font: { size: 12 }, 
-                            boxWidth: 12,
-                            padding: 15
-                          }
+              {globalProject && activeReleaseChartData && (
+                <div className="dashboard-release-chart-wrapper">
+                  <h4 className="dashboard-release-chart-title">Current Release Progress</h4>
+                  <div className="dashboard-release-chart-container">
+                    <Pie 
+                      data={activeReleaseChartData} 
+                      options={{ 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        onClick: handleChartClick,
+                        onHover: (event, chartElement) => { 
+                          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
                         },
-                        tooltip: {
-                          callbacks: {
-                            label: (c) => ` ${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)`
+                        plugins: { 
+                          legend: { 
+                            position: 'right',
+                            labels: { 
+                              color: chartTextColor,
+                              font: { size: 12 }, 
+                              boxWidth: 12,
+                              padding: 15
+                            }
+                          },
+                          tooltip: {
+                            callbacks: {
+                              label: (c) => ` ${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)`
+                            }
                           }
-                        }
-                      } 
-                    }} 
-                  />
+                        } 
+                      }} 
+                    />
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* MOVED CALENDAR WIDGET */}
+            {!globalProject && (
+              <div className="card widget-card calendar-card">
+                <h3>Release Calendar</h3>
+                <DashboardCalendarWidget allReleases={allReleases} />
               </div>
             )}
           </div>
         </div>
 
-        {!globalProject && (
+         {!globalProject && (
           <div className="grid-sidebar-area">
-            <div className="card widget-card">
+            <div className="card widget-card weather-card">
               <h3>Local Weather</h3>
               <WeatherWidget showMessage={() => {}} /> 
             </div>
 
-            <div className="card widget-card eortologio-wrapper">
+            <div className="card widget-card eortologio-wrapper celebrations-card">
                <h3>Celebrations Today</h3>
                <div className="iframe-box">
                  <DailyInfoWidget />

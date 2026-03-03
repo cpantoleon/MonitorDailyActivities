@@ -1,0 +1,141 @@
+.dashboard-calendar-widget {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  user-select: none;
+  font-family: inherit;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.calendar-month-year {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 5px;
+}
+
+.calendar-nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.calendar-nav-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.calendar-day-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+}
+
+.calendar-cell {
+  position: relative;
+  height: 46px; /* Taller to fit indicators comfortably */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: default;
+  transition: background-color 0.2s;
+  margin: 2px;
+}
+
+.calendar-cell:hover:not(.other-month):not(.today) {
+  background-color: var(--bg-tertiary);
+}
+
+.calendar-cell.other-month {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.calendar-cell.today {
+  background-color: var(--accent-color);
+  color: #fff;
+  font-weight: bold;
+}
+
+.calendar-cell.today:hover {
+  background-color: var(--accent-hover);
+}
+
+.release-indicators-container {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 0 4px;
+}
+
+.release-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--bg-secondary); /* Helps contrast overlapping elements */
+}
+
+.calendar-cell.today .release-indicator-dot {
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+/* Legend Styles */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.calendar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.calendar-legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}

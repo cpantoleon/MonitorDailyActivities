@@ -191,14 +191,14 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
       <div className="defect-card-actions">
         <button id={`defect-action-button-edit-${defect.id}`} onClick={() => onEdit(defect)} className="defect-action-btn edit" title={`Edit defect: ${defect.title}`}>Edit</button>
         <button id={`defect-action-button-history-${defect.id}`} onClick={() => onShowHistory(defect)} className="defect-action-btn history" title={`View history for defect: ${defect.title}`}>History</button>
-        {defect.status !== 'Closed' && (
+        {defect.status === 'Done' && (
             <button 
                 id={`defect-action-button-move-${defect.id}`}
                 onClick={() => onMoveToClosed(defect)} 
                 className="defect-action-btn close-btn"
                 title="Move defect to Closed"
             >
-                Close
+                Move to Closed
             </button>
         )}
         <button 

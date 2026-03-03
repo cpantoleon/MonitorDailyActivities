@@ -7,10 +7,11 @@
 .finalize-option {
     flex: 1;
     padding: 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     text-align: center;
-    background-color: #f9f9f9;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -36,7 +37,7 @@
 
 .finalize-option p {
     font-size: 0.9em;
-    color: #666;
+    color: var(--text-secondary);
     flex-grow: 1;
     margin-bottom: 20px;
 }

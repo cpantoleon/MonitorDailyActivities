@@ -94,9 +94,37 @@
 }
 
 .bento-grid.global-view {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: 
+    "overview overview weather"
+    "roadmaps calendar celebrations";
+  gap: 24px;
+  align-items: start;
 }
 
+/* Flatten the wrappers in Global View so cards plug directly into the grid areas */
+.bento-grid.global-view .grid-main-area,
+.bento-grid.global-view .dashboard-bottom-row,
+.bento-grid.global-view .grid-sidebar-area {
+  display: contents;
+}
+
+/* Assign Cards to Grid Areas */
+.bento-grid.global-view .overview-card { grid-area: overview; width: 100%; }
+.bento-grid.global-view .timeline-card { grid-area: roadmaps; width: 100%; }
+.bento-grid.global-view .calendar-card { grid-area: calendar; width: 100%; }
+.bento-grid.global-view .weather-card { grid-area: weather; width: 100%; }
+.bento-grid.global-view .celebrations-card { grid-area: celebrations; width: 100%; }
+
+/* Reset grid-area for Project Focused View so they flow normally side-by-side */
+.bento-grid.project-focused .overview-card,
+.bento-grid.project-focused .timeline-card {
+  grid-area: auto; 
+  width: 100%;
+}
+
+/* Project Focused View: 2-column Layout */
 .bento-grid.project-focused {
   grid-template-columns: 1fr;
 }
@@ -108,11 +136,8 @@
   align-items: start; 
 }
 
-.grid-main-area, .grid-sidebar-area {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  height: 100%;
+.bento-grid.project-focused .dashboard-bottom-row {
+  display: contents;
 }
 
 .card {
@@ -446,4 +471,31 @@
     left: 0;
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Responsive adjustments for the grid */
+@media (max-width: 1200px) {
+  .bento-grid.global-view {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-areas: 
+      "overview weather"
+      "roadmaps calendar"
+      "celebrations celebrations";
+  }
+}
+
+@media (max-width: 800px) {
+  .bento-grid.global-view {
+    grid-template-columns: 1fr;
+    grid-template-areas: 
+      "overview"
+      "roadmaps"
+      "calendar"
+      "weather"
+      "celebrations";
+  }
+  
+  .bento-grid.project-focused .grid-main-area {
+    grid-template-columns: 1fr;
+  }
 }

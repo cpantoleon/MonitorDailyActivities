@@ -272,9 +272,8 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
             showMainMessage(result.message, 'success');
-            onClose(); // Κλείνει το modal αμέσως
-            window.location.reload(); 
-
+            onClose();
+            onSave(); 
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -363,9 +362,8 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, project, totalR
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to save FAT report.');
             showMainMessage(result.message, 'success');
-            onClose(); // Κλείνει το modal
-            window.location.reload();
-
+            onClose();
+            onSave(); 
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -585,7 +583,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
             <AddFatReportModal
                 isOpen={isFatReportModalOpen}
                 onClose={() => setIsFatReportModalOpen(false)}
-                onSave={() => setIsFatReportModalOpen(false)}
+                onSave={() => { setIsFatReportModalOpen(false); onSaveFatReport(); }}
                 fatPeriod={fatPeriod}
                 project={project}
                 totalRequirements={totalRequirements}
@@ -627,60 +625,70 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
         setIsKpiModalOpen(true);
     };
 
-    const handleStartPeriod = async (startDate, releaseId) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/fat/${project}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ start_date: startDate, release_id: releaseId })
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
-            window.location.reload();
-        } catch (error) {
-            showMainMessage(error.message, 'error');
-        }
-    };
+   const handleStartPeriod = async (startDate, releaseId) => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/fat/${project}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start_date: startDate, release_id: releaseId })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
+                
+                fetchFatData();
+                setIsStartModalOpen(false);
+                showMainMessage('FAT period started successfully.', 'success');
+                if (onDataRefresh) onDataRefresh();
+            } catch (error) {
+                showMainMessage(error.message, 'error');
+            }
+        };
 
-    const handleCompletePeriod = async () => {
-        if (!activeFatPeriod) return;
+        const handleCompletePeriod = async () => {
+            if (!activeFatPeriod) return;
 
-        if (!activeFatPeriod.fat_report) {
-            showMainMessage("Please add FAT results before completing the period.", "error");
-            return; 
-        }
+            if (!activeFatPeriod.fat_report) {
+                showMainMessage("Please add FAT results before completing the period.", "error");
+                return; 
+            }
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, {
-                method: 'PUT',
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
-            window.location.reload();
-        } catch (error) {
-            showMainMessage(error.message, 'error');
-        }
-    };
+            try {
+                const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, {
+                    method: 'PUT',
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
+                
+                fetchFatData();
+                showMainMessage('FAT period completed successfully.', 'success');
+                if (onDataRefresh) onDataRefresh();
+            } catch (error) {
+                showMainMessage(error.message, 'error');
+            }
+        };
 
-    const handleDeleteRequest = (period) => {
-        setFatPeriodToDelete(period);
-    };
+        const handleDeleteRequest = (period) => {
+            setFatPeriodToDelete(period);
+        };
 
-    const handleConfirmDelete = async () => {
-        if (!fatPeriodToDelete) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/fat/${fatPeriodToDelete.id}`, {
-                method: 'DELETE',
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
-            window.location.reload();
-        } catch (error) {
-            showMainMessage(error.message, 'error');
-        } finally {
-            setFatPeriodToDelete(null);
-        }
-    };
+        const handleConfirmDelete = async () => {
+            if (!fatPeriodToDelete) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/fat/${fatPeriodToDelete.id}`, {
+                    method: 'DELETE',
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
+                
+                fetchFatData();
+                showMainMessage('FAT period deleted successfully.', 'success');
+                if (onDataRefresh) onDataRefresh();
+            } catch (error) {
+                showMainMessage(error.message, 'error');
+            } finally {
+                setFatPeriodToDelete(null);
+            }
+        };
 
     if (isLoading) return <LoadingSpinner />;
 
@@ -2092,8 +2100,11 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const id = parseInt(archiveIdParam, 10);
             const arch = archivedReleases.find(a => a.id === id);
             setSelectedArchive(prev => {
-                 if (arch && (!prev || prev.id !== id)) {
-                     return arch;
+                 if (arch) {
+                     // Update if the ID is different OR if the SAT report data changed
+                     if (!prev || prev.id !== id || JSON.stringify(prev.sat_report) !== JSON.stringify(arch.sat_report)) {
+                         return arch;
+                     }
                  }
                  return prev;
             });
@@ -2112,12 +2123,11 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 throw new Error(result.error || 'Failed to complete release.');
             }
             
-            // Παίρνουμε το τρέχον URL και βγάζουμε το archiveId
-            const params = new URLSearchParams(window.location.search);
+            const params = new URLSearchParams(location.search);
             params.delete('archiveId');
             
-            // Hard Refresh: Μας πάει πίσω στη λίστα και φορτώνει τα νέα δεδομένα από το 0!
-            window.location.href = `${window.location.pathname}?${params.toString()}`;
+            navigate(`${location.pathname}?${params.toString()}`);
+            fetchArchivedReleases();
             
         } catch (error) {
             showMainMessage(error.message, 'error');
@@ -2135,8 +2145,10 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 console.error('Failed to load FAT data for release finalization check.', err);
             }
         };
-        fetchFatData();
-    }, [selectedProject]);
+        if (view === 'active' || view === 'fat') {
+            fetchFatData();
+        }
+    }, [selectedProject, view]);
 
     const handleOpenFinalizeModal = (release) => {
         setReleaseToFinalize(release);
@@ -2168,6 +2180,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
                 showMainMessage('Active FAT period has been automatically completed.', 'success');
+                setActiveFatPeriod(null); // Clear from local state immediately
             } catch (error) {
                 showMainMessage(`Error completing FAT period: ${error.message}`, 'error');
                 setIsFatFinalizeConfirmOpen(false);
@@ -2338,26 +2351,21 @@ const releasesPageTooltipContent = (
         setIsEditModalOpen(false);
     };
 
-    const handleDeleteRequest = () => {
-        setIsDeleteConfirmOpen(true);
+    const handleDeleteRequest = (releaseToDelete) => {
+        setIsEditModalOpen(false);
+        onDeleteRelease(releaseToDelete);
     };
 
     const handleConfirmDelete = async () => {
-        await onDeleteRelease(releaseToEdit);
-        window.location.reload();
+        // Handled directly by App.jsx
     };
 
     const handleDeleteArchivedReleaseWrapper = (archive) => {
-        setArchiveToDelete(archive);
-        setIsArchiveDeleteConfirmOpen(true);
+        onDeleteArchivedRelease(archive);
     };
 
     const handleConfirmArchiveDelete = async () => {
-        if (!archiveToDelete) return;
-        await onDeleteArchivedRelease(archiveToDelete);
-        setIsArchiveDeleteConfirmOpen(false);
-        setArchiveToDelete(null);
-        window.location.reload(); // Added page refresh upon confirmation
+        // Handled directly by App.jsx
     };
 
     const handleOpenSatModal = (archive) => {
@@ -2367,6 +2375,7 @@ const releasesPageTooltipContent = (
 
     const handleSaveSatReport = () => {
         setIsSatModalOpen(false);
+        fetchArchivedReleases();
     };
     
     const handleToggleComparison = (archiveId) => {

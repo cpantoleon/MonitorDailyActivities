@@ -325,6 +325,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .modal-button-save,
+.modal-button-confirm,
 .modal-button-cancel,
 .modal-button-delete {
     padding: 10px 20px;
@@ -342,6 +343,17 @@ input:focus, select:focus, textarea:focus {
 }
 .modal-button-save:hover:not(:disabled) { background-color: var(--accent-hover) !important; }
 .modal-button-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.modal-button-confirm {
+    background-color: var(--accent-color);
+    color: white;
+}
+.modal-button-confirm:hover:not(:disabled) { 
+    background-color: var(--accent-hover); 
+}
+.modal-button-confirm:disabled { 
+    opacity: 0.6; cursor: not-allowed; 
+}
 
 .modal-button-cancel {
     background-color: var(--bg-tertiary) !important;
