@@ -5,7 +5,7 @@ const DashboardCalendarWidget = ({ allReleases = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // Vibrant color palette for project dots
-  const colorPalette = ['#e53e3e', '#3182ce', '#38a169', '#d69e2e', '#805ad5', '#00b5d8', '#ed64a6', '#dd6b20'];
+  const colorPalette = ['#e53e3e', '#3182ce', '#38a169', '#d69e2e', '#805ad5', '#00b5d8', '#ed64a6', '#dd6b20', '#4a5568', '#2d3748', '#cbd5e0', '#f6ad55', '#68d391', '#63b3ed', '#f56565', '#ed8936', '#48bb78', '#4299e1', '#9f7aea', '#ed64a6', '#4fd1c5'];
   
   const projectColors = useMemo(() => {
     const uniqueProjects = [...new Set(allReleases.map(r => r.project))].sort();
@@ -31,8 +31,8 @@ const DashboardCalendarWidget = ({ allReleases = [] }) => {
     const days = [];
     const todayStr = new Date().toDateString();
 
-    // 42 cells = 6 weeks (covers all possible month layouts)
-    for (let i = 0; i < 42; i++) {
+    // 35 cells = 5 weeks (covers all possible month layouts)
+    for (let i = 0; i < 35; i++) {
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
 
@@ -59,6 +59,23 @@ const DashboardCalendarWidget = ({ allReleases = [] }) => {
 
     return days;
   }, [currentDate, allReleases]);
+
+  // Extract only the releases visible in the current month view for the legend
+  const visibleReleases = useMemo(() => {
+    const inView = new Set();
+    const releases = [];
+    calendarDays.forEach(day => {
+      day.releases.forEach(r => {
+        const key = `${r.project}-${r.name}`;
+        if (!inView.has(key)) {
+          inView.add(key);
+          releases.push(r);
+        }
+      });
+    });
+    // Sort them by date so they appear sequentially in the legend
+    return releases.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+  }, [calendarDays]);
 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -114,12 +131,16 @@ const DashboardCalendarWidget = ({ allReleases = [] }) => {
         })}
       </div>
 
-      {Object.keys(projectColors).length > 0 && (
+      {/* Updated Legend mapping over visible releases */}
+      {visibleReleases.length > 0 && (
         <div className="calendar-legend">
-          {Object.entries(projectColors).map(([proj, color]) => (
-            <div key={proj} className="calendar-legend-item">
-              <span className="calendar-legend-color" style={{ backgroundColor: color }}></span>
-              {proj}
+          {visibleReleases.map((release) => (
+            <div key={`${release.project}-${release.name}`} className="calendar-legend-item">
+              <span 
+                className="calendar-legend-color" 
+                style={{ backgroundColor: projectColors[release.project] || '#dc3545' }}
+              ></span>
+              {release.project} - {release.name}
             </div>
           ))}
         </div>
