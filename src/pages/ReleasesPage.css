@@ -920,15 +920,25 @@
     font-size: 1.1em;
     font-weight: bold;
     background-color: var(--accent-color);
-    color: white;
+    color: #ffffff; /* Σταθερά λευκό στο Light Mode */
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .fat-start-button:hover {
-    background-color: var(--text-primary);
+    background-color: var(--accent-hover);
+}
+
+/* Σε Dark Mode βάζουμε σκούρα γράμματα για αντίθεση με το χρυσό/κίτρινο accent-color */
+[data-theme='dark'] .fat-start-button {
+    color: #1a202c;
+}
+
+[data-theme='dark'] .fat-start-button:hover {
+    color: #1a202c;
+    background-color: var(--accent-hover);
 }
 
 .fat-release-selection-list {
@@ -979,11 +989,13 @@
     color: white;
 }
 
-.fat-release-type-badge.type-active {
+.fat-release-type-badge.type-active,
+.fat-release-type-badge.type-current {
     background-color: #28a745;
 }
 
-.fat-release-type-badge.type-archived {
+.fat-release-type-badge.type-archived,
+.fat-release-type-badge.type-pending {
     background-color: #6c757d;
 }
 

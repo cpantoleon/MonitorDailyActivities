@@ -1,4 +1,4 @@
-Chatbot Usage and Example Questions
+# Chatbot Usage and Example Questions
 
 This document outlines the various questions and commands our Project Assistant chatbot can understand. The chatbot is designed to be conversational and can often understand variations of these phrases.
 
@@ -50,6 +50,30 @@ The bot can find release dates for an entire project or a specific requirement. 
     -   `give me the date`
     > **Bot Response:** Your request is a bit unclear. If you're asking for a release date, please try again using the phrase 'release date for [project name]'.
 
+#### Asking for a List of Requirements
+
+You can get a list of requirements for a project, and optionally filter by status or sprint.
+
+-   **List All Requirements:**
+    -   `list requirements for TEST`
+    -   `show me the requirements for TEST`
+
+-   **List Done / To Do Requirements:**
+    -   `show me the done requirements for TEST`
+    -   `what are the todo requirements in TEST?`
+
+-   **List Requirements by Sprint:**
+    -   `what are the requirements in sprint 2 for TEST?`
+    -   `show done requirements in sprint 3 for TEST`
+
+#### Asking for a Count of Requirements
+
+Similar to listing, you can get counts of requirements based on their status.
+
+-   **Count Requirements:**
+    -   `how many requirements are in TEST?`
+    -   `count the done requirements for TEST`
+
 #### Asking for a List of Defects
 
 You can filter defects by their status. If no status is mentioned, the bot shows in-progress defects.
@@ -100,6 +124,35 @@ Similar to listing, you can get counts of defects based on their status.
 -   **Count All Defects (including closed):**
     -   `count all the defects for TEST`
 
+#### Asking for Sprint Information
+
+You can quickly check which sprints are currently active or logged in a project.
+
+-   `show sprints in TEST`
+-   `what sprints exist for TEST?`
+
+#### Asking for Release Information
+
+You can request a list of all active releases and their dates for a project.
+
+-   `show releases for TEST`
+-   `list active releases for TEST`
+
+#### Asking for FAT (Factory Acceptance Testing) Information
+
+You can check the recent FAT periods and their statuses.
+
+-   `what is the FAT status for TEST?`
+-   `show FAT info for TEST`
+
+#### Asking for Retrospective Summaries
+
+Get an AI-generated summary of your project's retrospective items, automatically grouped by what went well, what went wrong, and what to improve.
+
+-   `summarize retrospectives for TEST`
+-   `what did we learn in TEST?`
+-   `show me the lessons learned for TEST`
+
 #### Asking for Project Summaries
 
 Get a high-level overview of a project's requirements and open defects.
@@ -120,9 +173,9 @@ If your question doesn't match a specific command, the bot uses its AI search to
 
 ## Creating New Items
 
-The chatbot can create new requirements or defects for you. You can provide all the information at once or answer the bot's follow-up questions.
+The chatbot can create new requirements or defects for you. You can provide all the information at once, answer the bot's follow-up questions, or even bulk-create items.
 
-#### Providing All Information at Once
+#### Creating a Single Item
 
 -   **Create a Requirement:**
     -   `create a requirement titled 'New User Profile Page' for project TEST in sprint 5`
@@ -144,6 +197,29 @@ If you provide incomplete information, the bot will ask for the missing details.
 -   **Example 2: Creating a Requirement**
     -   **You:** `create a requirement for TEST called "Implement Two-Factor Authentication"`
     > **Bot:** OK, I can create the requirement "Implement Two-Factor Authentication" for project "TEST". Which sprint should it be in? For example: '...in sprint 7'.
+
+#### Creating Multiple Items at Once (Bulk Creation)
+
+You can create multiple requirements or defects in a single prompt by listing them out.
+
+-   **Bulk Create Requirements:**
+    -   `create requirements for TEST: user login, user profile, password reset`
+    -   `add 3 requirements to TEST: api setup in sprint 1, db migration in sprint 2, frontend in sprint 2`
+    
+-   **Bulk Create Defects:**
+    -   `add 3 defects to TEST: broken button, typo on homepage, crash on submit`
+    -   `create multiple defects for TEST: issue with login, api 500 error`
+
+## Version Control (GitHub)
+
+You can execute basic Git version control commands directly from the chat window.
+
+-   **Push Changes to GitHub:**
+    -   `github`
+    > *Executes: `git add .`, `git commit -m "db updated"`, and `git push`*
+-   **Pull Changes from GitHub:**
+    -   `github pull`
+    > *Executes: `git pull`*
 
 ## Utilities & Daily Info
 

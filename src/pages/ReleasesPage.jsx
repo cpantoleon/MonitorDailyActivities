@@ -207,7 +207,9 @@ const StartFatPeriodModal = ({ isOpen, onClose, onStart, project, showMainMessag
                                     aria-label={`${release.name}, Status: ${release.type}`}
                                 />
                                 <span className="fat-release-name">{release.name}</span>
-                                <span className={`fat-release-type-badge type-${release.type}`}>{release.type}</span>
+                                <span className={`fat-release-type-badge type-${release.is_current ? 'current' : 'pending'}`}>
+                                    {release.is_current ? 'Current' : 'Pending'}
+                                </span>
                             </label>
                         )) : <p id="no-selectable-releases-message-id" role="status">No active releases found for this project.</p>}
                     </div>
@@ -475,8 +477,8 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
     }, [details.defects, selectedDefectFilter]);
 
     const handleDefectClick = (defect) => {
-        const defectForNav = { ...defect, project: project, status: 'Unknown' };
-        onNavigateToDefect(defectForNav, false);
+        const defectForNav = { ...defect, project: project };
+        onNavigateToDefect(defectForNav, defect.status === 'Closed');
     };
     
     const handleRequirementClick = (req) => {
@@ -561,7 +563,13 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                             <ul className="fat-item-list">
                                 {filteredDefects.map(def => (
                                     <li key={def.id}>
-                                        <button onClick={() => handleDefectClick(def)} className="link-button">{def.title}</button>
+                                        <button 
+                                            onClick={() => handleDefectClick(def)} 
+                                            className="link-button"
+                                            style={{ textDecoration: def.status === 'Closed' ? 'line-through' : 'none', opacity: def.status === 'Closed' ? 0.7 : 1 }}
+                                        >
+                                            {def.title}
+                                        </button>
                                         {def.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
                                     </li>
                                 ))}

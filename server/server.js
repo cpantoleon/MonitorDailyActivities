@@ -137,37 +137,45 @@ const calculateBusinessHours = (start, end) => {
 
     if (endDate <= startDate) return 0;
 
-    const endDayOfWeek = endDate.getUTCDay(); 
-    const isEndOnWeekend = (endDayOfWeek === 0 || endDayOfWeek === 6);
-
-    if (isEndOnWeekend) {
-        const diffInMs = endDate.getTime() - startDate.getTime();
-        return diffInMs / (1000 * 60 * 60);
-    }
-
     let totalHours = 0;
-    let current = new Date(startDate);
+    // Ξεκινάμε από τα μεσάνυχτα της ημέρας έναρξης (σε UTC για αποφυγή θεμάτων timezone)
+    let current = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
 
-    while (current < endDate) {
+    // Κρατάμε τις ημερομηνίες έναρξης και λήξης (μόνο τη μέρα, χωρίς την ώρα) για να κάνουμε συγκρίσεις
+    const startDayStr = startDate.toISOString().split('T')[0];
+    const endDayStr = endDate.toISOString().split('T')[0];
+
+    while (current <= endDate) {
         const dayOfWeek = current.getUTCDay();
+        const currentDayStr = current.toISOString().split('T')[0];
 
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-            let startOfDay = new Date(current);
-            startOfDay.setUTCHours(0, 0, 0, 0);
+        // Είναι Σαββατοκύριακο; (0 = Κυριακή, 6 = Σάββατο)
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        
+        // Υπολογίζουμε τη μέρα ΑΝ: 
+        // 1. ΔΕΝ είναι ΣΚ (καθημερινή)
+        // 2. Ή ΕΙΝΑΙ ΣΚ, αλλά είναι ακριβώς η μέρα που άνοιξε το ticket
+        // 3. Ή ΕΙΝΑΙ ΣΚ, αλλά είναι ακριβώς η μέρα που έκλεισε το ticket
+        const shouldCountDay = !isWeekend || currentDayStr === startDayStr || currentDayStr === endDayStr;
 
-            let endOfDay = new Date(startOfDay);
-            endOfDay.setUTCDate(startOfDay.getUTCDate() + 1);
+        if (shouldCountDay) {
+            let startOfBusiness = new Date(current);
+            startOfBusiness.setUTCHours(9, 0, 0, 0); // 09:00
 
-            let effectiveStart = (startDate > startOfDay) ? startDate : startOfDay;
-            let effectiveEnd = (endDate < endOfDay) ? endDate : endOfDay;
+            let endOfBusiness = new Date(current);
+            endOfBusiness.setUTCHours(17, 0, 0, 0); // 17:00 (8 ώρες/ημέρα)
 
+            let effectiveStart = (startDate > startOfBusiness) ? startDate : startOfBusiness;
+            let effectiveEnd = (endDate < endOfBusiness) ? endDate : endOfBusiness;
+
+            // Αν υπάρχει χρόνος μέσα στο 8ωρο (έστω και του ΣΚ), τον προσθέτουμε
             if (effectiveEnd > effectiveStart) {
                 totalHours += (effectiveEnd - effectiveStart) / (1000 * 60 * 60);
             }
         }
         
+        // Πάμε στην επόμενη μέρα
         current.setUTCDate(current.getUTCDate() + 1);
-        current.setUTCHours(0, 0, 0, 0);
     }
 
     return totalHours;
@@ -1887,7 +1895,7 @@ const getFatTotalRequirements = (fatPeriodId) => {
 app.get("/api/releases/:project/selectable", async (req, res) => {
     try {
         const projectId = await getProjectId(req.params.project);
-        const activeSql = "SELECT id, name FROM releases WHERE project_id = ? AND status = 'active' ORDER BY release_date DESC";
+        const activeSql = "SELECT id, name, is_current FROM releases WHERE project_id = ? AND status = 'active' ORDER BY release_date DESC";
 
         db.all(activeSql, [projectId], (err, activeRows) => {
             if (err) return res.status(500).json({ error: "DB error fetching selectable releases." });
@@ -1978,7 +1986,13 @@ app.post("/api/fat/:project", async (req, res) => {
             if (err) return res.status(500).json({ error: "DB error checking for active FAT periods." });
             if (activeFat) return res.status(409).json({ error: "An active FAT period already exists for this project. Please complete it before starting a new one." });
 
-            const startDateUTC = new Date(`${start_date}T09:00:00+03:00`).toISOString();
+            // Υπολογισμός σωστού Timezone Offset για Ελλάδα τη συγκεκριμένη ημερομηνία
+            const dt = new Date(`${start_date}T12:00:00Z`);
+            const athensOffsetString = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Athens', timeZoneName: 'longOffset' }).format(dt);
+            const offsetMatch = athensOffsetString.match(/GMT([+-]\d{2}:\d{2})/);
+            const offset = offsetMatch ? offsetMatch[1] : "+02:00"; 
+            
+            const startDateUTC = new Date(`${start_date}T09:00:00${offset}`).toISOString();
 
             db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
                 if (nameErr || !release) {
@@ -2055,9 +2069,9 @@ app.get("/api/fat/details/:fat_period_id", (req, res) => {
 
                 if (defectIds.length > 0) {
                     const defectsSql = `
-                        SELECT id, title, link, is_fat_defect 
+                        SELECT id, title, link, is_fat_defect, status 
                         FROM defects 
-                        WHERE id IN (${defectIds.join(',')}) AND is_fat_defect = 1 AND status != 'Closed'
+                        WHERE id IN (${defectIds.join(',')}) AND is_fat_defect = 1
                     `;
                     defects = await new Promise((resolve, reject) => db.all(defectsSql, [], (err, rows) => err ? reject(err) : resolve(rows)));
                 }
@@ -2301,7 +2315,7 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
                 totalDetectionHours += calculateBusinessHours(fatStartDate, defectCreatedAt);
             }
         });
-        const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 24) / totalFatDefects : 0;
+        const mttdInDays = totalFatDefects > 0 ? (totalDetectionHours / 8) / totalFatDefects : 0;
 
         let totalRepairHours = 0;
         let fixedForMttrCount = 0;
@@ -2335,7 +2349,7 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
                 }
             }
         });
-        const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 24) / fixedForMttrCount : 0;
+        const mttrInDays = fixedForMttrCount > 0 ? (totalRepairHours / 8) / fixedForMttrCount : 0;
 
         res.json({
             message: "success",

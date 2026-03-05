@@ -103,7 +103,12 @@ function extractProjectFromMessage(message, intent) {
             break;
         case 'get_defects_list':
         case 'get_defects_count':
-            regex = /(?:defects?|counter|number|undone|not done|done|closed)(?:.*?)(?: for| in| of)\s+(?:the\s+)?([a-zA-Z0-9\s-_]+)(?:\?|$)/i;
+        case 'get_requirements_list':
+        case 'get_requirements_count':
+        case 'get_retrospective_summary':
+        case 'get_releases_list':
+        case 'get_fat_info':
+            regex = /(?:defects?|requirements?|retrospectives?|releases?|fat|kpi|counter|number|undone|not done|done|closed)(?:.*?)(?: for| in| of)\s+(?:the\s+)?([a-zA-Z0-9\s-_]+)(?:\?|$)/i;
             break;
         default:
             return null;
@@ -183,6 +188,28 @@ function extractSprintFromMessage(message) {
 function detectIntentAndEntity(message) {
     const lowerMsg = message.toLowerCase();
 
+    if (lowerMsg.match(/how many requirements|count of requirements|number of requirements/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_requirements_count',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                req_status_filter: lowerMsg.includes('done') ? 'done' : 'all'
+            }
+        };
+    }
+
+    if (lowerMsg.match(/requirements (?:for|in)|list requirements|show me requirements|give me the requirements/)) {
+        const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
+        return {
+            intent: 'get_requirements_list',
+            parameters: { 
+                project_name: match ? match[1].replace('?', '').trim() : null,
+                req_status_filter: lowerMsg.includes('done') ? 'done' : 'all'
+            }
+        };
+    }
+
     if (lowerMsg.match(/how many defects|count of defects|number of defects/)) {
         const match = lowerMsg.match(/(?:for|in|of)\s+(.+)/);
         return {
@@ -205,11 +232,34 @@ function detectIntentAndEntity(message) {
         };
     }
 
+    if (lowerMsg.match(/show sprints|what sprints|list sprints|sprints in/)) {
+        return { intent: 'get_sprint_info', parameters: { project_name: extractConversationalProject(message) } };
+    }
+
+    if (lowerMsg.match(/show releases|what releases|list releases|active releases/)) {
+        return { intent: 'get_releases_list', parameters: { project_name: extractConversationalProject(message) } };
+    }
+
+    if (lowerMsg.match(/fat status|sat bugs|kpi|mttd|mttr|dre/)) {
+        return { intent: 'get_fat_info', parameters: { project_name: extractConversationalProject(message) } };
+    }
+
+    if (lowerMsg.match(/retrospective|went well|went wrong|lessons learned/)) {
+        return { intent: 'get_retrospective_summary', parameters: { project_name: extractConversationalProject(message) } };
+    }
+
     if (lowerMsg.includes('release date')) {
         const match = lowerMsg.match(/release date (?:for|of) (.+)/);
         return { 
             intent: 'get_release_date', 
             parameters: { project_name: match ? match[1].replace('?', '').trim() : null } 
+        };
+    }
+
+    if (lowerMsg.match(/create multiple|add requirements|add defects|create 2|create 3|create \d+/)) {
+        return {
+            intent: 'create_multiple_items',
+            parameters: { project_name: extractConversationalProject(message) }
         };
     }
 
@@ -257,7 +307,6 @@ async function fetchNamedaysFromWidget() {
 
         return namedays;
     } catch (error) {
-        console.error("Error scraping nameday widget:", error);
         return [];
     }
 }
@@ -305,7 +354,6 @@ async function embedBatchWithRetry(textsToEmbed, maxRetries = 5) {
                 const embedding = await getHybridEmbedding(safeText);
                 embeddings.push(embedding);
             } catch (error) {
-                console.error(`Skipping document due to Ollama error:`, error.message);
                 embeddings.push(null);
             }
         }
@@ -465,7 +513,6 @@ const syncWithQdrant = (dbInstance) => async (req, res) => {
 
         res.status(200).json({ message: "Sync successful! LanceDB table updated.", synced: dataToIngest.length });
     } catch (error) {
-        console.error("Failed to sync data with LanceDB:", error);
         res.status(500).json({ error: "Failed to sync data with LanceDB.", details: error.message });
     }
 };
@@ -543,7 +590,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
 
         const lowerCaseMessage = message.toLowerCase().trim();
 
-        // --- GitHub Commands ---
         if (lowerCaseMessage === 'github') {
             try {
                 const projectRoot = path.resolve(__dirname, '..'); 
@@ -573,7 +619,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             }
         }
         
-        // --- Static Responses ---
         let preDeterminedIntent = null;
         if (['hello', 'hi', 'hey'].includes(lowerCaseMessage)) {
             return res.json({ reply: "Hello! How can I help you with your project data today?" });
@@ -595,14 +640,13 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             preDeterminedIntent = 'get_weather';
         }
 
-        if (lowerCaseMessage.includes('release') && !lowerCaseMessage.includes('date')) {
+        if (lowerCaseMessage.includes('release') && !lowerCaseMessage.includes('date') && !lowerCaseMessage.match(/show|what|list/)) {
             return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try asking again using the words 'release date'." });
         }
         if (lowerCaseMessage.includes('date') && !lowerCaseMessage.includes('release date') && !lowerCaseMessage.includes('today') && !lowerCaseMessage.includes('nameday')) {
             return res.json({ reply: "Your request is a bit unclear. If you're asking for a release date, please try again using the phrase 'release date for [project name]'." });
         }
 
-        // --- Intent Detection ---
         let intentData = {};
 
         if (!preDeterminedIntent) {
@@ -613,33 +657,42 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                 Analyze the user's message to determine their primary intent and extract key parameters.
                 Your response must be ONLY a single JSON object.
                 **INTENTS:**
-                - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm-project", "show me the undone defects for crm".
-                - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm-project?".
-                - "create_item": User wants to create a new item (requirement or defect). The parameters can appear in any order.
+                - "get_defects_list": User wants a list of defects. Examples: "give me the defects for crm", "show undone defects".
+                - "get_defects_count": User wants a count of defects. Examples: "how many defects are in crm?".
+                - "get_requirements_list": User wants a list of requirements. Examples: "list requirements for project X", "what are the done requirements in sprint 2?".
+                - "get_requirements_count": User wants a count of requirements.
+                - "get_sprint_info": User asks about a specific sprint. Examples: "what is in sprint 3 for crm?".
+                - "get_releases_list": User asks about releases. Examples: "show releases for crm".
+                - "get_fat_info": User asks about FAT or SAT or KPIs. Examples: "what is the FAT status for crm?", "show SAT bugs".
+                - "get_retrospective_summary": User asks about retrospectives or lessons learned. Examples: "summarize retrospectives for crm".
+                - "create_item": User wants to create ONE requirement or defect.
+                - "create_multiple_items": User wants to create MULTIPLE requirements or defects at once. Examples: "Add 3 defects: A, B, and C", "Create requirements: login, logout, register".
                 - "get_joke": User asks for a joke.
-                - "get_weather": User wants to know the current or future weather.
-                - "get_nameday": User wants to know who is celebrating their nameday.
-                - "get_release_date": User is asking for the release date of a project or a specific item.
-                - "get_project_summary": User wants a summary of a project's data.
-                - "get_general_info": A general question that requires searching the database that does not match any other intent.
-                - "unknown": The intent is unclear.
+                - "get_weather": User wants to know the weather.
+                - "get_nameday": User wants to know who is celebrating.
+                - "get_release_date": User asks for the release date.
+                - "get_project_summary": User wants a general summary of a project's data.
+                - "get_general_info": A general question requiring a vector search.
+                - "unknown": Unclear intent.
+                
                 **PARAMETERS TO EXTRACT:**
                 - "project_name": The name of the project.
-                - "defect_status_filter": The status filter for defect queries.
+                - "defect_status_filter": "closed", "undone", "done", "all".
+                - "req_status_filter": "done", "todo", "all".
                 - "item_type": "requirement" or "defect".
-                - "item_id": The specific ID of an item.
-                - "title": The title for an item to be created.
-                - "sprint": The name or number of the sprint.
-                - "location": The city/place for the weather forecast.
+                - "title": Title for single item creation.
+                - "sprint": Sprint name or number.
+                - "items": Array of objects for multiple items, e.g., [{"type": "defect", "title": "login bug", "sprint": "1"}, {"type": "requirement", "title": "add button"}].
+                - "location": City for weather.
                 - "timeframe": "today", "tomorrow", "next 7 days".
                 - "query": The user's core question.
+                
                 User message: "${message}"
                 `;
                 try {
                     const cleanedText = await getHybridCompletion(intentPrompt, true);
                     intentData = JSON.parse(cleanedText);
                 } catch (apiError) {
-                    console.error("Error calling AI Service:", apiError);
                     intentData = { intent: "get_general_info", parameters: {} };
                 }
             }
@@ -664,7 +717,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             }
 
             case "get_nameday": {
-                // ... (Ο κώδικας για nameday μένει ίδιος)
                 const timeframe = (parameters || {}).timeframe || '';
                 const isTodayOnly = timeframe.toLowerCase().includes('today') || lowerCaseMessage.includes('today');
                 const isTomorrowOnly = timeframe.toLowerCase().includes('tomorrow') || lowerCaseMessage.includes('tomorrow');
@@ -710,13 +762,11 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                     return res.json({ reply: replyText });
 
                 } catch (apiError) {
-                    console.error("Eortologio Scraping Error:", apiError);
                     return res.json({ reply: "Sorry, I was unable to connect to the nameday service at the moment." });
                 }
             }
 
             case "get_weather": {
-                // ... (Ο κώδικας για weather μένει ίδιος)
                 const { location: queryLocation, timeframe } = parameters || {};
                 let locationToFetch = queryLocation;
                 if (!locationToFetch) {
@@ -748,7 +798,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                         }
                         return res.json({ reply: `I found ${weatherData.city.name}, but couldn't get a specific forecast for noon tomorrow.` });
                     } catch (apiError) {
-                        console.error("Weather API Error:", apiError);
                         return res.json({ reply: "Sorry, I was unable to connect to the weather service." });
                     }
                 } else {
@@ -762,7 +811,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                         const { name, main, weather } = weatherData;
                         return res.json({ reply: `Currently in ${name}, it's ${main.temp.toFixed(1)}°C and feels like ${main.feels_like.toFixed(1)}°C, with ${weather[0].description}.` });
                     } catch (apiError) {
-                        console.error("Weather API Error:", apiError);
                         return res.json({ reply: "Sorry, I was unable to connect to the weather service." });
                     }
                 }
@@ -770,8 +818,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
 
             case "get_release_date": {
                 const { item_id } = parameters || {};
-
-                // Use a dynamic dummy vector for searching
                 const dummyVector = await getHybridEmbedding("dummy query"); 
 
                 if (item_id) {
@@ -828,7 +874,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             }
 
             case "create_item": {
-                // ... (Ο κώδικας για create_item μένει ίδιος)
                 let { item_type, title, sprint, project_name } = parameters || {};
 
                 item_type = item_type || (message.match(/\b(requirement|defect)\b/i) || [])[1]?.toLowerCase();
@@ -881,7 +926,7 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                     }
                     
                     setTimeout(() => {
-                        fetch(`http://localhost:${port}/api/chatbot/sync`, { method: 'POST' }).catch(err => console.error("Self-sync failed:", err));
+                        fetch(`http://localhost:${port}/api/chatbot/sync`, { method: 'POST' }).catch(() => {});
                     }, 1000);
 
                     return res.json({ 
@@ -891,6 +936,54 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                     });
                 } catch (error) {
                     return res.json({ reply: `I couldn't find a project named "${finalProjectName}".` });
+                }
+            }
+
+            case "create_multiple_items": {
+                const { items, project_name } = parameters || {};
+                const proj = project_name || extractConversationalProject(message) || projectContext;
+                if (!proj) return res.json({ reply: "Please specify a project for these items." });
+                
+                const match = await findProjectMatch(dbInstance, proj);
+                const finalProjectName = match.exact || match.autocorrect;
+                if (!finalProjectName) return res.json({ reply: `I couldn't find a project named "${proj}".` });
+                
+                const projectId = await getProjectId(finalProjectName);
+                let createdCount = 0;
+                let replyDetails = [];
+
+                for (const item of (items || [])) {
+                    const type = (item.type || "requirement").toLowerCase();
+                    const title = item.title;
+                    const sprint = item.sprint ? `Sprint ${item.sprint.replace(/sprint/i, '').trim()}` : 'Backlog';
+
+                    if (!title) continue;
+
+                    if (type === 'requirement') {
+                        const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, isCurrent, created_at, updated_at) VALUES (?, ?, 'To Do', date('now'), ?, 1, datetime('now'), datetime('now'))`;
+                        await new Promise((resolve) => {
+                            dbInstance.run(insertSql, [projectId, title, sprint], function () {
+                                dbInstance.run(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [this.lastID, this.lastID], resolve);
+                            });
+                        });
+                        createdCount++;
+                        replyDetails.push(`Requirement: "${title}" (${sprint})`);
+                    } else if (type === 'defect') {
+                        const insertSql = `INSERT INTO defects (project_id, title, area, status, created_date) VALUES (?, ?, 'Imported', 'Assigned to Developer', date('now'))`;
+                        await new Promise((resolve) => dbInstance.run(insertSql, [projectId, title], resolve));
+                        createdCount++;
+                        replyDetails.push(`Defect: "${title}"`);
+                    }
+                }
+                
+                if (createdCount > 0) {
+                    setTimeout(() => { fetch(`http://localhost:${port}/api/chatbot/sync`, { method: 'POST' }).catch(() => {}); }, 1000);
+                    return res.json({ 
+                        reply: `I have created ${createdCount} items in "${finalProjectName}":\n- ${replyDetails.join('\n- ')}`,
+                        data_changed: true 
+                    });
+                } else {
+                    return res.json({ reply: "I didn't understand the items you wanted to create. Please provide them clearly, for example: 'Add 3 requirements: login, logout, and register'." });
                 }
             }
 
@@ -912,7 +1005,7 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                     return res.json({ reply: `I couldn't find a project named "${projectToQuery}".` });
                 }
 
-                const dummyVector = await getHybridEmbedding(finalProjectName); // Contextual embedding
+                const dummyVector = await getHybridEmbedding(finalProjectName);
 
                 const reqs = await table.search(dummyVector)
                     .where(`project = '${finalProjectName}' AND type = 'requirement'`)
@@ -945,11 +1038,61 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                 const finalResultText = await getHybridCompletion(finalPrompt);
                 return res.json({ reply: finalResultText });
             }
+
+            case "get_requirements_list":
+            case "get_requirements_count": {
+                const { project_name, req_status_filter, sprint } = parameters || {};
+                const projectToQuery = project_name || extractProjectFromMessage(message, intent) || projectContext;
+            
+                if (!projectToQuery) {
+                    return res.json({ reply: "Please specify a project." });
+                }
+            
+                let finalProjectName = null;
+                const match = await findProjectMatch(dbInstance, projectToQuery);
+
+                if (match.exact || match.autocorrect) {
+                    finalProjectName = match.exact || match.autocorrect;
+                } else if (match.suggestion) {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}". Did you mean "${match.suggestion}"?` });
+                } else {
+                    return res.json({ reply: `I couldn't find a project named "${projectToQuery}".` });
+                }
+            
+                let sql = "SELECT requirementUserIdentifier, status, sprint FROM activities WHERE isCurrent = 1 AND project_id = (SELECT id FROM projects WHERE name = ?)";
+                const params = [finalProjectName];
+
+                if (req_status_filter && req_status_filter.toLowerCase() === 'done') {
+                    sql += " AND status = 'Done'";
+                } else if (req_status_filter && req_status_filter.toLowerCase() === 'todo') {
+                    sql += " AND status != 'Done'";
+                }
+
+                if (sprint) {
+                    sql += " AND sprint LIKE ?";
+                    params.push(`%${sprint}%`);
+                }
+
+                const rows = await new Promise((resolve) => dbInstance.all(sql, params, (err, rows) => resolve(rows || [])));
+
+                if (intent === "get_requirements_count") {
+                    return res.json({ reply: `There are ${rows.length} matching requirements in project "${finalProjectName}".` });
+                } else {
+                    if (rows.length === 0) {
+                        return res.json({ reply: `I couldn't find any matching requirements for project "${finalProjectName}".` });
+                    }
+                    let replyText = `Here are the requirements for "${finalProjectName}":\n\n`;
+                    rows.forEach(r => {
+                        replyText += `- ${r.requirementUserIdentifier} (Status: ${r.status}, Sprint: ${r.sprint})\n`;
+                    });
+                    return res.json({ reply: replyText });
+                }
+            }
             
             case "get_defects_list":
             case "get_defects_count": {
                 const { project_name, defect_status_filter } = parameters || {};
-                const projectToQuery = project_name || extractProjectFromMessage(message, intent);
+                const projectToQuery = project_name || extractProjectFromMessage(message, intent) || projectContext;
             
                 if (!projectToQuery) {
                     return res.json({ reply: "Please specify a project. For example, 'show me the defects for crm-project'." });
@@ -1003,7 +1146,7 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                         replyDescription = "in-progress";
                 }
             
-                const dummyVector = await getHybridEmbedding(finalProjectName); // Use valid vector size
+                const dummyVector = await getHybridEmbedding(finalProjectName);
 
                 if (intent === "get_defects_count") {
                     const results = await table.search(dummyVector)
@@ -1029,6 +1172,76 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
                     });
                     return res.json({ reply: replyText });
                 }
+            }
+
+            case "get_sprint_info": {
+                const proj = parameters.project_name || projectContext;
+                if (!proj) return res.json({ reply: "Please specify a project to look up sprints." });
+                const match = await findProjectMatch(dbInstance, proj);
+                const finalProjectName = match.exact || match.autocorrect;
+                if (!finalProjectName) return res.json({ reply: `I couldn't find project "${proj}".` });
+
+                const rows = await new Promise((resolve) => dbInstance.all("SELECT DISTINCT sprint FROM activities WHERE project_id = (SELECT id FROM projects WHERE name = ?) AND isCurrent = 1", [finalProjectName], (err, r) => resolve(r || [])));
+                
+                if (rows.length === 0) return res.json({ reply: `No sprints found for project "${finalProjectName}".` });
+                
+                const sprints = rows.map(r => r.sprint).filter(Boolean);
+                return res.json({ reply: `The following sprints exist in "${finalProjectName}": ${sprints.join(', ')}.` });
+            }
+
+            case "get_releases_list": {
+                const proj = parameters.project_name || projectContext;
+                if (!proj) return res.json({ reply: "Please specify a project to look up releases." });
+                const match = await findProjectMatch(dbInstance, proj);
+                const finalProjectName = match.exact || match.autocorrect;
+                if (!finalProjectName) return res.json({ reply: `I couldn't find project "${proj}".` });
+
+                const rows = await new Promise((resolve) => dbInstance.all("SELECT name, release_date, is_current FROM releases WHERE project_id = (SELECT id FROM projects WHERE name = ?)", [finalProjectName], (err, r) => resolve(r || [])));
+                
+                if (rows.length === 0) return res.json({ reply: `No releases found for project "${finalProjectName}".` });
+                
+                let text = `Releases for "${finalProjectName}":\n`;
+                rows.forEach(r => {
+                    text += `- ${r.name} (Date: ${r.release_date})${r.is_current ? ' [ACTIVE]' : ''}\n`;
+                });
+                return res.json({ reply: text });
+            }
+
+            case "get_fat_info": {
+                const proj = parameters.project_name || projectContext;
+                if (!proj) return res.json({ reply: "Please specify a project." });
+                const match = await findProjectMatch(dbInstance, proj);
+                const finalProjectName = match.exact || match.autocorrect;
+                if (!finalProjectName) return res.json({ reply: `I couldn't find project "${proj}".` });
+
+                const fatRows = await new Promise((resolve) => dbInstance.all("SELECT * FROM fat_periods WHERE project_id = (SELECT id FROM projects WHERE name = ?) ORDER BY start_date DESC LIMIT 5", [finalProjectName], (err, r) => resolve(r || [])));
+                
+                if (fatRows.length === 0) return res.json({ reply: `No FAT periods recorded for "${finalProjectName}".` });
+
+                let text = `Recent FAT Periods for "${finalProjectName}":\n`;
+                for (const row of fatRows) {
+                    text += `- Started: ${row.start_date}, Status: ${row.status}\n`;
+                }
+                return res.json({ reply: text });
+            }
+
+            case "get_retrospective_summary": {
+                const proj = parameters.project_name || projectContext;
+                if (!proj) return res.json({ reply: "Which project's retrospectives would you like to summarize?" });
+                
+                const match = await findProjectMatch(dbInstance, proj);
+                const finalProjectName = match.exact || match.autocorrect;
+                if (!finalProjectName) return res.json({ reply: `I couldn't find project "${proj}".` });
+
+                const rows = await new Promise((resolve) => dbInstance.all("SELECT column_type, description, details FROM retrospective_items WHERE project_id = (SELECT id FROM projects WHERE name = ?)", [finalProjectName], (err, r) => resolve(r || [])));
+
+                if (rows.length === 0) return res.json({ reply: `No retrospective items found for "${finalProjectName}".` });
+
+                const contextData = rows.map(r => `Category: ${r.column_type}, Description: ${r.description}, Details: ${r.details}`).join('\n');
+                
+                const prompt = `Summarize the following retrospective items for the project "${finalProjectName}". Group them nicely by what went well, what went wrong, and what to improve.\n\n${contextData}\n\nDo not output <think> tags.`;
+                const summary = await getHybridCompletion(prompt);
+                return res.json({ reply: summary });
             }
 
             case "get_general_info":
@@ -1072,7 +1285,6 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             }
         }
     } catch (error) {
-        console.error("Chatbot error:", error);
         if (error instanceof SyntaxError) {
              return res.status(500).json({ error: "Sorry, I had trouble understanding that. Could you please rephrase your request?", details: "Failed to parse LLM response." });
         }
