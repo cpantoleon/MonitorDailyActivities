@@ -171,27 +171,29 @@ const [filterOptions, setFilterOptions] = useState({
 
     setAvailableSprints(visibleSprints);
 
-    // Fallback: Αν το επιλεγμένο sprint δεν υπάρχει (π.χ. απενεργοποίησε το show archived)
     if (selectedProject && selectedSprint && !visibleSprints.includes(selectedSprint)) {
+        let sprintToSelect = '';
         if (visibleSprints.length > 0) {
             const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
             if (nonArchivedSprints.length > 0) {
-                setSelectedSprint(nonArchivedSprints[nonArchivedSprints.length - 1]);
-                sessionStorage.setItem('sprintBoardSprint', nonArchivedSprints[nonArchivedSprints.length - 1]);
+                sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1];
             } else {
-                setSelectedSprint(visibleSprints[0]);
-                sessionStorage.setItem('sprintBoardSprint', visibleSprints[0]);
+                sprintToSelect = visibleSprints[0];
+            }
+        }
+        
+        if (sprintToSelect) {
+            if (location.pathname === '/sprint-board') {
+                navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprintToSelect)}`, { replace: true });
             }
         } else {
-            setSelectedSprint('');
-            sessionStorage.removeItem('sprintBoardSprint');
+            if (location.pathname === '/sprint-board') {
+                navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}`, { replace: true });
+            }
         }
     }
-  }, [selectedProject, allProcessedRequirements, showArchivedSprints]); 
+  }, [selectedProject, selectedSprint, allProcessedRequirements, showArchivedSprints, navigate, location.pathname]); 
 
-  // --- MANUAL SELECTION HANDLERS ---
-  
-  // Όταν ο χρήστης αλλάζει χειροκίνητα Project, βρες το τελευταίο Sprint και φόρτωσε το
   const handleManualProjectSelect = useCallback((project) => {
     setSelectedProject(project);
 
