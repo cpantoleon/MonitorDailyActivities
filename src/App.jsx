@@ -617,15 +617,23 @@ const [filterOptions, setFilterOptions] = useState({
     }
   }, [fetchData, showMainMessage]);
 
-  const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
-    if (!activityDbId) { showMainMessage("Error: Cannot update history. Missing activity DB ID.", 'error'); return; }
+const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
+    if (!dbId) { showMainMessage("Error: Cannot update history. Missing activity DB ID.", 'error'); return; }
     try {
       const formattedDate = new Date(date).toISOString().split('T')[0];
       const res = await fetch(`${API_BASE_URL}/activities/${dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment, statusDate: formattedDate }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to save history"); }
-      await fetchData(); showMainMessage("History updated!", 'success');
+      
+      // Ζητάμε τα φρέσκα δεδομένα και ενημερώνουμε το state του modal
+      const freshReqs = await fetchRequirementsOnly(); 
+      const updatedReq = freshReqs.find(r => r.id === id);
+      if (updatedReq) {
+          setRequirementForHistory(updatedReq);
+      }
+      
+      showMainMessage("History updated!", 'success');
     } catch (e) { showMainMessage(`Error: ${e.message}`, 'error'); }
-  }, [fetchData, showMainMessage]);
+  }, [fetchRequirementsOnly, showMainMessage]); // Προστέθηκε το fetchRequirementsOnly στα dependencies
 
   const handleAddNewRequirement = useCallback(async () => {
     const targetProject = newReqFormState.project;
