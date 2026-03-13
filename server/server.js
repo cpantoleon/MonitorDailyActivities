@@ -3067,17 +3067,43 @@ app.post('/api/jira/fetch', async (req, res) => {
                     if (!parentsMap.has(parentKey)) {
                         parentsMap.set(parentKey, { key: parentKey, isPlaceholder: true, subtasks: [] });
                     }
-                    parentsMap.get(parentKey).subtasks.push(itemData);
+                    // Έλεγχος για αποφυγή διπλοεγγραφών αν το subtask ήρθε και ανεξάρτητα και μέσω του parent
+                    const existingSubtasks = parentsMap.get(parentKey).subtasks;
+                    if (!existingSubtasks.some(s => s.key === itemData.key)) {
+                        existingSubtasks.push(itemData);
+                    }
                 } else {
                     orphanSubtasks.push(itemData);
                 }
             } else {
+                // 1. Διάβασμα των subtasks που έρχονται μέσα στο ίδιο το parent issue
+                let embeddedSubtasks = [];
+                if (issue.fields.subtasks && Array.isArray(issue.fields.subtasks)) {
+                    embeddedSubtasks = issue.fields.subtasks.map(sub => ({
+                        key: sub.key,
+                        summary: sub.fields.summary ? sub.fields.summary.trim() : "No Summary",
+                        type: sub.fields.issuetype && sub.fields.issuetype.name ? sub.fields.issuetype.name.trim() : "Unknown",
+                        status: sub.fields.status && sub.fields.status.name ? sub.fields.status.name.trim() : "To Do",
+                        link: `${jiraDomain}/browse/${sub.key}`,
+                        rawIssue: sub
+                    }));
+                }
+
                 if (parentsMap.has(issue.key)) {
-                    // Αν υπήρχε ήδη σαν placeholder από κάποιο subtask, το ανανεώνουμε
+                    // 2. Αν υπάρχει ήδη από κάποιο ανεξάρτητο subtask, κάνουμε merge για να μην χάσουμε τίποτα
                     const existing = parentsMap.get(issue.key);
-                    parentsMap.set(issue.key, { ...itemData, subtasks: existing.subtasks });
+                    const mergedSubtasks = [...existing.subtasks];
+                    
+                    embeddedSubtasks.forEach(es => {
+                        if (!mergedSubtasks.some(s => s.key === es.key)) {
+                            mergedSubtasks.push(es);
+                        }
+                    });
+                    
+                    parentsMap.set(issue.key, { ...itemData, subtasks: mergedSubtasks });
                 } else {
-                    parentsMap.set(issue.key, { ...itemData, subtasks: [] });
+                    // 3. Αν δεν υπάρχει, απλά βάζουμε τα embeddedSubtasks αντί για []
+                    parentsMap.set(issue.key, { ...itemData, subtasks: embeddedSubtasks });
                 }
             }
         });
