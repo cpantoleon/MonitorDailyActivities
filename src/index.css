@@ -45,6 +45,25 @@
   --success-border: rgba(30, 126, 52, 0.5);
   --success-hover: #1e7e34;
   --success-text: #ffffff;
+  
+  --type-bug-bg: #FED7D7;
+  --type-bug-text: #C53030;
+  --type-bug-border: #FEB2B2;
+  --type-cr-bg: #E9D8FD;
+  --type-cr-text: #6B46C1;
+  --type-cr-border: #D6BCFA;
+  --type-story-bg: #C6F6D5;
+  --type-story-text: #2F855A;
+  --type-story-border: #9AE6B4;
+  --type-subtask-bg: #FFFFFF;
+  --type-subtask-text: #4A5568;
+  --type-subtask-border: #CBD5E0;
+  --type-task-bg: #EBF8FF;
+  --type-task-text: #2C5282;
+  --type-task-border: #BEE3F8;
+  --type-incident-bg: #EDF2F7;
+  --type-incident-text: #4A5568;
+  --type-incident-border: #CBD5E0;
 }
 
 [data-theme='dark'] {
@@ -92,6 +111,25 @@
   --success-border: rgba(72, 187, 120, 0.4);
   --success-hover: #48bb78;
   --success-text: #1a202c;
+  
+  --type-bug-bg: rgba(229, 62, 62, 0.2);
+  --type-bug-text: #fc8181;
+  --type-bug-border: #e53e3e;
+  --type-cr-bg: rgba(128, 90, 213, 0.2);
+  --type-cr-text: #b794f4;
+  --type-cr-border: #805ad5;
+  --type-story-bg: rgba(56, 161, 105, 0.2);
+  --type-story-text: #68d391;
+  --type-story-border: #38a169;
+  --type-subtask-bg: transparent;
+  --type-subtask-text: #E2E8F0;
+  --type-subtask-border: #4A5568;
+  --type-task-bg: rgba(49, 130, 206, 0.2);
+  --type-task-text: #90cdf4;
+  --type-task-border: #3182ce;
+  --type-incident-bg: rgba(160, 174, 192, 0.2);
+  --type-incident-text: #A0AEC0;
+  --type-incident-border: #718096;
 }
 
 body {
@@ -521,6 +559,109 @@ body {
         margin-left: calc(var(--sidebar-width) / 0.88) !important;
     }
 }
+
+.kanban-board-container.focus-mode .kanban-card {
+  opacity: 0.25;
+  filter: grayscale(80%);
+  transition: opacity 0.3s ease, filter 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  pointer-events: none; 
+}
+
+.kanban-board-container.focus-mode .kanban-card.focus-active {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  z-index: 100;
+  pointer-events: auto; 
+}
+
+.kanban-board-container.focus-mode .kanban-card.focus-parent {
+  border: 2px solid var(--accent-color);
+}
+
+.kanban-board-container.focus-mode .kanban-card.focus-child {
+  border: 2px dashed var(--accent-color); 
+}
+
+.kanban-board-container.focus-mode .kanban-card .focus-toggle-btn {
+  pointer-events: auto;
+}
+
+.subtask-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  font-weight: 600;
+}
+
+.card-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.focus-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  opacity: 0.4;
+  transition: all 0.2s;
+  padding: 0 5px;
+}
+
+.focus-toggle-btn:hover, .focus-toggle-btn.active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.add-subtask-btn {
+  background-color: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.add-subtask-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  background-color: var(--bg-tertiary);
+}
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid;
+}
+
+.type-badge.bug { background-color: var(--type-bug-bg); color: var(--type-bug-text); border-color: var(--type-bug-border); }
+.type-badge.story { background-color: var(--type-story-bg); color: var(--type-story-text); border-color: var(--type-story-border); }
+.type-badge.task { background-color: var(--type-task-bg); color: var(--type-task-text); border-color: var(--type-task-border); }
+.type-badge.change-request { background-color: var(--type-cr-bg); color: var(--type-cr-text); border-color: var(--type-cr-border); }
+.type-badge.incident { background-color: var(--type-incident-bg); color: var(--type-incident-text); border-color: var(--type-incident-border); }
+.type-badge.sub-task { background-color: var(--type-subtask-bg); color: var(--type-subtask-text); border-color: var(--type-subtask-border); }
+.type-badge.default { background-color: var(--tag-gray-bg); color: var(--tag-gray-text); border-color: var(--tag-gray-border); }
 
 @media screen and (max-width: 1600px) and (max-width: 768px) {
     .main-layout-content {

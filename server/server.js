@@ -398,7 +398,7 @@ app.get("/api/requirements", (req, res) => {
                     act.id as activityDbId, act.requirementGroupId, p.name as project,
                     act.requirementUserIdentifier, act.status, act.statusDate,
                     act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
-                    act.created_at, act.release_id,
+                    act.created_at, act.release_id, act.parent_id,
                     rel.name as release_name, rel.release_date
                  FROM activities act
                  JOIN projects p ON act.project_id = p.id
@@ -441,6 +441,7 @@ app.get("/api/requirements", (req, res) => {
                     id: groupId,
                     project: row.project ? row.project.trim() : 'Unknown Project',
                     requirementUserIdentifier: row.requirementUserIdentifier ? row.requirementUserIdentifier.trim() : 'Unknown Identifier',
+                    parentId: row.parent_id, // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
                     history: [],
                     currentStatusDetails: {},
                     linkedDefects: linksMap.get(groupId) || [],
@@ -456,7 +457,8 @@ app.get("/api/requirements", (req, res) => {
                     createdAt: row.created_at,
                     releaseId: row.release_id,
                     releaseName: row.release_name,
-                    releaseDate: row.release_date
+                    releaseDate: row.release_date,
+                    parentId: row.parent_id // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
                 });
             }
         });
@@ -497,7 +499,7 @@ app.get("/api/requirements", (req, res) => {
 });
 
 app.post("/api/activities", async (req, res) => {
-    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id } = req.body;
+    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id } = req.body;
     if (!project || !requirementName || !status || !statusDate || !sprint) {
         return res.status(400).json({ error: "Missing required fields (project, requirementName, status, statusDate, sprint)" });
     }
@@ -513,12 +515,13 @@ app.post("/api/activities", async (req, res) => {
         tags = tags ? tags.trim() : null;
         const itemKey = key ? key.trim() : null;
         const finalReleaseId = release_id || null;
+        const finalParentId = parent_id || null; // <--- ΠΡΟΣΘΗΚΗ
         const now = new Date().toISOString();
 
         db.serialize(() => {
-            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, now, now], function(err) {
+            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`;
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now], function(err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -532,14 +535,47 @@ app.post("/api/activities", async (req, res) => {
                     db.run(updateOldSql, [finalRequirementGroupId, newActivityDbId], (updateOldErr) => {
                         if (updateOldErr) console.error("Error updating old current status:", updateOldErr.message);
                         
-                        scheduleQdrantSync();
-                        res.json({
-                            message: "success",
-                            data: {
-                                activityDbId: newActivityDbId, requirementGroupId: finalRequirementGroupId,
-                                project, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent: 1, type, tags, release_id: finalReleaseId
-                            }
-                        });
+                        // ΛΟΓΙΚΗ CASCADE ΓΙΑ SUB-TASKS: Αν είναι Parent, ενημερώνουμε το Sprint των παιδιών του
+                        if (!finalParentId) {
+                            const findSubtasksSql = `SELECT * FROM activities WHERE parent_id = ? AND isCurrent = 1 AND sprint != ?`;
+                            db.all(findSubtasksSql, [finalRequirementGroupId, sprint], (err, subtasks) => {
+                                if (err) {
+                                    console.error("Error finding subtasks for sprint cascade:", err.message);
+                                    return finishResponse();
+                                }
+                                if (subtasks.length === 0) return finishResponse();
+
+                                let processed = 0;
+                                subtasks.forEach(sub => {
+                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at)
+                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`;
+                                    db.run(insertSubSql, [
+                                        sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate, 
+                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now
+                                    ], function(errInsert) {
+                                        if (!errInsert) {
+                                            const newSubId = this.lastID;
+                                            db.run(`UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ? AND id != ?`, [sub.requirementGroupId, newSubId]);
+                                        }
+                                        processed++;
+                                        if (processed === subtasks.length) finishResponse();
+                                    });
+                                });
+                            });
+                        } else {
+                            finishResponse();
+                        }
+
+                        function finishResponse() {
+                            scheduleQdrantSync();
+                            res.json({
+                                message: "success",
+                                data: {
+                                    activityDbId: newActivityDbId, requirementGroupId: finalRequirementGroupId,
+                                    project, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent: 1, type, tags, release_id: finalReleaseId, parent_id: finalParentId
+                                }
+                            });
+                        }
                     });
                 });
             });
@@ -550,11 +586,9 @@ app.post("/api/activities", async (req, res) => {
 });
 
 app.put("/api/activities/:activityId", (req, res) => {
-    let { comment, statusDate, link, type, tags, release_id } = req.body;
+    let { comment, statusDate, link, type, tags, release_id, parent_id } = req.body;
     const activityDbId = req.params.activityId;
-    if (comment === undefined && statusDate === undefined && link === undefined && type === undefined && tags === undefined && release_id === undefined) {
-        return res.status(400).json({ error: "No fields to update provided" });
-    }
+    
     let fieldsToUpdate = [];
     let params = [];
     if (comment !== undefined) { fieldsToUpdate.push("comment = ?"); params.push(comment); }
@@ -563,6 +597,11 @@ app.put("/api/activities/:activityId", (req, res) => {
     if (type !== undefined) { fieldsToUpdate.push("type = ?"); params.push(type); }
     if (tags !== undefined) { fieldsToUpdate.push("tags = ?"); params.push(tags); }
     if (release_id !== undefined) { fieldsToUpdate.push("release_id = ?"); params.push(release_id); }
+    if (parent_id !== undefined) { fieldsToUpdate.push("parent_id = ?"); params.push(parent_id); }
+
+    if (fieldsToUpdate.length === 0) {
+        return res.status(400).json({ error: "No fields to update provided" });
+    }
 
     fieldsToUpdate.push("updated_at = ?");
     params.push(new Date().toISOString());
@@ -1374,7 +1413,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
         const requirementsSql = `
             SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags
             FROM activities a
-            WHERE a.release_id = ? AND a.isCurrent = 1
+            WHERE a.release_id = ? AND a.isCurrent = 1 AND a.parent_id IS NULL
         `;
 
         db.all(requirementsSql, [releaseId], (err, requirements) => {
@@ -1386,126 +1425,133 @@ app.post("/api/releases/:id/close", async (req, res) => {
             const metricsJson = JSON.stringify(metrics);
             const closedAt = new Date().toISOString();
 
-            db.serialize(() => {
-                db.run("BEGIN TRANSACTION");
+            // Τώρα φέρνουμε ΚΑΙ τα sub-tasks για να τα κάνουμε archive μαζί με τους γονείς τους
+            const allItemsToArchiveSql = `
+                SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags, a.parent_id
+                FROM activities a
+                WHERE a.isCurrent = 1 AND (a.release_id = ? OR a.parent_id IN (SELECT requirementGroupId FROM activities WHERE release_id = ? AND isCurrent = 1))
+            `;
 
-                const archiveSql = `
-                    INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                `;
-                db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function(err) {
-                    if (err) {
-                        db.run("ROLLBACK");
-                        return res.status(500).json({ error: "Failed to create archive record." });
-                    }
-                    
-                    const archiveId = this.lastID;
-                    const archiveItemsSql = `
-                        INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status)
-                        VALUES (?, ?, ?, ?)
+            db.all(allItemsToArchiveSql, [releaseId, releaseId], (err, allItems) => {
+                if (err) return res.status(500).json({ error: "DB error fetching all items to archive." });
+
+                db.serialize(() => {
+                    db.run("BEGIN TRANSACTION");
+
+                    const archiveSql = `
+                        INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     `;
-                    
-                    let itemsProcessed = 0;
-                    if (requirements.length === 0) {
-                        finalizeProcess(archiveId);
-                    } else {
-                        requirements.forEach(req => {
-                            db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status], (err) => {
-                                if (err) {
-                                    db.run("ROLLBACK");
-                                    if (!res.headersSent) {
-                                        res.status(500).json({ error: "Failed to archive requirement item." });
-                                    }
-                                    return;
-                                }
-                                itemsProcessed++;
-                                if (itemsProcessed === requirements.length) {
-                                    finalizeProcess(archiveId);
-                                }
-                            });
-                        });
-                    }
-
-                    function finalizeProcess(archiveId) {
-                        const checkFatSql = `
-                            SELECT fr.id 
-                            FROM fat_reports fr
-                            JOIN fat_periods fp ON fr.fat_period_id = fp.id
-                            JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
-                            WHERE fsr.release_id = ? AND fp.status = 'completed'
-                            ORDER BY fp.completion_date DESC
-                            LIMIT 1
+                    db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function(err) {
+                        if (err) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: "Failed to create archive record." });
+                        }
+                        
+                        const archiveId = this.lastID;
+                        const archiveItemsSql = `
+                            INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status)
+                            VALUES (?, ?, ?, ?)
                         `;
-                        db.get(checkFatSql, [releaseId], (fatErr, fatReport) => {
-                            if (fatErr) {
-                                console.error("Error checking for completed FAT reports:", fatErr.message);
-                            }
-                            if (fatReport) {
-                                db.run("UPDATE archived_releases SET fat_report_id = ? WHERE id = ?", [fatReport.id, archiveId], (updateFatErr) => {
-                                    if (updateFatErr) console.error("Error linking FAT report to new archive:", updateFatErr.message);
+                        
+                        let itemsProcessed = 0;
+                        if (allItems.length === 0) {
+                            finalizeProcess(archiveId);
+                        } else {
+                            allItems.forEach(req => {
+                                // Σώζουμε στο archive table (μπορούμε να σώσουμε και τα sub-tasks εδώ για ιστορικότητα)
+                                db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status], (err) => {
+                                    if (err) {
+                                        db.run("ROLLBACK");
+                                        if (!res.headersSent) {
+                                            res.status(500).json({ error: "Failed to archive requirement item." });
+                                        }
+                                        return;
+                                    }
+                                    itemsProcessed++;
+                                    if (itemsProcessed === allItems.length) {
+                                        finalizeProcess(archiveId);
+                                    }
                                 });
-                            }
+                            });
+                        }
 
-                            const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
-                            db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
-                                if (err) {
-                                    db.run("ROLLBACK");
-                                    if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
-                                    return;
+                        function finalizeProcess(archiveId) {
+                            const checkFatSql = `
+                                SELECT fr.id 
+                                FROM fat_reports fr
+                                JOIN fat_periods fp ON fr.fat_period_id = fp.id
+                                JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
+                                WHERE fsr.release_id = ? AND fp.status = 'completed'
+                                ORDER BY fp.completion_date DESC
+                                LIMIT 1
+                            `;
+                            db.get(checkFatSql, [releaseId], (fatErr, fatReport) => {
+                                if (fatReport) {
+                                    db.run("UPDATE archived_releases SET fat_report_id = ? WHERE id = ?", [fatReport.id, archiveId]);
                                 }
 
-                                if (closeAction === 'archive_only') {
-                                    commitTransaction();
-                                } else if (closeAction === 'archive_and_complete') {
-                                    const now = new Date().toISOString();
-                                    const statusDate = now.split('T')[0];
-                                    const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
-                                    
-                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id)
-                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)`;
-                                    const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+                                const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
+                                db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
+                                    if (err) {
+                                        db.run("ROLLBACK");
+                                        if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
+                                        return;
+                                    }
 
-                                    let activitiesProcessed = 0;
-                                    if (requirements.length === 0) {
+                                    if (closeAction === 'archive_only') {
                                         commitTransaction();
-                                    } else {
-                                        requirements.forEach(req => {
-                                            db.run(updateOldSql, [req.requirementGroupId], function(err) {
-                                                if (err) {
-                                                    db.run("ROLLBACK");
-                                                    if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
-                                                    return;
-                                                }
-                                                const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now], function(err) {
+                                    } else if (closeAction === 'archive_and_complete') {
+                                        const now = new Date().toISOString();
+                                        const statusDate = now.split('T')[0];
+                                        const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
+                                        
+                                        const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id, parent_id)
+                                                                   VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, ?)`;
+                                        const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+
+                                        let activitiesProcessed = 0;
+                                        if (allItems.length === 0) {
+                                            commitTransaction();
+                                        } else {
+                                            allItems.forEach(req => {
+                                                db.run(updateOldSql, [req.requirementGroupId], function(err) {
                                                     if (err) {
                                                         db.run("ROLLBACK");
-                                                        if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                        if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                                         return;
                                                     }
-                                                    activitiesProcessed++;
-                                                    if (activitiesProcessed === requirements.length) {
-                                                        commitTransaction();
-                                                    }
+                                                    const comment = `Item completed as part of finalizing release '${release.name}'`;
+                                                    db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function(err) {
+                                                        if (err) {
+                                                            db.run("ROLLBACK");
+                                                            if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                            return;
+                                                        }
+                                                        activitiesProcessed++;
+                                                        if (activitiesProcessed === allItems.length) {
+                                                            commitTransaction();
+                                                        }
+                                                    });
                                                 });
                                             });
-                                        });
+                                        }
                                     }
-                                }
+                                });
                             });
-                        });
-                    }
+                        }
 
-                    function commitTransaction() {
-                        db.run("COMMIT", (err) => {
-                            if (err) {
-                                if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
-                                return;
-                            }
-                            scheduleQdrantSync();
-                            if (!res.headersSent) res.json({ message: `Release '${release.name}' has been successfully finalized and archived.` });
-                        });
-                    }
+                        function commitTransaction() {
+                            db.run("COMMIT", (err) => {
+                                if (err) {
+                                    if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
+                                    return;
+                                }
+                                scheduleQdrantSync();
+                                if (!res.headersSent) res.json({ message: `Release '${release.name}' has been successfully finalized and archived.` });
+                            });
+                        }
+                    });
                 });
             });
         });
@@ -2931,10 +2977,9 @@ app.get('/api/jira/config/:project', async (req, res) => {
     }
 });
 
-app.post('/api/jira/import', async (req, res) => {
-    let { project, jql, token, importType, sprint, release_id, saveToken } = req.body;
-
-    console.log(`Starting JIRA Import for project: ${project}, Sprint: ${sprint}`);
+// --- 1. FETCH ΑΠΟ JIRA (ΔΕΝ ΣΩΖΕΙ ΣΤΗ ΒΑΣΗ, ΑΠΛΑ ΦΕΡΝΕΙ ΤΑ ΔΕΔΟΜΕΝΑ ΣΤΟ UI) ---
+app.post('/api/jira/fetch', async (req, res) => {
+    let { project, jql, token, saveToken } = req.body;
 
     if (!token) {
         try {
@@ -2950,10 +2995,6 @@ app.post('/api/jira/import', async (req, res) => {
     if (!token || !jql) {
         return res.status(400).json({ error: "Token and JQL are required." });
     }
-
-    const REQUIREMENT_TYPES = ['Change Request', 'Task', 'Story', 'Incident', 'Bug'];
-    const DEFECT_TYPES = ['Defect']; 
-    const DONE_STATUSES = ['DONE', 'CLOSED', 'RESOLVED', 'COMPLETED', 'FIXED'];
 
     try {
         if (saveToken && req.body.token) {
@@ -2972,6 +3013,7 @@ app.post('/api/jira/import', async (req, res) => {
         const jiraDomain = JIRA_BASE_URL; 
         const searchUrl = `${jiraDomain}/rest/api/2/search`;
 
+        // Ζητάμε και το 'parent' και το 'subtasks' για να χτίσουμε το δέντρο
         const jiraResponse = await fetch(searchUrl, {
             method: 'POST',
             headers: {
@@ -2980,8 +3022,8 @@ app.post('/api/jira/import', async (req, res) => {
             },
             body: JSON.stringify({
                 jql: jql,
-                maxResults: 10000, 
-                fields: ["summary", "status", "issuetype", "created", "parent", "issuelinks"],
+                maxResults: 1000, 
+                fields: ["summary", "status", "issuetype", "created", "parent", "subtasks", "issuelinks"],
                 expand: ["changelog"]
             })
         });
@@ -2990,246 +3032,167 @@ app.post('/api/jira/import', async (req, res) => {
             return res.status(jiraResponse.status).json({ error: `JIRA API Error: ${jiraResponse.statusText}` });
         }
 
-        const jiraData = await jiraResponse.json();
-        const issues = jiraData.issues || [];
-        console.log(`Fetched ${issues.length} issues from JIRA.`);
+        // ΕΔΩ ΗΤΑΝ ΤΟ ΛΑΘΟΣ: Έλειπε το parse του JSON!
+        const data = await jiraResponse.json();
+        const issues = data.issues || [];
 
-        let newCount = 0;
-        let updatedCount = 0;
-        let skippedCount = 0;
-        const processedKeysInBatch = new Set();
+        const parentsMap = new Map();
+        const orphanSubtasks = [];
 
-        for (const issue of issues) {
-            let key = issue.key;
-            let fields = issue.fields || {};
-            let summary = fields.summary ? fields.summary.trim() : "No Summary";
-            let issueType = fields.issuetype ? fields.issuetype.name.trim() : "Unknown";
-            let rawJiraStatus = fields.status ? fields.status.name.trim() : "To Do";
+        // Ορίζουμε ποια types επιτρέπονται στα Requirements
+        const VALID_REQUIREMENT_TYPES = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'];
+
+        issues.forEach(issue => {
+            const type = issue.fields.issuetype.name ? issue.fields.issuetype.name.trim() : "Unknown";
+            const isSubtask = issue.fields.issuetype.subtask || !!issue.fields.parent;
             
-            const jiraCreatedTime = fields.created ? new Date(fields.created).toISOString() : new Date().toISOString();
-
-            let lastDoneTime = null;
-            const isJiraDone = DONE_STATUSES.includes(rawJiraStatus.toUpperCase());
-
-            if (isJiraDone && issue.changelog && issue.changelog.histories) {
-                const histories = issue.changelog.histories.sort((a, b) => new Date(b.created) - new Date(a.created));
-                
-                for (const history of histories) {
-                    const statusItem = history.items.find(item => item.field === 'status');
-                    if (statusItem) {
-                        const toStatus = statusItem.toString ? statusItem.toString.toUpperCase() : '';
-                        if (DONE_STATUSES.includes(toStatus)) {
-                            lastDoneTime = new Date(history.created).toISOString();
-                            break; 
-                        }
-                    }
-                }
-                
-                if (!lastDoneTime) {
-                    lastDoneTime = new Date().toISOString();
-                }
+            // Αν ΔΕΝ είναι στα επιτρεπόμενα ΚΑΙ ΔΕΝ είναι subtask, το αγνοούμε
+            if (!VALID_REQUIREMENT_TYPES.includes(type) && !isSubtask) {
+                return;
             }
+            
+            const itemData = {
+                key: issue.key,
+                summary: issue.fields.summary ? issue.fields.summary.trim() : "No Summary",
+                type: issue.fields.issuetype.name ? issue.fields.issuetype.name.trim() : "Unknown",
+                status: issue.fields.status ? issue.fields.status.name.trim() : "To Do",
+                created: issue.fields.created,
+                link: `${jiraDomain}/browse/${issue.key}`,
+                rawIssue: issue 
+            };
 
-            let timeForUpdatedAt = isJiraDone && lastDoneTime ? lastDoneTime : new Date().toISOString();
-
-            let isFromSubtask = false;
-
-            if (fields.parent) {
-                if (fields.parent.fields && fields.parent.fields.issuetype) {
-                    key = fields.parent.key;
-                    summary = fields.parent.fields.summary ? fields.parent.fields.summary.trim() : summary;
-                    issueType = fields.parent.fields.issuetype.name ? fields.parent.fields.issuetype.name.trim() : issueType;
-                    rawJiraStatus = fields.parent.fields.status ? fields.parent.fields.status.name.trim() : rawJiraStatus;
-                    isFromSubtask = true;
+            if (isSubtask) {
+                const parentKey = issue.fields.parent ? issue.fields.parent.key : null;
+                if (parentKey) {
+                    if (!parentsMap.has(parentKey)) {
+                        parentsMap.set(parentKey, { key: parentKey, isPlaceholder: true, subtasks: [] });
+                    }
+                    parentsMap.get(parentKey).subtasks.push(itemData);
                 } else {
-                    continue; 
+                    orphanSubtasks.push(itemData);
+                }
+            } else {
+                if (parentsMap.has(issue.key)) {
+                    // Αν υπήρχε ήδη σαν placeholder από κάποιο subtask, το ανανεώνουμε
+                    const existing = parentsMap.get(issue.key);
+                    parentsMap.set(issue.key, { ...itemData, subtasks: existing.subtasks });
+                } else {
+                    parentsMap.set(issue.key, { ...itemData, subtasks: [] });
                 }
             }
+        });
 
-            if (processedKeysInBatch.has(key)) continue;
-
-            const webLink = `${jiraDomain}/browse/${key}`;
-            let isMatch = false;
-
-            if (importType === 'requirements') {
-                if (REQUIREMENT_TYPES.includes(issueType)) {
-                    isMatch = true;
-                    processedKeysInBatch.add(key);
-
-                    const groupRow = await new Promise((resolve) => {
-                        db.get("SELECT requirementGroupId FROM activities WHERE key = ? LIMIT 1", [key], (err, row) => resolve(row));
-                    });
-
-                    let existing = null;
-                    if (groupRow) {
-                        existing = await new Promise((resolve) => {
-                            db.get("SELECT * FROM activities WHERE requirementGroupId = ? AND isCurrent = 1", [groupRow.requirementGroupId], (err, row) => resolve(row));
-                        });
-                    }
-
-                    let localStatus = "To Do"; 
-                    let currentGroupId = null;
-
-                    if (existing) {
-                        if (!isFromSubtask) {
-                            await new Promise((resolve, reject) => {
-                                const updateSql = `UPDATE activities SET 
-                                    release_id = ?, 
-                                    sprint = ?, 
-                                    requirementUserIdentifier = ?, 
-                                    link = ?, 
-                                    updated_at = ? 
-                                    WHERE id = ?`;
-                                
-                                db.run(updateSql, 
-                                    [release_id || null, sprint, summary, webLink, timeForUpdatedAt, existing.id], 
-                                    function(err) {
-                                        if (err) reject(err);
-                                        else resolve();
-                                    }
-                                );
-                            });
-                        }
-
-                        skippedCount++;
-                        currentGroupId = existing.requirementGroupId;
-                    } else {
-                        await new Promise((resolve, reject) => {
-                            const insertSql = `INSERT INTO activities (
-                                project_id, requirementUserIdentifier, key, status, statusDate, 
-                                sprint, type, link, isCurrent, created_at, updated_at, release_id
-                            ) VALUES (
-                                (SELECT id FROM projects WHERE name = ?), ?, ?, ?, date('now'), 
-                                ?, ?, ?, 1, ?, ?, ?
-                            )`;
-                            db.run(insertSql, 
-                                [project, summary, key, localStatus, sprint, issueType, webLink, jiraCreatedTime, timeForUpdatedAt, release_id], 
-                                function(err) {
-                                    if (err) reject(err);
-                                    else {
-                                        const newId = this.lastID;
-                                        currentGroupId = newId;
-                                        db.run(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [newId, newId], () => resolve());
-                                    }
-                                }
-                            );
-                        });
-                        newCount++;
-                    }
-
-                    if (currentGroupId && fields.issuelinks && fields.issuelinks.length > 0) {
-                        for (const linkItem of fields.issuelinks) {
-                            const linkedIssue = linkItem.inwardIssue || linkItem.outwardIssue;
-                            if (linkedIssue && linkedIssue.key) {
-                                const defectKeySearch = `%${linkedIssue.key}`;
-                                const defectRow = await new Promise((resolve) => {
-                                    db.get("SELECT id FROM defects WHERE link LIKE ? LIMIT 1", [defectKeySearch], (err, row) => resolve(row));
-                                });
-                                if (defectRow) {
-                                    await new Promise((resolve) => {
-                                        db.run("INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)", 
-                                            [defectRow.id, currentGroupId], (err) => resolve()
-                                        );
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            } 
-            else if (importType === 'defects') {
-                if (DEFECT_TYPES.includes(issueType)) {
-                    isMatch = true;
-                    processedKeysInBatch.add(key);
-
-                    const existing = await new Promise((resolve) => {
-                        db.get("SELECT id, status, fixed_date FROM defects WHERE title = ? AND project_id = (SELECT id FROM projects WHERE name = ?)", [summary, project], (err, row) => resolve(row));
-                    });
-
-                    let localDefectStatus = "Assigned to Developer"; 
-                    let currentDefectId = null;
-                    let fixedDateValue = null;
-
-                    if (isJiraDone) {
-                        localDefectStatus = "Done";
-                        fixedDateValue = lastDoneTime || jiraCreatedTime; 
-                    } else {
-                        if (rawJiraStatus.toLowerCase().includes('test')) {
-                            localDefectStatus = "Assigned to Tester";
-                        } else {
-                            localDefectStatus = "Assigned to Developer";
-                        }
-                    }
-
-                    const now = new Date().toISOString();
-
-                    if (existing) {
-                        let statusToUpdate = localDefectStatus;
-                        let fixedDateToUpdate = fixedDateValue;
-
-                        if (localDefectStatus !== 'Done') {
-                            statusToUpdate = existing.status; 
-                            fixedDateToUpdate = existing.fixed_date;
-                        } 
-                        
-                        await new Promise((resolve) => {
-                            db.run(`UPDATE defects SET status = ?, link = ?, created_date = ?, created_at = ?, fixed_date = ?, updated_at = ? WHERE id = ?`, 
-                                [statusToUpdate, webLink, jiraCreatedTime, jiraCreatedTime, fixedDateToUpdate, now, existing.id], 
-                                () => resolve()
-                            );
-                        });
-                        updatedCount++;
-                        currentDefectId = existing.id;
-                    } else {
-                        const insertDefectSql = `INSERT INTO defects (
-                            project_id, title, area, status, link, created_date, is_fat_defect, created_at, fixed_date, updated_at
-                        ) VALUES (
-                            (SELECT id FROM projects WHERE name = ?), ?, 'Imported', ?, ?, ?, 0, ?, ?, ?
-                        )`;
-                        await new Promise((resolve, reject) => {
-                            db.run(insertDefectSql, 
-                                [project, summary, localDefectStatus, webLink, jiraCreatedTime, jiraCreatedTime, fixedDateValue, now], 
-                                function(err) {
-                                    if(err) reject(err);
-                                    else {
-                                        currentDefectId = this.lastID;
-                                        resolve();
-                                    }
-                                }
-                            );
-                        });
-                        newCount++;
-                    }
-
-                    if (currentDefectId && fields.issuelinks && fields.issuelinks.length > 0) {
-                        for (const linkItem of fields.issuelinks) {
-                            const linkedIssue = linkItem.inwardIssue || linkItem.outwardIssue;
-                            if (linkedIssue && linkedIssue.key) {
-                                const reqRow = await new Promise((resolve) => {
-                                    db.get("SELECT requirementGroupId FROM activities WHERE key = ? LIMIT 1", [linkedIssue.key], (err, row) => resolve(row));
-                                });
-                                if (reqRow) {
-                                    await new Promise((resolve) => {
-                                        db.run("INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)", 
-                                            [currentDefectId, reqRow.requirementGroupId], (err) => resolve()
-                                        );
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!isMatch) {
-                skippedCount++;
-            }
-        }
+        // Φιλτράρουμε τα placeholders (parents που δεν ήρθαν στο JQL αλλά ήρθαν τα subtasks τους)
+        const finalHierarchy = Array.from(parentsMap.values()).filter(p => !p.isPlaceholder);
 
         res.json({ 
-            message: `Import complete. Added: ${newCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}`,
-            data: { newCount, updatedCount, skippedCount }
+            message: "Fetched successfully",
+            data: {
+                hierarchy: finalHierarchy,
+                orphans: orphanSubtasks
+            }
         });
+
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+});
+
+// --- 2. IMPORT ΣΤΗ ΒΑΣΗ (ΔΕΧΕΤΑΙ ΤΗΝ ΕΠΙΛΕΓΜΕΝΗ ΛΙΣΤΑ ΑΠΟ ΤΟ UI) ---
+app.post('/api/jira/import', async (req, res) => {
+    const { project, sprint, release_id, itemsToImport } = req.body;
+
+    if (!project || !itemsToImport || !Array.isArray(itemsToImport)) {
+        return res.status(400).json({ error: "Project and itemsToImport are required." });
+    }
+
+    const DONE_STATUSES = ['DONE', 'CLOSED', 'RESOLVED', 'COMPLETED', 'FIXED'];
+
+    try {
+        const projectId = await getProjectId(project);
+        const now = new Date().toISOString();
+        const statusDate = now.split('T')[0];
+
+        let importedParents = 0;
+        let importedSubtasks = 0;
+        let skipped = 0;
+
+        // Παίρνουμε τα υπάρχοντα keys για να μην διπλο-εισάγουμε
+        const existingRows = await dbAll("SELECT key FROM activities WHERE project_id = ?", [projectId]);
+        const existingKeys = new Set(existingRows.map(r => r.key).filter(Boolean));
+
+        // Helper function για να τρέχουμε db.run με Promises
+        const runQuery = (sql, params) => {
+            return new Promise((resolve, reject) => {
+                db.run(sql, params, function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                });
+            });
+        };
+
+        const insertSql = `INSERT INTO activities (
+            project_id, requirementUserIdentifier, key, status, statusDate, 
+            sprint, type, link, isCurrent, created_at, updated_at, release_id, parent_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`;
+
+        await runQuery("BEGIN TRANSACTION", []);
+
+        try {
+            for (const parentItem of itemsToImport) {
+                if (existingKeys.has(parentItem.key)) {
+                    skipped++;
+                    continue;
+                }
+
+                let appStatus = 'To Do';
+                if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
+
+                // 1. Insert Parent
+                const parentDbId = await runQuery(insertSql, [
+                    projectId, parentItem.summary, parentItem.key, appStatus, statusDate, 
+                    sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
+                ]);
+                importedParents++;
+
+                // 2. Update Parent requirementGroupId
+                await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
+
+                // 3. Insert Sub-tasks
+                if (parentItem.selectedSubtasks && parentItem.selectedSubtasks.length > 0) {
+                    for (const subtask of parentItem.selectedSubtasks) {
+                        if (existingKeys.has(subtask.key)) {
+                            skipped++;
+                            continue;
+                        }
+
+                        let subStatus = 'To Do';
+                        if (DONE_STATUSES.includes(subtask.status.toUpperCase())) subStatus = 'Done';
+
+                        const subDbId = await runQuery(insertSql, [
+                            projectId, subtask.summary, subtask.key, subStatus, statusDate, 
+                            sprint, subtask.type, subtask.link, now, now, release_id || null, parentDbId
+                        ]);
+                        importedSubtasks++;
+
+                        await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [subDbId, subDbId]);
+                    }
+                }
+            }
+
+            await runQuery("COMMIT", []);
+            scheduleQdrantSync();
+            
+            res.json({ 
+                message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Skipped ${skipped} existing.`,
+                data: { importedParents, importedSubtasks, skipped }
+            });
+
+        } catch (transactionError) {
+            await runQuery("ROLLBACK", []);
+            throw transactionError;
+        }
 
     } catch (error) {
         console.error("Import Error:", error);
@@ -3405,7 +3368,7 @@ app.post("/api/jira/import/defects", async (req, res) => {
             }
 
             const title = issue.fields.summary;
-            const description = issue.fields.description || "";
+            const description = null;
             const jiraStatus = issue.fields.status.name;
             
             let appStatus = 'Assigned to Developer';

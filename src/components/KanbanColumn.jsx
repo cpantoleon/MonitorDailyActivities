@@ -4,11 +4,15 @@ import KanbanCard from './KanbanCard';
 const KanbanColumn = ({
   title,
   requirements,
+  allRequirements,
   onShowHistory,
   onEditRequirement,
   onDeleteRequirement,
   onDragStart,
-  onDrop
+  onDrop,
+  focusedFamilyId,
+  setFocusedFamilyId,
+  onAddSubtask // <--- ΠΡΕΠΕΙ ΝΑ ΥΠΑΡΧΕΙ ΕΔΩ
 }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
@@ -16,22 +20,16 @@ const KanbanColumn = ({
   const handleDragEnter = (e) => {
     e.preventDefault();
     dragCounter.current++;
-    if (dragCounter.current === 1) {
-      setIsDraggedOver(true);
-    }
+    if (dragCounter.current === 1) setIsDraggedOver(true);
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
     dragCounter.current--;
-    if (dragCounter.current === 0) {
-      setIsDraggedOver(false);
-    }
+    if (dragCounter.current === 0) setIsDraggedOver(false);
   };
   
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const handleDragOver = (e) => e.preventDefault();
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -59,10 +57,14 @@ const KanbanColumn = ({
           <KanbanCard
             key={req.id}
             requirement={req}
+            allRequirements={allRequirements}
             onShowHistory={onShowHistory}
             onEditRequirement={onEditRequirement}
             onDeleteRequirement={onDeleteRequirement}
             onDragStart={onDragStart}
+            focusedFamilyId={focusedFamilyId}
+            setFocusedFamilyId={setFocusedFamilyId}
+            onAddSubtask={onAddSubtask} // <--- ΚΑΙ ΝΑ ΠΕΡΝΑΕΙ ΣΤΗΝ ΚΑΡΤΑ ΕΔΩ
           />
         ))}
       </div>

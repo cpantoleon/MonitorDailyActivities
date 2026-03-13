@@ -73,7 +73,7 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
 
 const SprintActivitiesPage = ({
   projects, selectedProject, onSelectProject, availableSprints, selectedSprint, onSelectSprint,
-  requirementQuery, onQueryChange, onSearch, onClear, onSuggestionSelect, searchSuggestions,
+  requirementQuery, onQueryChange, onSearch, onClear, onSuggestionSelect, searchSuggestions,onAddSubtask,
   onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenJiraImportModal, onOpenAddReleaseModal,
   onOpenEditReleaseModal, onOpenEditProjectModal, onToggleFilterSidebar, isSearching, displayableRequirements,
   onShowHistory, onEditRequirement, onDeleteRequirement, onStatusUpdateRequest, projectReleases,
@@ -370,7 +370,16 @@ const SprintActivitiesPage = ({
         <div className="empty-column-message">No results found for your search.</div>
       )}
       
-      <KanbanBoard requirements={displayableRequirements} onShowHistory={onShowHistory} onEditRequirement={onEditRequirement} onDeleteRequirement={onDeleteRequirement} isSearching={isSearching} onStatusUpdateRequest={onStatusUpdateRequest} />
+      <KanbanBoard 
+        requirements={displayableRequirements} 
+        allRequirements={allProcessedRequirements} // <--- ΠΡΟΣΘΗΚΗ
+        onShowHistory={onShowHistory} 
+        onEditRequirement={onEditRequirement} 
+        onDeleteRequirement={onDeleteRequirement} 
+        isSearching={isSearching} 
+        onStatusUpdateRequest={onStatusUpdateRequest} 
+        onAddSubtask={onAddSubtask} // <--- ΠΡΟΣΘΗΚΗ
+      />
     </div>
   );
 };

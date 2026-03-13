@@ -54,6 +54,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 key TEXT,
                 isCurrent INTEGER DEFAULT 0,
                 release_id INTEGER,
+                parent_id INTEGER DEFAULT NULL,
                 created_at TEXT,
                 updated_at TEXT,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -353,6 +354,23 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                             console.error("Error adding label column to sat_bugs:", alterErr.message);
                         } else {
                             console.log("Column 'label' added to sat_bugs table.");
+                        }
+                    });
+                }
+            });
+
+            db.all("PRAGMA table_info(activities)", (err, columns) => {
+                if (err) {
+                    console.error("Error fetching activities table info:", err.message);
+                    return;
+                }
+                const hasParentIdColumn = columns.some(col => col.name === 'parent_id');
+                if (!hasParentIdColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN parent_id INTEGER DEFAULT NULL", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding parent_id column to activities:", alterErr.message);
+                        } else {
+                            console.log("Column 'parent_id' added to activities table.");
                         }
                     });
                 }

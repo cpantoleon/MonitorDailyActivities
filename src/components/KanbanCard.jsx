@@ -1,32 +1,85 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Επαγγελματικό SVG Icon (Μάτι)
+const FocusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+);
+
+const getTypeClass = (type) => {
+  if (!type) return 'default';
+  const lowerType = type.toLowerCase();
+  if (lowerType.includes('bug') || lowerType.includes('defect')) return 'bug';
+  if (lowerType.includes('story')) return 'story';
+  if (lowerType.includes('task') && !lowerType.includes('sub')) return 'task';
+  if (lowerType.includes('sub-task') || lowerType.includes('subtask')) return 'sub-task';
+  if (lowerType.includes('change') || lowerType.includes('cr')) return 'change-request';
+  if (lowerType.includes('incident')) return 'incident';
+  return 'default';
+};
+
 const KanbanCard = React.memo(({
   requirement,
+  allRequirements,
   onShowHistory,
   onEditRequirement,
   onDeleteRequirement,
-  onDragStart
+  onDragStart,
+  focusedFamilyId,
+  setFocusedFamilyId,
+  onAddSubtask
 }) => {
   const { comment, link, type, tags, releaseName, releaseDate } = requirement.currentStatusDetails;
   const navigate = useNavigate();
 
+  // Υπολογισμοί για Sub-tasks & Focus Mode
+  const isSubtask = !!requirement.parentId;
+  
+  // Ελέγχουμε αν αυτή η κάρτα (ως Parent) έχει παιδιά
+  const hasSubtasks = allRequirements ? allRequirements.some(r => r.parentId === requirement.id) : false;
+  
+  // Το μάτι θα φαίνεται ΜΟΝΟ αν είναι subtask Ή αν είναι parent που έχει subtasks
+  const showFocusIcon = isSubtask || hasSubtasks;
+
+  const myFamilyId = isSubtask ? String(requirement.parentId) : String(requirement.id);
+  const currentFocusId = focusedFamilyId ? String(focusedFamilyId) : null;
+  
+  const isFocused = currentFocusId === myFamilyId;
+  let focusClass = '';
+  if (currentFocusId) {
+      if (isFocused) {
+          focusClass = 'focus-active ' + (isSubtask ? 'focus-child' : 'focus-parent');
+      }
+  }
+
+  let parentName = "Unknown Parent";
+  if (isSubtask && allRequirements) {
+      const parent = allRequirements.find(r => String(r.id) === String(requirement.parentId));
+      if (parent) parentName = parent.requirementUserIdentifier;
+  }
+
+  const handleFocusToggle = (e) => {
+      e.stopPropagation();
+      if (focusedFamilyId === myFamilyId) {
+          setFocusedFamilyId(null); 
+      } else {
+          setFocusedFamilyId(myFamilyId); 
+      }
+  };
+
   const handleDefectClick = (project, defect) => {
     let url = `/defects?d_project=${encodeURIComponent(project)}&highlight=${defect.id}`;
-    if (defect.status === 'Closed') {
-      url += '&view=closed';
-    }
+    if (defect.status === 'Closed') url += '&view=closed';
     navigate(url);
   };
 
   const handleDragStart = (e, req) => {
     onDragStart(e, req);
-    
     const draggedElement = e.currentTarget;
-    
-    setTimeout(() => {
-      draggedElement.classList.add('dragging');
-    }, 0);
+    setTimeout(() => { draggedElement.classList.add('dragging'); }, 0);
   };
 
   const handleDragEnd = (e) => {
@@ -40,53 +93,69 @@ const KanbanCard = React.memo(({
 
   const getDefectStatusClass = (status) => {
     switch (status) {
-      case 'Closed':
-        return 'closed';
-      case 'Done':
-        return 'done';
-      default:
-        return 'open';
+      case 'Closed': return 'closed';
+      case 'Done': return 'done';
+      default: return 'open';
     }
   };
 
   return (
     <div 
       id={`req-card-${requirement.id}`}
-      className="kanban-card"
+      className={`kanban-card ${focusClass}`}
       draggable="true"
       onDragStart={(e) => handleDragStart(e, requirement)}
       onDragEnd={handleDragEnd}
       style={{ position: 'relative' }}
     >
       <div style={{
-          position: 'absolute',
-          top: '8px',
-          right: '8px',
-          cursor: 'grab',
-          color: 'var(--text-secondary)',
-          opacity: 0.4,
-          fontSize: '14px',
-          lineHeight: 1,
-          userSelect: 'none'
+          position: 'absolute', top: '8px', right: '8px', cursor: 'grab',
+          color: 'var(--text-secondary)', opacity: 0.4, fontSize: '14px',
+          lineHeight: 1, userSelect: 'none'
       }} title="Drag to move">
         ⋮⋮
       </div>
+
       <div id={`kanban-card-main-content-${requirement.id}`} className="kanban-card-main-content">
+        
+        {/* Top Header: Εδώ μπαίνει το Μάτι (αριστερά) */}
+        <div className="card-header-top" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            {showFocusIcon && (
+                <button 
+                    type="button"
+                    className={`focus-toggle-btn ${isFocused ? 'active' : ''}`} 
+                    onClick={handleFocusToggle}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title={isFocused ? "Remove Focus" : "Highlight Family (Parent & Sub-tasks)"}
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        color: isFocused ? 'var(--accent-color)' : 'var(--text-secondary)',
+                        padding: 0,
+                        margin: 0
+                    }}
+                >
+                    <FocusIcon />
+                </button>
+            )}
+        </div>
+
         <strong id={`requirement-identifier-${requirement.id}`}>{requirement.requirementUserIdentifier}</strong>
 
         <div id={`kanban-card-details-${requirement.id}`} className="kanban-card-details">
-          {releaseName && (
+          {!isSubtask && releaseName && (
             <p id={`card-detail-item-release-${requirement.id}`} className="card-detail-item">
               <span className="detail-label">Release:</span>
               <span className="detail-value">{releaseName} (Due: {formatDate(releaseDate)})</span>
             </p>
           )}
 
+          {/* ΕΔΩ ΕΙΝΑΙ Η ΑΛΛΑΓΗ ΓΙΑ ΤΟ TYPE BADGE */}
           {type && (
-            <p id={`card-detail-item-type-${requirement.id}`} className="card-detail-item">
+            <div id={`card-detail-item-type-${requirement.id}`} className="card-detail-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
               <span className="detail-label">Type:</span>
-              <span className="detail-value">{type}</span>
-            </p>
+              <span className={`type-badge ${getTypeClass(type)}`}>{type}</span>
+            </div>
           )}
 
           {tags && (
@@ -112,7 +181,7 @@ const KanbanCard = React.memo(({
             </p>
           )}
 
-          {requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
+          {!isSubtask && requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
             <div id={`card-detail-item-defects-${requirement.id}`} className="card-detail-item">
               <span className="detail-label">Linked Defects:</span>
               <div id={`linked-items-container-${requirement.id}`} className="linked-items-container">
@@ -130,12 +199,24 @@ const KanbanCard = React.memo(({
               </div>
             </div>
           )}
-
-          {!releaseName && !comment && !link && !type && !tags && (!requirement.linkedDefects || requirement.linkedDefects.length === 0) && (
-            <p id={`card-detail-item-empty-${requirement.id}`} className="card-detail-item-empty">No additional details.</p>
-          )}
         </div>
       </div>
+
+      {!isSubtask && (
+          <button 
+            type="button"
+            className="add-subtask-btn" 
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onAddSubtask(requirement);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="Create a new sub-task under this item"
+          >
+            + Add Sub-task
+          </button>
+      )}
 
       <div id={`kanban-card-buttons-container-${requirement.id}`} className="kanban-card-buttons-container">
         <button 

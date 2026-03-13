@@ -9,10 +9,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
 
+  // FIX: Αφαιρέσαμε το `formData` από τα dependencies. 
+  // Τώρα το tab γίνεται reset ΜΟΝΟ όταν ανοίγει το modal (isOpen αλλάζει σε true).
   useEffect(() => {
     if (isOpen) {
       setInitialFormData(formData);
-      setActiveTab('core'); // Reset to first tab on open
+      setActiveTab('core'); 
     }
   }, [isOpen]);
 
@@ -57,11 +59,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
         return;
     }
     if (!formData.requirementName || !formData.requirementName.trim()) {
-        alert("Requirement Name is required.");
+        alert(formData.parent_id ? "Sub-task Name is required." : "Requirement Name is required.");
         setActiveTab('core');
         return;
     }
-    if (!formData.type || !formData.type.trim()) {
+    // Το Type είναι υποχρεωτικό ΜΟΝΟ αν δεν είναι sub-task
+    if (!formData.parent_id && (!formData.type || !formData.type.trim())) {
         alert("Type is required.");
         setActiveTab('core');
         return;
@@ -94,11 +97,13 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     </div>
   );
 
+  const isSubtask = !!formData.parent_id;
+
   return (
     <div id="add-new-requirement-modal-wrapper-id">
       <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
         <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
-          <h2>Add New Requirement</h2>
+          <h2>{isSubtask ? 'Add New Sub-task' : 'Add New Requirement'}</h2>
           
           <div className="modal-tabs">
               <button 
@@ -129,26 +134,30 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                     value={formData.project}
                     onChange={onFormChange}
                     options={projectOptions}
-                    disabled={projects.length === 0}
+                    disabled={projects.length === 0 || isSubtask} // Κλειδωμένο στο project του γονέα αν είναι subtask
                     placeholder={projects.length === 0 ? "-- No projects available --" : "-- Select a Project --"}
                   />
                 </div>
                 <div id="form-group-requirement-name-id" className="form-group">
-                  <label htmlFor="newReqName">Requirement Name:</label>
-                  <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder="e.g., User Login Feature TEST-INT-01" />
+                  <label htmlFor="newReqName">{isSubtask ? 'Sub-task Name:' : 'Requirement Name:'}</label>
+                  <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder={isSubtask ? "e.g., Update database schema" : "e.g., User Login Feature TEST-INT-01"} />
                 </div>
-                <div id="form-group-type-id" className="form-group">
-                  {/* REMOVED .optional-label here to make the red asterisk appear */}
-                  <label id="newReqType-label" htmlFor="newReqType-button">Type:</label>
-                  <CustomDropdown
-                    id="newReqType"
-                    name="type"
-                    value={formData.type}
-                    onChange={onFormChange}
-                    options={typeOptions}
-                    placeholder="-- Select Type --"
-                  />
-                </div>
+                
+                {/* Κρύβουμε το Type αν είναι Sub-task */}
+                {!isSubtask && (
+                  <div id="form-group-type-id" className="form-group">
+                    <label id="newReqType-label" htmlFor="newReqType-button">Type:</label>
+                    <CustomDropdown
+                      id="newReqType"
+                      name="type"
+                      value={formData.type}
+                      onChange={onFormChange}
+                      options={typeOptions}
+                      placeholder="-- Select Type --"
+                    />
+                  </div>
+                )}
+
                 <div id="form-group-comment-id" className="form-group">
                   <label htmlFor="newReqComment" className="optional-label">Comment:</label>
                   <textarea id="newReqComment" name="comment" value={formData.comment} onChange={onFormChange} rows="3" placeholder="Initial comment (optional)" />
@@ -167,36 +176,47 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                     options={statusOptions}
                   />
                 </div>
-                <div id="form-group-sprint-id" className="form-group">
-                  <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
-                  <CustomDropdown
-                    id="newReqSprint"
-                    name="sprint"
-                    value={formData.sprint}
-                    onChange={onFormChange}
-                    options={sprintNumberOptions}
-                    disabled={formData.isBacklog}
-                  />
-                </div>
-                <div id="form-group-backlog-toggle-id" className="form-group new-project-toggle">
-                  <input type="checkbox" id="isBacklogCheckbox" name="isBacklog" checked={formData.isBacklog} onChange={onFormChange} />
-                  <label htmlFor="isBacklogCheckbox" className="checkbox-label optional-label">Assign to Backlog</label>
-                </div>
-                <div id="form-group-release-id" className="form-group">
-                  <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <label id="newReqRelease-label" htmlFor="newReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
-                    <Tooltip content={releaseTooltipContent} className="release" />
+                
+                {/* Κρύβουμε το Sprint και το Backlog αν είναι Sub-task */}
+                {!isSubtask && (
+                  <>
+                    <div id="form-group-sprint-id" className="form-group">
+                      <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
+                      <CustomDropdown
+                        id="newReqSprint"
+                        name="sprint"
+                        value={formData.sprint}
+                        onChange={onFormChange}
+                        options={sprintNumberOptions}
+                        disabled={formData.isBacklog}
+                      />
+                    </div>
+                    <div id="form-group-backlog-toggle-id" className="form-group new-project-toggle">
+                      <input type="checkbox" id="isBacklogCheckbox" name="isBacklog" checked={formData.isBacklog} onChange={onFormChange} />
+                      <label htmlFor="isBacklogCheckbox" className="checkbox-label optional-label">Assign to Backlog</label>
+                    </div>
+                  </>
+                )}
+                
+                {/* Κρύβουμε το Release αν είναι Sub-task */}
+                {!isSubtask && (
+                  <div id="form-group-release-id" className="form-group">
+                    <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <label id="newReqRelease-label" htmlFor="newReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
+                      <Tooltip content={releaseTooltipContent} className="release" />
+                    </div>
+                    <CustomDropdown
+                      id="newReqRelease"
+                      name="release_id"
+                      value={formData.release_id}
+                      onChange={onFormChange}
+                      options={releaseOptions}
+                      disabled={!formData.project || releaseOptions.length === 0}
+                      placeholder={!formData.project ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
+                    />
                   </div>
-                  <CustomDropdown
-                    id="newReqRelease"
-                    name="release_id"
-                    value={formData.release_id}
-                    onChange={onFormChange}
-                    options={releaseOptions}
-                    disabled={!formData.project || releaseOptions.length === 0}
-                    placeholder={!formData.project ? "-- Select a project first --" : (releaseOptions.length === 0 ? "-- No releases for this project --" : "-- Select a Release --")}
-                  />
-                </div>
+                )}
+
                 <div id="form-group-tags-id" className="form-group">
                   <label htmlFor="newReqTags" className="optional-label">Tags:</label>
                   <input type="text" id="newReqTags" name="tags" value={formData.tags} onChange={onFormChange} placeholder="e.g., Sprint 4, Project Tools" />
@@ -221,7 +241,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
               
               <button type="submit" className="modal-button-save">
-                 {activeTab === 'core' ? 'Next: Tracking & Links' : 'Add Requirement'}
+                 {activeTab === 'core' ? 'Next: Tracking & Links' : (isSubtask ? 'Add Sub-task' : 'Add Requirement')}
               </button>
             </div>
           </form>

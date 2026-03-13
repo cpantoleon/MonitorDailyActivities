@@ -55,7 +55,10 @@ function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newReqFormState, setNewReqFormState] = useState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '' });
+  
+  // ΠΡΟΣΘΗΚΗ: parent_id: null στο αρχικό state
+  const [newReqFormState, setNewReqFormState] = useState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null });
+  
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -107,7 +110,6 @@ const [filterOptions, setFilterOptions] = useState({
     let needsReplace = false;
 
     if (location.pathname === '/sprint-board') {
-        // Restore URL from session storage if returning to the board without parameters
         if (!projectParam) {
             const storedProject = sessionStorage.getItem('sprintBoardProject');
             const storedSprint = sessionStorage.getItem('sprintBoardSprint');
@@ -123,7 +125,6 @@ const [filterOptions, setFilterOptions] = useState({
             }
         }
 
-        // Sync state from URL (or restored session)
         if ((projectParam || '') !== selectedProject) {
             setSelectedProject(projectParam || '');
             if (projectParam) sessionStorage.setItem('sprintBoardProject', projectParam);
@@ -136,7 +137,6 @@ const [filterOptions, setFilterOptions] = useState({
             else sessionStorage.removeItem('sprintBoardSprint');
         }
     } else {
-        // If we are on another route (like /releases) that uses 'project', we still sync state
         if (projectParam !== null && projectParam !== selectedProject) {
             setSelectedProject(projectParam);
         }
@@ -216,7 +216,7 @@ const [filterOptions, setFilterOptions] = useState({
     if (visibleSprints.length > 0) {
         const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
         if (nonArchivedSprints.length > 0) {
-            sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1]; // Τελευταίο ενεργό
+            sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1]; 
         } else {
             sprintToSelect = visibleSprints[0];
         }
@@ -234,7 +234,6 @@ const [filterOptions, setFilterOptions] = useState({
 
   }, [allProcessedRequirements, showArchivedSprints, navigate]);
 
-  // Όταν ο χρήστης αλλάζει χειροκίνητα Sprint
   const handleManualSprintSelect = useCallback((sprint) => {
     setSelectedSprint(sprint);
     if (sprint) {
@@ -248,7 +247,6 @@ const [filterOptions, setFilterOptions] = useState({
         navigate(newUrl, { replace: true });
     }
   }, [selectedProject, navigate]);
-
 
   // Effect για highlighting
   useEffect(() => {
@@ -337,7 +335,7 @@ const [filterOptions, setFilterOptions] = useState({
       showMainMessage(`Successfully created: "${newItemDetails.title}"`, 'success');
       
       if (newItemDetails.project && newItemDetails.sprint) {
-         handleManualProjectSelect(newItemDetails.project); // Forces selection of project and latest sprint safely
+         handleManualProjectSelect(newItemDetails.project); 
       }
   }, [fetchRequirementsOnly, showMainMessage, handleManualProjectSelect]);
 
@@ -398,9 +396,7 @@ const [filterOptions, setFilterOptions] = useState({
       if (selectedReleases.length > 0) {
           filteredRequirements = filteredRequirements.filter(req => {
               const rId = req.currentStatusDetails.releaseId;
-              // If req has no release ID, keep it ONLY if 'no-release' is selected
               if (!rId) return selectedReleases.includes('no-release');
-              // Otherwise check if the ID is in the list
               return selectedReleases.includes(rId);
           });
       }
@@ -516,16 +512,32 @@ const [filterOptions, setFilterOptions] = useState({
   const handleOpenEditModal = useCallback((req) => { setEditingRequirement(req); setIsEditModalOpen(true); }, []);
   const handleCloseEditModal = useCallback(() => { setIsEditModalOpen(false); setEditingRequirement(null); }, []);
   
-  const handleOpenAddModal = useCallback(() => {
+  // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleOpenAddModal για να δέχεται parentReq
+  const handleOpenAddModal = useCallback((eventOrReq = null) => {
+    const isEvent = eventOrReq && eventOrReq.nativeEvent;
+    const parentReq = isEvent ? null : eventOrReq;
+    const isParent = parentReq && parentReq.id; 
+
     setNewReqFormState({
-      project: selectedProject || '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: ''
+      project: isParent ? parentReq.project : (selectedProject || ''), 
+      requirementName: '', 
+      status: 'To Do', 
+      sprint: isParent ? (parentReq.currentStatusDetails.sprint === 'Backlog' ? '1' : parentReq.currentStatusDetails.sprint.replace('Sprint ', '')) : '1', 
+      comment: '', 
+      link: '', 
+      isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false, 
+      type: isParent ? 'Sub-task' : '', 
+      tags: '', 
+      release_id: isParent ? parentReq.currentStatusDetails.releaseId : '',
+      parent_id: isParent ? parentReq.id : null 
     });
     setIsAddModalOpen(true);
   }, [selectedProject]);
 
+  // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleCloseAddModal
   const handleCloseAddModal = useCallback(() => {
     setIsAddModalOpen(false);
-    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '' });
+    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null });
   }, []);
   
   const handleNewReqFormChange = useCallback((e) => { 
@@ -554,7 +566,7 @@ const [filterOptions, setFilterOptions] = useState({
   const handleConfirmStatusUpdate = async (comment) => {
     const { requirement, newStatus } = statusUpdateInfo;
     if (!requirement) return;
-    const payload = { project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, release_id: requirement.currentStatusDetails.releaseId, statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id };
+    const payload = { project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error('Failed to update status.');
@@ -577,7 +589,7 @@ const [filterOptions, setFilterOptions] = useState({
       const payload = {
         project: editingRequirement.project, requirementName: formData.name, status: formData.status,
         sprint: newSprint, comment: formData.comment, link: formData.link, type: formData.type,
-        tags: formData.tags, release_id: formData.release_id, statusDate: new Date().toISOString().split('T')[0],
+        tags: formData.tags, release_id: formData.release_id, parent_id: editingRequirement.parentId, statusDate: new Date().toISOString().split('T')[0],
         existingRequirementGroupId: editingRequirement.id
       };
       const response = await fetch(`${API_BASE_URL}/activities`, {
@@ -624,7 +636,6 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
       const res = await fetch(`${API_BASE_URL}/activities/${dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment, statusDate: formattedDate }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to save history"); }
       
-      // Ζητάμε τα φρέσκα δεδομένα και ενημερώνουμε το state του modal
       const freshReqs = await fetchRequirementsOnly(); 
       const updatedReq = freshReqs.find(r => r.id === id);
       if (updatedReq) {
@@ -633,8 +644,9 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
       
       showMainMessage("History updated!", 'success');
     } catch (e) { showMainMessage(`Error: ${e.message}`, 'error'); }
-  }, [fetchRequirementsOnly, showMainMessage]); // Προστέθηκε το fetchRequirementsOnly στα dependencies
+  }, [fetchRequirementsOnly, showMainMessage]); 
 
+  // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleAddNewRequirement με το parent_id
   const handleAddNewRequirement = useCallback(async () => {
     const targetProject = newReqFormState.project;
     const targetSprint = newReqFormState.isBacklog ? 'Backlog' : `Sprint ${newReqFormState.sprint}`;
@@ -645,18 +657,19 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
         body: JSON.stringify({
           project: targetProject, requirementName: newReqFormState.requirementName, status: newReqFormState.status,
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
-          tags: newReqFormState.tags, release_id: newReqFormState.release_id, statusDate: new Date().toISOString().split('T')[0]
+          tags: newReqFormState.tags, release_id: newReqFormState.release_id, 
+          parent_id: newReqFormState.parent_id, // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+          statusDate: new Date().toISOString().split('T')[0]
         }),
       });
       
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to add requirement');
       
-      showMainMessage('Requirement added successfully!', 'success');
+      showMainMessage(newReqFormState.parent_id ? 'Sub-task added successfully!' : 'Requirement added successfully!', 'success');
       
       await fetchRequirementsOnly();
       
-      // Navigate to the precise board
       navigate(`/sprint-board?project=${encodeURIComponent(targetProject)}&sprint=${encodeURIComponent(targetSprint)}`, { replace: true });
 
     } catch (error) {
@@ -877,10 +890,10 @@ if (isLoading) {
               <SprintActivitiesPage
                 projects={projects} 
                 selectedProject={selectedProject} 
-                onSelectProject={handleManualProjectSelect} // <-- ΕΝΗΜΕΡΩΜΕΝΟ HANDLER
+                onSelectProject={handleManualProjectSelect} 
                 availableSprints={availableSprints} 
                 selectedSprint={selectedSprint} 
-                onSelectSprint={handleManualSprintSelect} // <-- ΕΝΗΜΕΡΩΜΕΝΟ HANDLER
+                onSelectSprint={handleManualSprintSelect} 
                 requirementQuery={requirementQuery} 
                 onQueryChange={handleRequirementQueryChange} 
                 onSearch={handleRequirementSearch}
@@ -889,6 +902,7 @@ if (isLoading) {
                 searchSuggestions={searchSuggestions}
                 onOpenAddProjectModal={handleOpenAddProjectModal} 
                 onOpenAddModal={handleOpenAddModal} 
+                onAddSubtask={handleOpenAddModal} // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
                 onOpenImportModal={handleOpenImportModal}
                 onOpenJiraImportModal={handleOpenJiraImportModal} 
                 onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}
@@ -951,7 +965,7 @@ if (isLoading) {
             selectedReleases={selectedReleases} 
             onReleaseChange={handleReleaseChange} 
             enabledReleases={filterOptions.enabledReleases} 
-            hasNoReleaseItems={filterOptions.hasNoReleaseItems} // <--- PASS PROP HERE
+            hasNoReleaseItems={filterOptions.hasNoReleaseItems} 
             dateFrom={dateFrom} 
             dateTo={dateTo} 
             onDateFromChange={setDateFrom} 
