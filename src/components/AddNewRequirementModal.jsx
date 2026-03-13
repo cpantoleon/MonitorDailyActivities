@@ -3,8 +3,9 @@ import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import SearchableDropdown from './SearchableDropdown';
 
-const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSubmit, projects, releases }) => {
+const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSubmit, projects, releases, allRequirements = [], selectedSprint }) => {
   const [initialFormData, setInitialFormData] = useState(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
@@ -59,13 +60,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
         return;
     }
     if (!formData.requirementName || !formData.requirementName.trim()) {
-        alert(formData.parent_id ? "Sub-task Name is required." : "Requirement Name is required.");
+        alert(formData.type === 'Sub-task' ? "Sub-task Name is required." : "Requirement Name is required.");
         setActiveTab('core');
         return;
     }
-    // Το Type είναι υποχρεωτικό ΜΟΝΟ αν δεν είναι sub-task
-    if (!formData.parent_id && (!formData.type || !formData.type.trim())) {
+    if (!formData.type || !formData.type.trim()) {
         alert("Type is required.");
+        setActiveTab('core');
+        return;
+    }
+    if (formData.type === 'Sub-task' && !formData.parent_id) {
+        alert("Parent Requirement is required for Sub-tasks.");
         setActiveTab('core');
         return;
     }
@@ -80,11 +85,22 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     onSubmit();
   };
 
+  const parentOptions = useMemo(() => {
+    if (!formData.project || !allRequirements) return [];
+    
+    // ΠΛΕΟΝ ΧΡΗΣΙΜΟΠΟΙΕΙ ΤΟ SPRINT ΤΟΥ BOARD:
+    const targetSprint = selectedSprint || 'Sprint 1'; 
+    
+    return allRequirements
+      .filter(r => r.project === formData.project && r.currentStatusDetails?.sprint === targetSprint && !r.parentId)
+      .map(r => ({ value: r.id, label: r.requirementUserIdentifier }));
+  }, [formData.project, selectedSprint, allRequirements]);
+
   if (!isOpen) return null;
 
   const projectOptions = projects.map(p => ({ value: p, label: p }));
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
-  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'].map(t => ({ value: t, label: t }));
+  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Sub-task'].map(t => ({ value: t, label: t }));
   const sprintNumberOptions = Array.from({ length: 20 }, (_, i) => ({
     value: `${i + 1}`,
     label: `${i + 1}`
@@ -97,13 +113,14 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     </div>
   );
 
-  const isSubtask = !!formData.parent_id;
+  // We determine if it was opened from the "Add Sub-task" button on a card by checking initialFormData
+  const isOpenedFromCard = initialFormData ? !!initialFormData.parent_id : false;
 
   return (
     <div id="add-new-requirement-modal-wrapper-id">
       <div id="add-new-modal-overlay-id" className="add-new-modal-overlay">
         <div ref={modalRef} id="add-new-modal-content-id" className="add-new-modal-content">
-          <h2>{isSubtask ? 'Add New Sub-task' : 'Add New Requirement'}</h2>
+          <h2>{isOpenedFromCard || formData.type === 'Sub-task' ? 'Add New Sub-task' : 'Add New Requirement'}</h2>
           
           <div className="modal-tabs">
               <button 
@@ -134,17 +151,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                     value={formData.project}
                     onChange={onFormChange}
                     options={projectOptions}
-                    disabled={projects.length === 0 || isSubtask} // Κλειδωμένο στο project του γονέα αν είναι subtask
+                    disabled={projects.length === 0 || isOpenedFromCard} // Κλειδωμένο στο project του γονέα αν ανοίξει από την κάρτα
                     placeholder={projects.length === 0 ? "-- No projects available --" : "-- Select a Project --"}
                   />
                 </div>
                 <div id="form-group-requirement-name-id" className="form-group">
-                  <label htmlFor="newReqName">{isSubtask ? 'Sub-task Name:' : 'Requirement Name:'}</label>
-                  <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder={isSubtask ? "e.g., Update database schema" : "e.g., User Login Feature TEST-INT-01"} />
+                  <label htmlFor="newReqName">{isOpenedFromCard || formData.type === 'Sub-task' ? 'Sub-task Name:' : 'Requirement Name:'}</label>
+                  <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder={isOpenedFromCard || formData.type === 'Sub-task' ? "e.g., Update database schema" : "e.g., User Login Feature TEST-INT-01"} />
                 </div>
                 
-                {/* Κρύβουμε το Type αν είναι Sub-task */}
-                {!isSubtask && (
+                {/* Κρύβουμε το Type ΜΟΝΟ αν ανοίξει απευθείας από το κουμπί της κάρτας */}
+                {!isOpenedFromCard && (
                   <div id="form-group-type-id" className="form-group">
                     <label id="newReqType-label" htmlFor="newReqType-button">Type:</label>
                     <CustomDropdown
@@ -154,6 +171,20 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                       onChange={onFormChange}
                       options={typeOptions}
                       placeholder="-- Select Type --"
+                    />
+                  </div>
+                )}
+
+                {/* Αν ο χρήστης επιλέξει Sub-task χειροκίνητα, εμφανίζουμε το Parent Dropdown */}
+                {!isOpenedFromCard && formData.type === 'Sub-task' && (
+                  <div id="form-group-parent-id" className="form-group">
+                    <label id="newReqParent-label" htmlFor="newReqParentSelect-button">Parent Requirement:</label>
+                    <SearchableDropdown
+                      name="parent_id"
+                      value={formData.parent_id || ''}
+                      onChange={onFormChange}
+                      options={parentOptions}
+                      placeholder={parentOptions.length === 0 ? "-- No available parents in this sprint --" : "-- Select a Parent --"}
                     />
                   </div>
                 )}
@@ -177,8 +208,8 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   />
                 </div>
                 
-                {/* Κρύβουμε το Sprint και το Backlog αν είναι Sub-task */}
-                {!isSubtask && (
+                {/* Εμφανίζουμε το Sprint για να μπορεί ο χρήστης να βρει το Parent, εκτός αν άνοιξε από κάρτα */}
+                {!isOpenedFromCard && (
                   <>
                     <div id="form-group-sprint-id" className="form-group">
                       <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
@@ -198,8 +229,8 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   </>
                 )}
                 
-                {/* Κρύβουμε το Release αν είναι Sub-task */}
-                {!isSubtask && (
+                {/* Κρύβουμε το Release αν είναι Sub-task (κληρονομεί από το parent) */}
+                {!isOpenedFromCard && formData.type !== 'Sub-task' && (
                   <div id="form-group-release-id" className="form-group">
                     <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                       <label id="newReqRelease-label" htmlFor="newReqRelease-button" className="optional-label" style={{marginBottom: 0}}>Release:</label>
@@ -241,7 +272,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
               <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
               
               <button type="submit" className="modal-button-save">
-                 {activeTab === 'core' ? 'Next: Tracking & Links' : (isSubtask ? 'Add Sub-task' : 'Add Requirement')}
+                 {activeTab === 'core' ? 'Next: Tracking & Links' : (isOpenedFromCard || formData.type === 'Sub-task' ? 'Add Sub-task' : 'Add Requirement')}
               </button>
             </div>
           </form>

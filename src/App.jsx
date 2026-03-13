@@ -589,7 +589,9 @@ const [filterOptions, setFilterOptions] = useState({
       const payload = {
         project: editingRequirement.project, requirementName: formData.name, status: formData.status,
         sprint: newSprint, comment: formData.comment, link: formData.link, type: formData.type,
-        tags: formData.tags, release_id: formData.release_id, parent_id: editingRequirement.parentId, statusDate: new Date().toISOString().split('T')[0],
+        tags: formData.tags, release_id: formData.release_id, 
+        parent_id: formData.type === 'Sub-task' ? formData.parent_id : null, // Καθαρίζει το parent_id αν ο χρήστης το αλλάξει σε κανονικό Task
+        statusDate: new Date().toISOString().split('T')[0],
         existingRequirementGroupId: editingRequirement.id
       };
       const response = await fetch(`${API_BASE_URL}/activities`, {
@@ -658,7 +660,7 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
           project: targetProject, requirementName: newReqFormState.requirementName, status: newReqFormState.status,
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
           tags: newReqFormState.tags, release_id: newReqFormState.release_id, 
-          parent_id: newReqFormState.parent_id, // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+          parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null, // Εξασφαλίζει ότι το parent_id σώζεται μόνο σε sub-tasks
           statusDate: new Date().toISOString().split('T')[0]
         }),
       });
@@ -941,14 +943,14 @@ if (isLoading) {
         </div>
 
         <HistoryModal requirement={requirementForHistory} isOpen={isHistoryModalOpen} onClose={handleCloseHistoryModal} onSaveHistoryEntry={handleSaveHistoryEntry} apiBaseUrl={API_BASE_URL} />
-        <AddNewRequirementModal isOpen={isAddModalOpen} onClose={handleCloseAddModal} formData={newReqFormState} onFormChange={handleNewReqFormChange} onSubmit={handleAddNewRequirement} projects={projects} releases={allReleases} />
+        <AddNewRequirementModal isOpen={isAddModalOpen} onClose={handleCloseAddModal} formData={newReqFormState} onFormChange={handleNewReqFormChange} onSubmit={handleAddNewRequirement} projects={projects} releases={allReleases} allRequirements={allProcessedRequirements} selectedSprint={selectedSprint} />
         <AddProjectModal isOpen={isAddProjectModalOpen} onClose={handleCloseAddProjectModal} onAddProject={handleAddNewProject} />
         <ImportRequirementsModal isOpen={isImportModalOpen} onClose={handleCloseImportModal} onImport={handleValidateImport} projects={projects} releases={allReleases} currentProject={selectedProject} />
         <JiraImportModal isOpen={isJiraImportModalOpen} onClose={handleCloseJiraImportModal} onImportSuccess={handleJiraImportSuccess} projects={projects} releases={allReleases} currentProject={selectedProject} importType="requirements" showMessage={showMainMessage} />
         <AddReleaseModal isOpen={isAddReleaseModalOpen} onClose={() => setIsAddReleaseModalOpen(false)} onAdd={handleAddRelease} projects={projects} currentProject={selectedProject} />
         <EditReleaseModal isOpen={isEditReleaseModalOpen} onClose={() => setIsEditReleaseModalOpen(false)} onSave={handleEditRelease} onDelete={(release) => handleDeleteRequest('release', release)} releases={allReleases} projects={projects} currentProject={selectedProject} />
         <EditProjectModal isOpen={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} onSave={handleEditProject} onDelete={(project) => handleDeleteRequest('project', project)} projects={projects} currentProject={selectedProject} />
-        <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} />
+        <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} allRequirements={allProcessedRequirements} selectedSprint={selectedSprint} />
         <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} showMessage={showMainMessage} />
         <FilterSidebar 
             isOpen={isFilterSidebarOpen} 

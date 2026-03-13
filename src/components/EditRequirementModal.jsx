@@ -3,8 +3,9 @@ import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import SearchableDropdown from './SearchableDropdown';
 
-const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, onLogChange, showMessage }) => {
+const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, onLogChange, showMessage, allRequirements = [], selectedSprint }) => {
   const [formData, setFormData] = useState({});
   const [initialFormData, setInitialFormData] = useState(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
@@ -40,6 +41,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
         type: requirement.currentStatusDetails?.type || '',
         tags: requirement.currentStatusDetails?.tags || '',
         release_id: requirement.currentStatusDetails?.releaseId || '',
+        parent_id: requirement.parentId || '',
       };
       setFormData(initialData);
       setInitialFormData(initialData);
@@ -80,6 +82,12 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       return;
     }
 
+    if (formData.type === 'Sub-task' && !formData.parent_id) {
+      alert("Parent Requirement is required for Sub-tasks.");
+      setActiveTab('core');
+      return;
+    }
+
     // If on Tracking tab, perform validation and save
     if (openDefects.length > 0 && !acknowledgeDefects) {
       showMessage('Please acknowledge the open defects before proceeding.', 'error');
@@ -99,11 +107,22 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
     }
   };
 
+  const parentOptions = useMemo(() => {
+    if (!requirement || !requirement.project || !allRequirements) return [];
+    
+    // ΠΛΕΟΝ ΧΡΗΣΙΜΟΠΟΙΕΙ ΤΟ SPRINT ΤΟΥ BOARD:
+    const targetSprint = selectedSprint || 'Sprint 1'; 
+    
+    return allRequirements
+      .filter(r => r.project === requirement.project && r.currentStatusDetails?.sprint === targetSprint && !r.parentId && r.id !== requirement.id)
+      .map(r => ({ value: r.id, label: r.requirementUserIdentifier }));
+  }, [requirement?.project, requirement?.id, selectedSprint, allRequirements]);
+  
   if (!isOpen || !requirement) return null;
 
   const sprintNumberOptions = Array.from({ length: 20 }, (_, i) => ({ value: `${i + 1}`, label: `${i + 1}` }));
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
-  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'].map(t => ({ value: t, label: t }));
+  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Sub-task'].map(t => ({ value: t, label: t }));
   const releaseOptions = [
     { value: '', label: '-- None (Clear Release) --' },
     ...releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }))
@@ -116,8 +135,8 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
     </div>
   );
 
-  // Ελέγχουμε αν το requirement είναι sub-task
-  const isSubtask = !!requirement.parentId;
+  // Ελέγχουμε αν το requirement δημιουργήθηκε εξαρχής ως sub-task
+  const isOriginallySubtask = !!requirement.parentId;
 
   return (
     <div className="add-new-modal-overlay">
@@ -154,6 +173,20 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               <label className="optional-label">Type:</label>
               <CustomDropdown name="type" value={formData.type} onChange={handleChange} options={typeOptions} placeholder="-- Select Type --" />
             </div>
+            
+            {formData.type === 'Sub-task' && (
+              <div className="form-group">
+                <label>Parent Requirement:</label>
+                <SearchableDropdown
+                  name="parent_id"
+                  value={formData.parent_id || ''}
+                  onChange={handleChange}
+                  options={parentOptions}
+                  placeholder={parentOptions.length === 0 ? "-- No available parents in this sprint --" : "-- Select a Parent --"}
+                />
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="editReqComment" className="optional-label">Current Comment:</label>
               <textarea id="editReqComment" name="comment" value={formData.comment || ''} onChange={handleChange} rows="3" placeholder="Enter a comment for the current status" />
@@ -187,8 +220,8 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </div>
             )}
 
-            {/* Κρύβουμε το Sprint και το Backlog αν είναι Sub-task */}
-            {!isSubtask && (
+            {/* Αν δεν ήταν εξαρχής Sub-task, αφήνουμε το Sprint ανοιχτό για να βρίσκει parents */}
+            {!isOriginallySubtask && (
               <>
                 <div className="form-group">
                   <label>Sprint:</label>
@@ -202,7 +235,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
             )}
 
             {/* Κρύβουμε το Release αν είναι Sub-task */}
-            {!isSubtask && (
+            {!isOriginallySubtask && formData.type !== 'Sub-task' && (
               <div className="form-group">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <label className="optional-label" style={{marginBottom: 0}}>Release:</label>
@@ -237,7 +270,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
                   className="modal-button-cancel" 
                   style={{marginRight: 'auto'}}
                >
-                   Back
+                  Back
                </button>
             )}
             <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
@@ -248,7 +281,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
         </form>
 
         {/* LOG SCOPE CHANGE SECTION - Κρύβεται αν είναι sub-task */}
-        {!isSubtask && (
+        {!isOriginallySubtask && formData.type !== 'Sub-task' && (
           <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 className="modal-section-title" style={{borderBottom: 'none', margin: 0, paddingBottom: 0}}>Log Scope Change</h3>
