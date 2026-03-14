@@ -374,6 +374,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         }
                     });
                 }
+
+                const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
+                if (!hasDisplayOrderColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding display_order column to activities:", alterErr.message);
+                        } else {
+                            console.log("Column 'display_order' added to activities table.");
+                        }
+                    });
+                }
             });
 
             db.all("PRAGMA table_info(defects)", (err, columns) => {

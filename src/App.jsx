@@ -76,7 +76,7 @@ function App() {
   const [requirementQuery, setRequirementQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
-  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '' });
+  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '', targetIndex: null });
   const [highlightedReqId, setHighlightedReqId] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   
@@ -557,16 +557,22 @@ const [filterOptions, setFilterOptions] = useState({
   const handleDeleteRequest = useCallback((type, item) => { setDeleteType(type); setItemToDelete(item); setIsDeleteConfirmModalOpen(true); }, []);
   const handleCancelDelete = useCallback(() => { setIsDeleteConfirmModalOpen(false); setItemToDelete(null); setDeleteType(''); }, []);
   
-  const handleStatusUpdateRequest = (requirement, newStatus) => { setStatusUpdateInfo({ requirement, newStatus }); setIsUpdateStatusModalOpen(true); };
-  const handleCloseUpdateStatusModal = () => { setIsUpdateStatusModalOpen(false); setStatusUpdateInfo({ requirement: null, newStatus: '' }); };
+  const handleStatusUpdateRequest = (requirement, newStatus, targetIndex) => { 
+      setStatusUpdateInfo({ requirement, newStatus, targetIndex }); 
+      setIsUpdateStatusModalOpen(true); 
+  };
+  const handleCloseUpdateStatusModal = () => { 
+      setIsUpdateStatusModalOpen(false); 
+      setStatusUpdateInfo({ requirement: null, newStatus: '', targetIndex: null }); 
+  };
 
   const handleNavigateToRequirement = (req) => { navigate(`/sprint-board?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`); };
   const handleNavigateToDefect = (defect, isClosed = false) => { navigate(`/defects?d_project=${encodeURIComponent(defect.project)}&highlight=${defect.id}${isClosed ? '&view=closed' : ''}`); };
 
   const handleConfirmStatusUpdate = async (comment) => {
-    const { requirement, newStatus } = statusUpdateInfo;
+    const { requirement, newStatus, targetIndex } = statusUpdateInfo;
     if (!requirement) return;
-    const payload = { project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id };
+    const payload = { project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error('Failed to update status.');
@@ -575,6 +581,28 @@ const [filterOptions, setFilterOptions] = useState({
       await fetchData();
     } catch (error) { showMainMessage(`Error: ${error.message}`, 'error'); } 
     finally { handleCloseUpdateStatusModal(); }
+  };
+
+  // Πρόσθεσε αυτή τη συνάρτηση μέσα στο App (π.χ. κάτω από το handleConfirmStatusUpdate)
+const handleReorderRequirements = async (orderedIds) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/activities/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save new order');
+      }
+      
+      // ΑΥΤΟ ΕΛΕΙΠΕ: Κάνουμε refresh τα δεδομένα για να "κλειδώσει" η νέα σειρά στο UI
+      await fetchData(); 
+      
+    } catch (error) {
+      console.error("❌ Reorder failed:", error);
+      showMainMessage("Failed to save order", "error");
+    }
   };
 
   const handleSaveRequirementEdit = useCallback(async (formData) => {
@@ -905,6 +933,7 @@ if (isLoading) {
                 onOpenAddProjectModal={handleOpenAddProjectModal} 
                 onOpenAddModal={handleOpenAddModal} 
                 onAddSubtask={handleOpenAddModal} // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+                onReorderRequirements={handleReorderRequirements}
                 onOpenImportModal={handleOpenImportModal}
                 onOpenJiraImportModal={handleOpenJiraImportModal} 
                 onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}

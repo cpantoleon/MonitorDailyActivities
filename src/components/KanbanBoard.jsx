@@ -9,7 +9,8 @@ const KanbanBoard = ({
   onDeleteRequirement,
   isSearching,
   onStatusUpdateRequest,
-  onAddSubtask
+  onAddSubtask,
+  onReorderRequirements
 }) => {
   const columnTitles = ['To Do', 'Scenarios created', 'Under testing', 'Done'];
   
@@ -20,12 +21,12 @@ const KanbanBoard = ({
     e.dataTransfer.setData("requirementId", requirement.id);
   };
 
-  const handleDrop = (e, targetStatus) => {
+  const handleDrop = (e, targetStatus, targetIndex) => {
     const requirementId = e.dataTransfer.getData("requirementId");
     const draggedRequirement = requirements.find(r => r.id.toString() === requirementId.toString());
     
     if (draggedRequirement && draggedRequirement.currentStatusDetails.status !== targetStatus) {
-      onStatusUpdateRequest(draggedRequirement, targetStatus);
+      onStatusUpdateRequest(draggedRequirement, targetStatus, targetIndex); // <--- Προστέθηκε το targetIndex
     }
   };
 
@@ -51,6 +52,7 @@ const KanbanBoard = ({
           focusedFamilyId={focusedFamilyId}
           setFocusedFamilyId={setFocusedFamilyId}
           onAddSubtask={onAddSubtask}
+          onReorder={onReorderRequirements}
         />
       ))}
     </div>

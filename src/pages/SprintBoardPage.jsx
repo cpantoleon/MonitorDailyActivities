@@ -77,7 +77,7 @@ const SprintActivitiesPage = ({
   onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenJiraImportModal, onOpenAddReleaseModal,
   onOpenEditReleaseModal, onOpenEditProjectModal, onToggleFilterSidebar, isSearching, displayableRequirements,
   onShowHistory, onEditRequirement, onDeleteRequirement, onStatusUpdateRequest, projectReleases,
-  allProcessedRequirements, hasAnyReleases, showArchivedSprints, onSetShowArchived,
+  allProcessedRequirements, hasAnyReleases, showArchivedSprints, onSetShowArchived, onReorderRequirements,
 }) => {
   const [showCharts, setShowCharts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -379,6 +379,7 @@ const SprintActivitiesPage = ({
         isSearching={isSearching} 
         onStatusUpdateRequest={onStatusUpdateRequest} 
         onAddSubtask={onAddSubtask} // <--- ΠΡΟΣΘΗΚΗ
+        onReorderRequirements={onReorderRequirements} // <--- ΠΡΟΣΘΗΚΗ
       />
     </div>
   );

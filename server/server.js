@@ -395,11 +395,11 @@ app.put("/api/projects/:name", (req, res) => {
 
 app.get("/api/requirements", (req, res) => {
     const activitiesSql = `SELECT
-                    act.id as activityDbId, act.requirementGroupId, p.name as project,
-                    act.requirementUserIdentifier, act.status, act.statusDate,
-                    act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
-                    act.created_at, act.release_id, act.parent_id,
-                    rel.name as release_name, rel.release_date
+                            act.id as activityDbId, act.requirementGroupId, p.name as project,
+                            act.requirementUserIdentifier, act.status, act.statusDate,
+                            act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
+                            act.created_at, act.release_id, act.parent_id, act.display_order,
+                            rel.name as release_name, rel.release_date
                  FROM activities act
                  JOIN projects p ON act.project_id = p.id
                  LEFT JOIN releases rel ON act.release_id = rel.id
@@ -458,7 +458,8 @@ app.get("/api/requirements", (req, res) => {
                     releaseId: row.release_id,
                     releaseName: row.release_name,
                     releaseDate: row.release_date,
-                    parentId: row.parent_id // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+                    parentId: row.parent_id,
+                    display_order: row.display_order
                 });
             }
         });
@@ -467,6 +468,7 @@ app.get("/api/requirements", (req, res) => {
         requirementsGroupMap.forEach(reqGroup => {
             if (reqGroup.history.length > 0) {
                 reqGroup.currentStatusDetails = reqGroup.history.find(h => h.isCurrent) || reqGroup.history[0];
+                reqGroup.displayOrder = reqGroup.history.find(h => h.isCurrent)?.display_order || 0;
 
                 const isArchivedAndCompleted = 
                     reqGroup.currentStatusDetails.status === 'Done' &&
@@ -499,7 +501,7 @@ app.get("/api/requirements", (req, res) => {
 });
 
 app.post("/api/activities", async (req, res) => {
-    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id } = req.body;
+    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id, display_order } = req.body;
     if (!project || !requirementName || !status || !statusDate || !sprint) {
         return res.status(400).json({ error: "Missing required fields (project, requirementName, status, statusDate, sprint)" });
     }
@@ -517,11 +519,30 @@ app.post("/api/activities", async (req, res) => {
         const finalReleaseId = release_id || null;
         const finalParentId = parent_id || null; // <--- ΠΡΟΣΘΗΚΗ
         const now = new Date().toISOString();
+        let finalDisplayOrder = display_order;
+        if (finalDisplayOrder === undefined || finalDisplayOrder === null) {
+            try {
+                // Βρίσκουμε το μεγαλύτερο order που υπάρχει ήδη στη συγκεκριμένη στήλη
+                const maxRow = await dbGet(
+                    `SELECT MAX(display_order) as maxOrder FROM activities WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1`, 
+                    [projectId, sprint, status]
+                );
+                finalDisplayOrder = (maxRow && maxRow.maxOrder !== null) ? maxRow.maxOrder + 1 : 0;
+            } catch (err) {
+                console.error("Error getting max display_order:", err);
+                finalDisplayOrder = 0;
+            }
+        }
 
         db.serialize(() => {
-            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now], function(err) {
+            // Αν το item μπαίνει σε συγκεκριμένη θέση, σπρώχνουμε τα από κάτω +1 για να κάνουμε χώρο
+            if (display_order !== undefined && display_order !== null) {
+                db.run(`UPDATE activities SET display_order = display_order + 1 WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1 AND display_order >= ?`, [projectId, sprint, status, display_order]);
+            }
+
+            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?)`;
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder], function(err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -535,23 +556,19 @@ app.post("/api/activities", async (req, res) => {
                     db.run(updateOldSql, [finalRequirementGroupId, newActivityDbId], (updateOldErr) => {
                         if (updateOldErr) console.error("Error updating old current status:", updateOldErr.message);
                         
-                        // ΛΟΓΙΚΗ CASCADE ΓΙΑ SUB-TASKS: Αν είναι Parent, ενημερώνουμε το Sprint των παιδιών του
                         if (!finalParentId) {
                             const findSubtasksSql = `SELECT * FROM activities WHERE parent_id = ? AND isCurrent = 1 AND sprint != ?`;
                             db.all(findSubtasksSql, [finalRequirementGroupId, sprint], (err, subtasks) => {
-                                if (err) {
-                                    console.error("Error finding subtasks for sprint cascade:", err.message);
-                                    return finishResponse();
-                                }
+                                if (err) return finishResponse();
                                 if (subtasks.length === 0) return finishResponse();
 
                                 let processed = 0;
                                 subtasks.forEach(sub => {
-                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at)
-                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`;
+                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order)
+                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`;
                                     db.run(insertSubSql, [
                                         sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate, 
-                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now
+                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999
                                     ], function(errInsert) {
                                         if (!errInsert) {
                                             const newSubId = this.lastID;
@@ -585,6 +602,30 @@ app.post("/api/activities", async (req, res) => {
     }
 });
 
+// ΠΡΟΣΘΗΚΗ: Endpoint για μαζικό update της σειράς (Reorder)
+app.put("/api/activities/reorder", async (req, res) => {
+    const { orderedIds } = req.body; 
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: "Invalid data format." });
+    }
+
+    try {
+        await dbRun("BEGIN TRANSACTION");
+        
+        // Κάνουμε update το display_order χρησιμοποιώντας το primary key (id)
+        for (let i = 0; i < orderedIds.length; i++) {
+            await dbRun("UPDATE activities SET display_order = ? WHERE id = ?", [i, orderedIds[i]]);
+        }
+        
+        await dbRun("COMMIT");
+        res.json({ message: "Order updated successfully." });
+    } catch (error) {
+        await dbRun("ROLLBACK");
+        console.error("Reorder error:", error);
+        res.status(500).json({ error: "Failed to save order." });
+    }
+});
+
 app.put("/api/activities/:activityId", (req, res) => {
     let { comment, statusDate, link, type, tags, release_id, parent_id } = req.body;
     const activityDbId = req.params.activityId;
@@ -614,6 +655,7 @@ app.put("/api/activities/:activityId", (req, res) => {
         res.json({ message: "success", data: { id: activityDbId, changes: this.changes }});
     });
 });
+
 
 app.get("/api/requirements/:requirementGroupId/changes", (req, res) => {
     const groupId = parseInt(req.params.requirementGroupId, 10);

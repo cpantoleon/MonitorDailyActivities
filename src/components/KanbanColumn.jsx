@@ -12,38 +12,34 @@ const KanbanColumn = ({
   onDrop,
   focusedFamilyId,
   setFocusedFamilyId,
-  onAddSubtask
+  onAddSubtask,
+  onReorder // <--- ΠΡΟΣΘΗΚΗ
 }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
   const containerRef = useRef(null);
 
-  // Scroll State για τη ΔΥΝΑΜΙΚΗ ταχύτητα
   const scrollInterval = useRef(null);
-  const scrollSpeed = useRef(0); // Αντί για direction, αποθηκεύουμε την ακριβή ταχύτητα
+  const scrollSpeed = useRef(0);
 
   const [sortedRequirements, setSortedRequirements] = useState([]);
   const [dropIndicator, setDropIndicator] = useState({ id: null, position: null });
 
   useEffect(() => {
     setSortedRequirements(prev => {
-      const prevIds = prev.map(p => p.id);
-      const newReqs = requirements.filter(r => !prevIds.includes(r.id));
-      const existingReqs = prev
-        .filter(p => requirements.some(r => r.id === p.id))
-        .map(p => requirements.find(r => r.id === p.id));
-      return [...existingReqs, ...newReqs];
+      const sortedNewReqs = [...requirements].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      if (dragCounter.current === 0) {
+          return sortedNewReqs;
+      }
+      return prev;
     });
   }, [requirements]);
 
-  // Το interval ξεκινάει ΜΙΑ φορά και διαβάζει το scrollSpeed.current
   const startScrolling = () => {
     if (!scrollInterval.current) {
       scrollInterval.current = setInterval(() => {
-        if (scrollSpeed.current !== 0) {
-          window.scrollBy(0, scrollSpeed.current);
-        }
-      }, 16); // ~60 frames το δευτερόλεπτο για απόλυτο smoothness
+        if (scrollSpeed.current !== 0) window.scrollBy(0, scrollSpeed.current);
+      }, 16);
     }
   };
 
@@ -59,29 +55,23 @@ const KanbanColumn = ({
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    // --- ΔΥΝΑΜΙΚΗ ΤΑΧΥΤΗΤΑ SCROLL ---
     const threshold = 250; 
     const mouseY = e.clientY;
     const windowHeight = window.innerHeight;
 
     if (mouseY < threshold) {
-      // Scroll ΠΑΝΩ: Υπολογίζουμε πόσο "βαθιά" μέσα στο threshold είμαστε (0 έως 1)
       const intensity = (threshold - mouseY) / threshold;
-      // Ταχύτητα από 2 (αργά) μέχρι 30 (πολύ γρήγορα) pixels/frame
       scrollSpeed.current = -(intensity * 28 + 2); 
       startScrolling();
     } else if (windowHeight - mouseY < threshold) {
-      // Scroll ΚΑΤΩ
       const distBottom = windowHeight - mouseY;
       const intensity = (threshold - distBottom) / threshold;
       scrollSpeed.current = (intensity * 28 + 2);
       startScrolling();
     } else {
-      // Αν βγούμε από τη ζώνη, σταματάμε το scroll
       stopScrolling();
     }
 
-    // --- DROP INDICATOR LOGIC ---
     const targetCard = e.target.closest('.kanban-card');
     if (targetCard && !targetCard.classList.contains('dragging')) {
       const targetId = targetCard.getAttribute('data-id');
@@ -128,24 +118,41 @@ const KanbanColumn = ({
 
     const isSameColumn = sortedRequirements.some(r => r.id.toString() === draggedId.toString());
 
-    if (isSameColumn && finalIndicator.id) {
-      const targetId = finalIndicator.id;
-      if (draggedId !== targetId) {
-        const draggedIndex = sortedRequirements.findIndex(r => r.id.toString() === draggedId.toString());
-        let targetIndex = sortedRequirements.findIndex(r => r.id.toString() === targetId.toString());
+    if (isSameColumn) {
+      const draggedIndex = sortedRequirements.findIndex(r => r.id.toString() === draggedId.toString());
+      if (draggedIndex === -1) return;
 
-        if (draggedIndex !== -1 && targetIndex !== -1) {
-          const newSorted = [...sortedRequirements];
-          const [removed] = newSorted.splice(draggedIndex, 1);
-          targetIndex = newSorted.findIndex(r => r.id.toString() === targetId.toString());
-          if (finalIndicator.position === 'after') targetIndex += 1;
-          newSorted.splice(targetIndex, 0, removed);
-          setSortedRequirements(newSorted);
-        }
+      const newSorted = [...sortedRequirements];
+      const [removed] = newSorted.splice(draggedIndex, 1);
+
+      if (finalIndicator.id) {
+        let targetIndex = newSorted.findIndex(r => r.id.toString() === finalIndicator.id.toString());
+        if (finalIndicator.position === 'after') targetIndex += 1;
+        newSorted.splice(targetIndex, 0, removed);
+      } else {
+        // Αν το ρίξει στο κενό (κάτω κάτω)
+        newSorted.push(removed);
+      }
+      
+      setSortedRequirements(newSorted);
+
+      if (onReorder) {
+        const orderedIds = newSorted.map(req => req.currentStatusDetails.activityId);
+        console.log("✅ Saving new order to DB:", orderedIds);
+        onReorder(orderedIds);
+      } else {
+        console.error("❌ ΣΦΑΛΜΑ: Το onReorder δεν έχει περαστεί σωστά στο KanbanColumn!");
       }
       return;
     }
-    onDrop(e, title);
+    
+    let targetIndex = sortedRequirements.length;
+    if (finalIndicator.id) {
+      targetIndex = sortedRequirements.findIndex(r => r.id.toString() === finalIndicator.id.toString());
+      if (finalIndicator.position === 'after') targetIndex += 1;
+    }
+    
+    onDrop(e, title, targetIndex); // Στέλνουμε και το targetIndex!
   };
 
   const safeTitleId = title.replace(/\s+/g, '-').toLowerCase();
