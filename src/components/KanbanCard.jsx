@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Επαγγελματικό SVG Icon (Μάτι)
@@ -6,6 +6,39 @@ const FocusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
     <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+);
+
+// Εικονίδιο Expand/Collapse (Απλό, καθαρό chevron)
+const ToggleIcon = ({ isExpanded }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="16" height="16" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.5" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+    style={{
+      transition: 'transform 0.3s ease',
+      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+    }}
+  >
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+
+// Εικονίδια για Expand / Collapse
+const ChevronUp = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+);
+
+const ChevronDown = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 
@@ -32,16 +65,36 @@ const KanbanCard = React.memo(({
   setFocusedFamilyId,
   onAddSubtask
 }) => {
-  const { comment, link, type, tags, releaseName, releaseDate } = requirement.currentStatusDetails;
+  const { comment, link, type, tags, releaseName, releaseDate, activityId, is_expanded } = requirement.currentStatusDetails;
   const navigate = useNavigate();
+
+  // State για το Expand / Collapse
+  // Αν το is_expanded είναι undefined (π.χ. παλιές εγγραφές πριν το migration), το θεωρούμε true (1)
+  const [isExpanded, setIsExpanded] = useState(is_expanded !== 0);
+
+  // Συγχρονισμός με το global state (όταν πατιέται το Expand All / Collapse All)
+  useEffect(() => {
+    setIsExpanded(is_expanded !== 0);
+  }, [is_expanded]);
+
+  const handleToggleExpand = (e) => {
+    e.stopPropagation();
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    
+    // Ενημέρωση της βάσης στο background
+    if (activityId) {
+      fetch(`/api/activities/${activityId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_expanded: newState ? 1 : 0 })
+      }).catch(err => console.error("Failed to save expand state", err));
+    }
+  };
 
   // Υπολογισμοί για Sub-tasks & Focus Mode
   const isSubtask = !!requirement.parentId;
-  
-  // Ελέγχουμε αν αυτή η κάρτα (ως Parent) έχει παιδιά
   const hasSubtasks = allRequirements ? allRequirements.some(r => r.parentId === requirement.id) : false;
-  
-  // Το μάτι θα φαίνεται ΜΟΝΟ αν είναι subtask Ή αν είναι parent που έχει subtasks
   const showFocusIcon = isSubtask || hasSubtasks;
 
   const myFamilyId = isSubtask ? String(requirement.parentId) : String(requirement.id);
@@ -53,12 +106,6 @@ const KanbanCard = React.memo(({
       if (isFocused) {
           focusClass = 'focus-active ' + (isSubtask ? 'focus-child' : 'focus-parent');
       }
-  }
-
-  let parentName = "Unknown Parent";
-  if (isSubtask && allRequirements) {
-      const parent = allRequirements.find(r => String(r.id) === String(requirement.parentId));
-      if (parent) parentName = parent.requirementUserIdentifier;
   }
 
   const handleFocusToggle = (e) => {
@@ -102,13 +149,14 @@ const KanbanCard = React.memo(({
   return (
     <div 
       id={`req-card-${requirement.id}`}
-      data-id={requirement.id} /* <--- Η ΠΡΟΣΘΗΚΗ ΠΟΥ ΧΡΕΙΑΖΕΤΑΙ ΕΔΩ */
+      data-id={requirement.id}
       className={`kanban-card ${focusClass}`}
       draggable="true"
       onDragStart={(e) => handleDragStart(e, requirement)}
       onDragEnd={handleDragEnd}
       style={{ position: 'relative' }}
     >
+      {/* Drag Handle */}
       <div style={{
           position: 'absolute', top: '8px', right: '8px', cursor: 'grab',
           color: 'var(--text-secondary)', opacity: 0.4, fontSize: '14px',
@@ -117,93 +165,134 @@ const KanbanCard = React.memo(({
         ⋮⋮
       </div>
 
+      {/* Type Bubble (Εμφανίζεται ΜΟΝΟ όταν η κάρτα είναι collapsed) */}
+      {!isExpanded && type && (
+        <div className={`type-bubble type-badge ${getTypeClass(type)}`}>
+          {type}
+        </div>
+      )}
+
       <div id={`kanban-card-main-content-${requirement.id}`} className="kanban-card-main-content">
         
-        {/* Top Header: Εδώ μπαίνει το Μάτι (αριστερά) */}
-        <div className="card-header-top" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            {showFocusIcon && (
-                <button 
-                    type="button"
-                    className={`focus-toggle-btn ${isFocused ? 'active' : ''}`} 
-                    onClick={handleFocusToggle}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    title={isFocused ? "Remove Focus" : "Highlight Family (Parent & Sub-tasks)"}
-                    style={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: isFocused ? 'var(--accent-color)' : 'var(--text-secondary)',
-                        padding: 0,
-                        margin: 0
-                    }}
-                >
-                    <FocusIcon />
-                </button>
-            )}
+        {/* Top Header: Μάτι (αριστερά) και Κουμπί Expand/Collapse (δεξιά) */}
+        <div className="card-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '24px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                {showFocusIcon && (
+                    <button 
+                        type="button"
+                        className={`focus-toggle-btn ${isFocused ? 'active' : ''}`} 
+                        onClick={handleFocusToggle}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        title={isFocused ? "Remove Focus" : "Highlight Family (Parent & Sub-tasks)"}
+                        style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            color: isFocused ? 'var(--accent-color)' : 'var(--text-secondary)',
+                            padding: 0,
+                            margin: 0
+                        }}
+                    >
+                        <FocusIcon />
+                    </button>
+                )}
+            </div>
+            
+            {/* Νέο, διακριτικό κυκλικό κουμπί */}
+            <button 
+                type="button" 
+                onClick={handleToggleExpand} 
+                onMouseDown={(e) => e.stopPropagation()}
+                title={isExpanded ? "Collapse Card" : "Expand Card"}
+                style={{ 
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    width: '24px',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0, 
+                    margin: 0, 
+                    marginRight: '20px', /* Αφήνει χώρο για το drag handle */
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    borderRadius: '50%',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.borderColor = 'var(--text-primary)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+            >
+                <ToggleIcon isExpanded={isExpanded} />
+            </button>
         </div>
 
         <strong id={`requirement-identifier-${requirement.id}`}>{requirement.requirementUserIdentifier}</strong>
 
-        <div id={`kanban-card-details-${requirement.id}`} className="kanban-card-details">
-          {!isSubtask && releaseName && (
-            <p id={`card-detail-item-release-${requirement.id}`} className="card-detail-item">
-              <span className="detail-label">Release:</span>
-              <span className="detail-value">{releaseName} (Due: {formatDate(releaseDate)})</span>
-            </p>
-          )}
+        {/* Λεπτομέρειες (Κρύβονται αν η κάρτα είναι Collapsed) */}
+        {isExpanded && (
+          <div id={`kanban-card-details-${requirement.id}`} className="kanban-card-details">
+            {!isSubtask && releaseName && (
+              <p id={`card-detail-item-release-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Release:</span>
+                <span className="detail-value">{releaseName} (Due: {formatDate(releaseDate)})</span>
+              </p>
+            )}
 
-          {/* ΕΔΩ ΕΙΝΑΙ Η ΑΛΛΑΓΗ ΓΙΑ ΤΟ TYPE BADGE */}
-          {type && (
-            <div id={`card-detail-item-type-${requirement.id}`} className="card-detail-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
-              <span className="detail-label">Type:</span>
-              <span className={`type-badge ${getTypeClass(type)}`}>{type}</span>
-            </div>
-          )}
-
-          {tags && (
-            <p id={`card-detail-item-tags-${requirement.id}`} className="card-detail-item">
-              <span className="detail-label">Tags:</span>
-              <span className="detail-value">{tags}</span>
-            </p>
-          )}
-
-          {comment && (
-            <p id={`card-detail-item-comment-${requirement.id}`} className="card-detail-item">
-              <span className="detail-label">Comment:</span>
-              <span className="detail-value">{comment}</span>
-            </p>
-          )}
-
-          {link && (
-            <p id={`card-detail-item-link-${requirement.id}`} className="card-detail-item">
-              <span className="detail-label">Link:</span>
-              <a href={link} target="_blank" rel="noopener noreferrer" className="detail-value">
-                {link}
-              </a>
-            </p>
-          )}
-
-          {!isSubtask && requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
-            <div id={`card-detail-item-defects-${requirement.id}`} className="card-detail-item">
-              <span className="detail-label">Linked Defects:</span>
-              <div id={`linked-items-container-${requirement.id}`} className="linked-items-container">
-                {requirement.linkedDefects.map(defect => (
-                  <button 
-                    key={defect.id} 
-                    id={`linked-defect-tag-${defect.id}`}
-                    className={`linked-item-tag defect ${getDefectStatusClass(defect.status)}`}
-                    onClick={() => handleDefectClick(requirement.project, defect)}
-                    title={`Go to defects for project ${requirement.project} (Status: ${defect.status})`}
-                  >
-                    {defect.title}
-                  </button>
-                ))}
+            {type && (
+              <div id={`card-detail-item-type-${requirement.id}`} className="card-detail-item" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
+                <span className="detail-label">Type:</span>
+                <span className={`type-badge ${getTypeClass(type)}`}>{type}</span>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {tags && (
+              <p id={`card-detail-item-tags-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Tags:</span>
+                <span className="detail-value">{tags}</span>
+              </p>
+            )}
+
+            {comment && (
+              <p id={`card-detail-item-comment-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Comment:</span>
+                <span className="detail-value">{comment}</span>
+              </p>
+            )}
+
+            {link && (
+              <p id={`card-detail-item-link-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Link:</span>
+                <a href={link} target="_blank" rel="noopener noreferrer" className="detail-value">
+                  {link}
+                </a>
+              </p>
+            )}
+
+            {!isSubtask && requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
+              <div id={`card-detail-item-defects-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Linked Defects:</span>
+                <div id={`linked-items-container-${requirement.id}`} className="linked-items-container">
+                  {requirement.linkedDefects.map(defect => (
+                    <button 
+                      key={defect.id} 
+                      id={`linked-defect-tag-${defect.id}`}
+                      className={`linked-item-tag defect ${getDefectStatusClass(defect.status)}`}
+                      onClick={() => handleDefectClick(requirement.project, defect)}
+                      title={`Go to defects for project ${requirement.project} (Status: ${defect.status})`}
+                    >
+                      {defect.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {!isSubtask && (
+      {/* Κουμπί Add Sub-task (Ορατό μόνο αν δεν είναι subtask ΚΑΙ η κάρτα είναι ανοιχτή) */}
+      {!isSubtask && isExpanded && (
           <button 
             type="button"
             className="add-subtask-btn" 

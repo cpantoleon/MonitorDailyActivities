@@ -394,11 +394,12 @@ app.put("/api/projects/:name", (req, res) => {
 });
 
 app.get("/api/requirements", (req, res) => {
+    // 1. ΔΙΟΡΘΩΣΗ ΣΤΟ SQL QUERY (αφαιρέθηκε το : row.is_expanded και μπήκε κόμμα)
     const activitiesSql = `SELECT
                             act.id as activityDbId, act.requirementGroupId, p.name as project,
                             act.requirementUserIdentifier, act.status, act.statusDate,
                             act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
-                            act.created_at, act.release_id, act.parent_id, act.display_order,
+                            act.created_at, act.release_id, act.parent_id, act.display_order, act.is_expanded,
                             rel.name as release_name, rel.release_date
                  FROM activities act
                  JOIN projects p ON act.project_id = p.id
@@ -441,7 +442,7 @@ app.get("/api/requirements", (req, res) => {
                     id: groupId,
                     project: row.project ? row.project.trim() : 'Unknown Project',
                     requirementUserIdentifier: row.requirementUserIdentifier ? row.requirementUserIdentifier.trim() : 'Unknown Identifier',
-                    parentId: row.parent_id, // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+                    parentId: row.parent_id,
                     history: [],
                     currentStatusDetails: {},
                     linkedDefects: linksMap.get(groupId) || [],
@@ -450,6 +451,7 @@ app.get("/api/requirements", (req, res) => {
             }
             const reqGroupEntry = requirementsGroupMap.get(groupId);
             if (reqGroupEntry) {
+                // 2. ΠΡΟΣΘΗΚΗ ΤΟΥ is_expanded ΕΔΩ
                 reqGroupEntry.history.push({
                     activityId: row.activityDbId, status: row.status, date: row.statusDate,
                     comment: row.comment, sprint: row.sprint ? row.sprint.trim() : row.sprint,
@@ -459,7 +461,8 @@ app.get("/api/requirements", (req, res) => {
                     releaseName: row.release_name,
                     releaseDate: row.release_date,
                     parentId: row.parent_id,
-                    display_order: row.display_order
+                    display_order: row.display_order,
+                    is_expanded: row.is_expanded // <--- ΑΥΤΟ
                 });
             }
         });
@@ -519,6 +522,8 @@ app.post("/api/activities", async (req, res) => {
         const finalReleaseId = release_id || null;
         const finalParentId = parent_id || null; // <--- ΠΡΟΣΘΗΚΗ
         const now = new Date().toISOString();
+        const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
+        const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
         let finalDisplayOrder = display_order;
         if (finalDisplayOrder === undefined || finalDisplayOrder === null) {
             try {
@@ -540,9 +545,9 @@ app.post("/api/activities", async (req, res) => {
                 db.run(`UPDATE activities SET display_order = display_order + 1 WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1 AND display_order >= ?`, [projectId, sprint, status, display_order]);
             }
 
-            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder], function(err) {
+            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?)`;
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, defaultExpanded], function(err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -626,8 +631,19 @@ app.put("/api/activities/reorder", async (req, res) => {
     }
 });
 
+app.put("/api/activities/expand-all", async (req, res) => {
+    const { project, sprint, is_expanded } = req.body;
+    try {
+        const projectId = await getProjectId(project);
+        await dbRun("UPDATE activities SET is_expanded = ? WHERE project_id = ? AND sprint = ? AND isCurrent = 1", [is_expanded ? 1 : 0, projectId, sprint]);
+        res.json({ message: "Cards updated successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.put("/api/activities/:activityId", (req, res) => {
-    let { comment, statusDate, link, type, tags, release_id, parent_id } = req.body;
+    let { comment, statusDate, link, type, tags, release_id, parent_id, is_expanded } = req.body;
     const activityDbId = req.params.activityId;
     
     let fieldsToUpdate = [];
@@ -639,6 +655,7 @@ app.put("/api/activities/:activityId", (req, res) => {
     if (tags !== undefined) { fieldsToUpdate.push("tags = ?"); params.push(tags); }
     if (release_id !== undefined) { fieldsToUpdate.push("release_id = ?"); params.push(release_id); }
     if (parent_id !== undefined) { fieldsToUpdate.push("parent_id = ?"); params.push(parent_id); }
+    if (is_expanded !== undefined) { fieldsToUpdate.push("is_expanded = ?"); params.push(is_expanded); }
 
     if (fieldsToUpdate.length === 0) {
         return res.status(400).json({ error: "No fields to update provided" });
@@ -3462,6 +3479,23 @@ app.post("/api/jira/import/defects", async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// 2. Λήψη Default Setting
+app.get("/api/settings/default-expanded", async (req, res) => {
+    try {
+        const row = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
+        res.json({ isExpanded: row ? row.value === '1' : true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Αποθήκευση Default Setting
+app.post("/api/settings/default-expanded", async (req, res) => {
+    try {
+        const val = req.body.isExpanded ? '1' : '0';
+        await dbRun("INSERT INTO app_settings (key, value) VALUES ('default_card_expanded', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [val]);
+        res.json({ message: "Settings saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 if (isChatbotEnabled) {

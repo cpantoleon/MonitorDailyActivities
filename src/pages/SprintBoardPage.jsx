@@ -78,6 +78,7 @@ const SprintActivitiesPage = ({
   onOpenEditReleaseModal, onOpenEditProjectModal, onToggleFilterSidebar, isSearching, displayableRequirements,
   onShowHistory, onEditRequirement, onDeleteRequirement, onStatusUpdateRequest, projectReleases,
   allProcessedRequirements, hasAnyReleases, showArchivedSprints, onSetShowArchived, onReorderRequirements,
+  onDataRefresh // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
 }) => {
   const [showCharts, setShowCharts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -321,6 +322,32 @@ const SprintActivitiesPage = ({
           </div>
         </div>
         <div className="page-actions-group">
+           {/* Expand / Collapse All */}
+           <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+               <button 
+                   onClick={async () => {
+                       await fetch('/api/activities/expand-all', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: true }) });
+                       onDataRefresh();
+                   }} 
+                   className="btn-primary" 
+                   style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
+                   title="Show details for all cards" 
+                   disabled={!selectedProject || !selectedSprint}>
+                   Expand All
+               </button>
+               <button 
+                   onClick={async () => {
+                       await fetch('/api/activities/expand-all', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: false }) });
+                       onDataRefresh();
+                   }} 
+                   className="btn-primary" 
+                   style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
+                   title="Hide details for all cards" 
+                   disabled={!selectedProject || !selectedSprint}>
+                   Collapse All
+               </button>
+           </div>
+
            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                <Tooltip content={sprintChartTooltipContent} position="bottom" />
                <button onClick={() => setShowCharts(p => !p)} className="btn-primary" disabled={!selectedProject || !selectedSprint}>

@@ -243,6 +243,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating app_settings table", err.message);
                 else {
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['weather_location', 'Marousi, Athens']);
+                    db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['default_card_expanded', '1']);
                 }
             });
 
@@ -383,6 +384,14 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         } else {
                             console.log("Column 'display_order' added to activities table.");
                         }
+                    });
+                }
+
+                const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
+                if (!hasIsExpandedColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
+                        if (alterErr) console.error("Error adding is_expanded column:", alterErr.message);
+                        else console.log("Column 'is_expanded' added to activities table.");
                     });
                 }
             });

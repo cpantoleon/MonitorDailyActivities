@@ -33,6 +33,7 @@ import Chatbot from './components/Chatbot';
 import FilterSidebar from './components/FilterSidebar';
 import './components/FilterSidebar.css';
 import SprintActivitiesPage from './pages/SprintBoardPage';
+import SettingsModal from './components/SettingsModal';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
@@ -79,6 +80,7 @@ function App() {
   const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '', targetIndex: null });
   const [highlightedReqId, setHighlightedReqId] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   
   const [availableTypes, setAvailableTypes] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
@@ -100,6 +102,13 @@ const [filterOptions, setFilterOptions] = useState({
   const location = useLocation();
   const navigate = useNavigate();
   const isSearchUpdate = useRef(false);
+
+
+  useEffect(() => {
+    const handleOpenSettings = () => setIsSettingsModalOpen(true);
+    window.addEventListener('openSettingsModal', handleOpenSettings);
+    return () => window.removeEventListener('openSettingsModal', handleOpenSettings);
+  }, []);
 
   // 1. Ενημέρωση state από το URL
   useEffect(() => {
@@ -934,6 +943,7 @@ if (isLoading) {
                 onOpenAddModal={handleOpenAddModal} 
                 onAddSubtask={handleOpenAddModal} // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
                 onReorderRequirements={handleReorderRequirements}
+                onDataRefresh={fetchData}
                 onOpenImportModal={handleOpenImportModal}
                 onOpenJiraImportModal={handleOpenJiraImportModal} 
                 onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}
@@ -1031,6 +1041,7 @@ if (isLoading) {
         )}
 
         <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
+        <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} showMessage={showMainMessage} />
         <Chatbot selectedProject={selectedProject} onDataChange={handleDataRefresh} firstProjectName={projects.length > 0 ? projects[0] : ''} className={isFilterSidebarOpen ? 'sidebar-open' : ''} />
       </div>
     </GlobalProvider>

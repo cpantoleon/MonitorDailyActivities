@@ -60,7 +60,10 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <button onClick={() => window.dispatchEvent(new CustomEvent('openSettingsModal'))} className="theme-toggle" title="Settings">
+          {sidebarCollapsed ? '⚙️' : '⚙️ Settings'}
+        </button>
         <button onClick={toggleTheme} className="theme-toggle" title="Toggle Theme">
           {sidebarCollapsed ? (theme === 'light' ? '🌙' : '☀️') : (theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode')}
         </button>
