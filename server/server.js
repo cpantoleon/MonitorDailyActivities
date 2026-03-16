@@ -3203,11 +3203,13 @@ app.post('/api/jira/import', async (req, res) => {
         let importedSubtasks = 0;
         let skipped = 0;
 
-        // Παίρνουμε τα υπάρχοντα keys για να μην διπλο-εισάγουμε
-        const existingRows = await dbAll("SELECT key FROM activities WHERE project_id = ?", [projectId]);
-        const existingKeys = new Set(existingRows.map(r => r.key).filter(Boolean));
+        // ΑΛΛΑΓΗ: Χρησιμοποιούμε Map για να κρατήσουμε τα IDs των ήδη υπαρχόντων requirements
+        const existingRows = await dbAll("SELECT link, requirementGroupId FROM activities WHERE project_id = ? AND isCurrent = 1", [projectId]);
+        const existingLinksMap = new Map();
+        existingRows.forEach(r => {
+            if (r.link) existingLinksMap.set(r.link, r.requirementGroupId);
+        });
 
-        // Helper function για να τρέχουμε db.run με Promises
         const runQuery = (sql, params) => {
             return new Promise((resolve, reject) => {
                 db.run(sql, params, function(err) {
@@ -3222,46 +3224,84 @@ app.post('/api/jira/import', async (req, res) => {
             sprint, type, link, isCurrent, created_at, updated_at, release_id, parent_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`;
 
+        const linkDefects = async (rawIssue, reqGroupId) => {
+            if (!rawIssue || !rawIssue.fields || !rawIssue.fields.issuelinks) return;
+            
+            const linkedKeys = [];
+            rawIssue.fields.issuelinks.forEach(linkObj => {
+                if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
+                if (linkObj.inwardIssue && linkObj.inwardIssue.key) linkedKeys.push(linkObj.inwardIssue.key);
+            });
+
+            if (linkedKeys.length > 0) {
+                const validKeys = linkedKeys.filter(Boolean);
+                if (validKeys.length > 0) {
+                    const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
+                    const likeParams = validKeys.map(k => `%${k}`);
+                    
+                    const findDefectsSql = `SELECT id FROM defects WHERE project_id = ? AND (${likeConditions})`;
+                    const matchedDefects = await dbAll(findDefectsSql, [projectId, ...likeParams]);
+                    
+                    if (matchedDefects && matchedDefects.length > 0) {
+                        for (const defect of matchedDefects) {
+                            await runQuery(
+                                `INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`,
+                                [defect.id, reqGroupId]
+                            );
+                            console.log(`[REQ IMPORT] Linked ReqGroupId ${reqGroupId} with DefectId ${defect.id}`);
+                        }
+                    }
+                }
+            }
+        };
+
         await runQuery("BEGIN TRANSACTION", []);
 
         try {
             for (const parentItem of itemsToImport) {
-                if (existingKeys.has(parentItem.key)) {
+                let parentDbId;
+
+                // ΑΛΛΑΓΗ: Αν υπάρχει ήδη, το παίρνουμε από το Map. ΔΕΝ κάνουμε continue;
+                if (existingLinksMap.has(parentItem.link)) {
                     skipped++;
-                    continue;
+                    parentDbId = existingLinksMap.get(parentItem.link);
+                } else {
+                    let appStatus = 'To Do';
+                    if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
+
+                    parentDbId = await runQuery(insertSql, [
+                        projectId, parentItem.summary, parentItem.key, appStatus, statusDate, 
+                        sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
+                    ]);
+                    await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
+                    importedParents++;
                 }
 
-                let appStatus = 'To Do';
-                if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
-
-                // 1. Insert Parent
-                const parentDbId = await runQuery(insertSql, [
-                    projectId, parentItem.summary, parentItem.key, appStatus, statusDate, 
-                    sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
-                ]);
-                importedParents++;
-
-                // 2. Update Parent requirementGroupId
-                await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
+                // Τρέχουμε πάντα το linkDefects (είτε ήταν νέο είτε υπήρχε ήδη)
+                await linkDefects(parentItem.rawIssue, parentDbId);
 
                 // 3. Insert Sub-tasks
                 if (parentItem.selectedSubtasks && parentItem.selectedSubtasks.length > 0) {
                     for (const subtask of parentItem.selectedSubtasks) {
-                        if (existingKeys.has(subtask.key)) {
+                        let subDbId;
+
+                        if (existingLinksMap.has(subtask.link)) {
                             skipped++;
-                            continue;
+                            subDbId = existingLinksMap.get(subtask.link);
+                        } else {
+                            let subStatus = 'To Do';
+                            if (DONE_STATUSES.includes(subtask.status.toUpperCase())) subStatus = 'Done';
+
+                            subDbId = await runQuery(insertSql, [
+                                projectId, subtask.summary, subtask.key, subStatus, statusDate, 
+                                sprint, subtask.type, subtask.link, now, now, release_id || null, parentDbId
+                            ]);
+                            await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [subDbId, subDbId]);
+                            importedSubtasks++;
                         }
 
-                        let subStatus = 'To Do';
-                        if (DONE_STATUSES.includes(subtask.status.toUpperCase())) subStatus = 'Done';
-
-                        const subDbId = await runQuery(insertSql, [
-                            projectId, subtask.summary, subtask.key, subStatus, statusDate, 
-                            sprint, subtask.type, subtask.link, now, now, release_id || null, parentDbId
-                        ]);
-                        importedSubtasks++;
-
-                        await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [subDbId, subDbId]);
+                        // Τρέχουμε πάντα το linkDefects
+                        await linkDefects(subtask.rawIssue, subDbId);
                     }
                 }
             }
@@ -3270,7 +3310,7 @@ app.post('/api/jira/import', async (req, res) => {
             scheduleQdrantSync();
             
             res.json({ 
-                message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Skipped ${skipped} existing.`,
+                message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Skipped/Updated links for ${skipped} existing.`,
                 data: { importedParents, importedSubtasks, skipped }
             });
 
@@ -3334,7 +3374,8 @@ async function fetchJiraIssues(jql, token) {
                 jql,
                 startAt,
                 maxResults,
-                fields: ["summary", "status", "issuetype", "priority", "description"]
+                // ΕΔΩ ΕΙΝΑΙ ΤΟ ΚΛΕΙΔΙ: Ζητάμε ρητά το "issuelinks"
+                fields: ["summary", "status", "issuetype", "priority", "description", "issuelinks"]
             })
         });
 
@@ -3370,47 +3411,83 @@ app.post("/api/jira/import/requirements", async (req, res) => {
         let imported = 0;
         let skipped = 0;
 
-        const existingRows = await dbAll("SELECT key FROM activities WHERE project_id = ?", [projectId]);
-        const existingKeys = new Set(existingRows.map(r => r.key).filter(k => k));
+        // ΑΛΛΑΓΗ: Χρήση Map αντί για Set
+        const existingRows = await dbAll("SELECT link, requirementGroupId FROM activities WHERE project_id = ? AND isCurrent = 1", [projectId]);
+        const existingLinksMap = new Map();
+        existingRows.forEach(r => { if (r.link) existingLinksMap.set(r.link, r.requirementGroupId); });
 
         const now = new Date().toISOString();
         const statusDate = now.split('T')[0];
 
         for (const issue of issues) {
             const key = issue.key;
-            if (existingKeys.has(key)) {
-                skipped++;
-                continue;
-            }
-
+            const link = `${JIRA_BASE_URL}/browse/${key}`;
+            
             const type = issue.fields.issuetype.name;
             const validTypes = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'];
             if (!validTypes.includes(type)) {
+                continue; // Εδώ κάνουμε continue γιατί το type δεν επιτρέπεται
+            }
+
+            let reqGroupId;
+
+            // ΑΛΛΑΓΗ: Αν υπάρχει, παίρνουμε το ID. Αλλιώς κάνουμε Insert.
+            if (existingLinksMap.has(link)) {
                 skipped++;
-                continue;
+                reqGroupId = existingLinksMap.get(link);
+            } else {
+                const title = issue.fields.summary;
+                const jiraStatus = issue.fields.status.name;
+                
+                let appStatus = 'To Do';
+                const lowerStatus = jiraStatus.toLowerCase();
+                if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
+                    appStatus = 'Done';
+                }
+
+                await dbRun(`INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`, 
+                             [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, release_id || null, now, now]);
+                
+                const row = await dbGet("SELECT last_insert_rowid() as id");
+                reqGroupId = row.id;
+                await dbRun("UPDATE activities SET requirementGroupId = ? WHERE id = ?", [reqGroupId, reqGroupId]);
+                imported++;
             }
 
-            const title = issue.fields.summary;
-            const jiraStatus = issue.fields.status.name;
-            const link = `${JIRA_BASE_URL}/browse/${key}`;
-            
-            let appStatus = 'To Do';
-            const lowerStatus = jiraStatus.toLowerCase();
-            if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
-                appStatus = 'Done';
+            // --- ΑΡΧΗ ΛΟΓΙΚΗΣ ΓΙΑ JIRA LINKS (Τρέχει και για νέα και για ήδη υπάρχοντα) ---
+            const linkedKeys = [];
+            if (issue.fields.issuelinks && issue.fields.issuelinks.length > 0) {
+                issue.fields.issuelinks.forEach(linkObj => {
+                    if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
+                    if (linkObj.inwardIssue && linkObj.inwardIssue.key) linkedKeys.push(linkObj.inwardIssue.key);
+                });
             }
 
-            await dbRun(`INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`, 
-                         [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, release_id || null, now, now]);
-            
-            const row = await dbGet("SELECT last_insert_rowid() as id");
-            await dbRun("UPDATE activities SET requirementGroupId = ? WHERE id = ?", [row.id, row.id]);
-            imported++;
+            if (linkedKeys.length > 0) {
+                const validKeys = linkedKeys.filter(Boolean);
+                if (validKeys.length > 0) {
+                    const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
+                    const likeParams = validKeys.map(k => `%${k}`);
+                    
+                    const findDefectsSql = `SELECT id FROM defects WHERE project_id = ? AND (${likeConditions})`;
+                    const matchedDefects = await dbAll(findDefectsSql, [projectId, ...likeParams]);
+                    
+                    if (matchedDefects && matchedDefects.length > 0) {
+                        for (const defect of matchedDefects) {
+                            await dbRun(
+                                `INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`,
+                                [defect.id, reqGroupId]
+                            );
+                            console.log(`[REQ IMPORT (Direct)] Linked ReqGroupId ${reqGroupId} with DefectId ${defect.id}`);
+                        }
+                    }
+                }
+            }
         }
         
         scheduleQdrantSync();
-        res.json({ message: `Imported ${imported} requirements. Skipped ${skipped}.` });
+        res.json({ message: `Imported ${imported} requirements. Skipped/Updated links for ${skipped}.` });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -3432,49 +3509,88 @@ app.post("/api/jira/import/defects", async (req, res) => {
         let imported = 0;
         let skipped = 0;
 
-        const existingRows = await dbAll("SELECT link FROM defects WHERE project_id = ?", [projectId]);
-        const existingLinks = new Set(existingRows.map(r => r.link));
+        // ΑΛΛΑΓΗ: Χρήση Map αντί για Set
+        const existingRows = await dbAll("SELECT link, id FROM defects WHERE project_id = ?", [projectId]);
+        const existingLinksMap = new Map();
+        existingRows.forEach(r => { if (r.link) existingLinksMap.set(r.link, r.id); });
 
         const now = new Date().toISOString();
 
         for (const issue of issues) {
             const type = issue.fields.issuetype.name;
             if (!['Bug', 'Defect'].includes(type)) {
-                skipped++;
                 continue;
             }
 
             const key = issue.key;
             const link = `${JIRA_BASE_URL}/browse/${key}`;
 
-            if (existingLinks.has(link)) {
+            let defectId;
+
+            // ΑΛΛΑΓΗ: Αν υπάρχει, παίρνουμε το ID. Αλλιώς κάνουμε Insert.
+            if (existingLinksMap.has(link)) {
                 skipped++;
-                continue;
+                defectId = existingLinksMap.get(link);
+            } else {
+                const title = issue.fields.summary;
+                const description = null;
+                const jiraStatus = issue.fields.status.name;
+                
+                let appStatus = 'Assigned to Developer';
+                const lowerStatus = jiraStatus.toLowerCase();
+                if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
+                    appStatus = 'Done';
+                }
+
+                await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at) 
+                             VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?)`,
+                             [projectId, title, description, appStatus, link, now, now, now]);
+                
+                const row = await dbGet("SELECT last_insert_rowid() as id");
+                defectId = row.id;
+
+                const historySummary = JSON.stringify({ status: { old: null, new: appStatus }, title: { old: null, new: title } });
+                await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, 'Imported from Jira', ?)`, [defectId, historySummary, now]);
+                
+                imported++;
             }
 
-            const title = issue.fields.summary;
-            const description = null;
-            const jiraStatus = issue.fields.status.name;
+            // --- ΑΡΧΗ ΛΟΓΙΚΗΣ ΓΙΑ JIRA LINKS (Τρέχει και για νέα και για ήδη υπάρχοντα) ---
+            const linkedKeys = [];
             
-            let appStatus = 'Assigned to Developer';
-            const lowerStatus = jiraStatus.toLowerCase();
-            if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
-                appStatus = 'Done';
+            if (issue.fields.issuelinks && issue.fields.issuelinks.length > 0) {
+                issue.fields.issuelinks.forEach(linkObj => {
+                    if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
+                    if (linkObj.inwardIssue && linkObj.inwardIssue.key) linkedKeys.push(linkObj.inwardIssue.key);
+                });
             }
 
-            await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at) 
-                         VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?)`,
-                         [projectId, title, description, appStatus, link, now, now, now]);
-            
-            const row = await dbGet("SELECT last_insert_rowid() as id");
-            const historySummary = JSON.stringify({ status: { old: null, new: appStatus }, title: { old: null, new: title } });
-            await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, 'Imported from Jira', ?)`, [row.id, historySummary, now]);
-
-            imported++;
+            if (linkedKeys.length > 0) {
+                const validKeys = linkedKeys.filter(Boolean);
+                if (validKeys.length > 0) {
+                    const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
+                    const likeParams = validKeys.map(k => `%${k}`);
+                    
+                    const findReqsSql = `SELECT requirementGroupId FROM activities WHERE isCurrent = 1 AND project_id = ? AND (${likeConditions})`;
+                    const matchedReqs = await dbAll(findReqsSql, [projectId, ...likeParams]);
+                    
+                    if (matchedReqs && matchedReqs.length > 0) {
+                        const uniqueReqIds = [...new Set(matchedReqs.map(r => r.requirementGroupId))];
+                        
+                        for (const reqId of uniqueReqIds) {
+                            await dbRun(
+                                `INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`,
+                                [defectId, reqId]
+                            );
+                            console.log(`[JIRA IMPORT] Linked Defect ID ${defectId} with Requirement Group ID ${reqId}`);
+                        }
+                    }
+                }
+            }
         }
 
         scheduleQdrantSync();
-        res.json({ message: `Imported ${imported} defects. Skipped ${skipped}.` });
+        res.json({ message: `Imported ${imported} defects. Skipped/Updated links for ${skipped}.` });
 
     } catch (err) {
         res.status(500).json({ error: err.message });

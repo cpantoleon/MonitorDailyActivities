@@ -40,7 +40,7 @@ Follow these steps to get the application running locally.
 
 ## Jira Integration Setup
 
-This application supports importing Requirements and Defects directly from Jira using JQL (Jira Query Language). To use this feature, you must generate a Personal Access Token (PAT).
+This application supports importing Requirements and Defects directly from Jira using JQL (Jira Query Language). It intelligently maps **Sub-tasks** to their parent requirements automatically. To use this feature, you must generate a Personal Access Token (PAT).
 
 ### 1. How to Generate a Jira Personal Access Token
 
@@ -60,8 +60,9 @@ This application supports importing Requirements and Defects directly from Jira 
     *   *Note: You can check "Save Token" to store it securely in the local database for future use.*
 4.  Select the **Target Project**.
 5.  (Requirements Only) Select a **Target Release** or choose to assign to **Backlog**.
-6.  Enter your **JQL Query** (e.g., `project = "MYPROJ" AND sprint in openSprints()`).
-7.  Click **Fetch & Import**.
+6.  (Requirements Only) Check **Review and Include Sub-tasks** if you want to preview the hierarchy and selectively import sub-tasks.
+7.  Enter your **JQL Query** (e.g., `project = "MYPROJ" AND sprint in openSprints()`).
+8.  Click **Fetch & Review** or **Import Directly**.
 
 ---
 
@@ -123,7 +124,7 @@ For the chatbot to create the local vector index from your project data inside L
 
 > **Note:** The server is configured to **automatically re-sync** in the background whenever you add, update, or delete data. This manual command is only needed for the initial setup or if you ever need to force a full re-sync.
 
-### 4. Start Chatting!
+### 5. Start Chatting!
 
 Once synced, you can start asking questions! For a full list of example commands, see the **[Chatbot Usage and Example Questions](./CHATBOT_EXAMPLES.md)** guide.
 
@@ -157,14 +158,15 @@ Once synced, you can start asking questions! For a full list of example commands
 -   **Quick Stats:** Immediate insight into open defects, active sprint status, and upcoming releases.
 
 #### 2. Sprint Activities
--   **Kanban Board:** View requirements (To Do, Scenarios created, Under testing, Done).
--   **Jira Import:** Import requirements directly via JQL (supports assigning to Releases/Backlog).
--   **Smart Sprint Selection:** Automatically selects the latest sprint.
+-   **Kanban Board:** View and move requirements (To Do, Scenarios created, Under testing, Done).
+-   **Sub-task Management:** Create sub-tasks directly from parent cards, maintaining a strict hierarchical relationship. 
+-   **Focus Mode:** Click the "eye" icon on any parent/sub-task to instantly highlight its entire family while dimming the rest of the board.
+-   **Custom Reordering:** Drag and drop cards within the *same* column to set custom display priorities.
+-   **Card View Control:** Use the "Expand All" or "Collapse All" buttons to instantly clean up your view, or toggle individual cards. Configure your default preference in Settings.
+-   **Jira Import:** Import requirements directly via JQL (supports assigning to Releases/Backlog and fetching sub-tasks).
 -   **Scope Change Tracking:** Log and visualize significant scope changes.
--   **Release Management:** Assign requirements to active releases.
 -   **Charts:** Visual summaries of sprint status and scope changes.
 -   **Excel Import:** Bulk import from Excel files (includes in-app "How-to" guides).
--   **Jira Import:** Import defects directly via JQL.
 
 #### 3. Defects
 -   **Kanban Board:** Track defects (Assigned to Developer, Assigned to Tester, Done).
@@ -184,10 +186,11 @@ Once synced, you can start asking questions! For a full list of example commands
 #### 5. Key Findings
 -   Log sprint retrospective items (Went Well, Went Wrong, Improvements).
 
-#### 6. Notes
+#### 6. Notes & Settings
 -   Rich text editor for daily project notes.
 -   **Keywords:** Highlights dates based on keywords (e.g., 'release date', 'FAT').
 -   **Integrations:** Sidebar with Weather widget and Nameday calendar.
+-   **Global Settings:** Save your Jira token, configure default Kanban views, and more.
 
 ## API Documentation
 

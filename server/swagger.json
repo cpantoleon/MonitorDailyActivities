@@ -1054,20 +1054,6 @@
               }
             }
           }
-        },
-        "responses": {
-          "200": {
-            "description": "SAT bug updated successfully."
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
         }
       },
       "delete": {
@@ -1166,6 +1152,90 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/activities/reorder": {
+      "put": {
+        "summary": "Reorder activities display order",
+        "tags": [
+          "Requirements"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "orderedIds"
+                ],
+                "properties": {
+                  "orderedIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Ordered list of activity database IDs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/activities/expand-all": {
+      "put": {
+        "summary": "Expand or collapse all cards for a project and sprint",
+        "tags": [
+          "Requirements"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project",
+                  "sprint",
+                  "is_expanded"
+                ],
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "sprint": {
+                    "type": "string"
+                  },
+                  "is_expanded": {
+                    "type": "boolean",
+                    "description": "Set to true to expand, false to collapse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cards updated successfully"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
@@ -2546,6 +2616,14 @@
           "existingRequirementGroupId": {
             "type": "integer",
             "nullable": true
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
           }
         }
       },
@@ -2598,6 +2676,18 @@
             "type": "string",
             "format": "date",
             "nullable": true
+          },
+          "parentId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "is_expanded": {
+            "type": "integer",
+            "nullable": true
           }
         }
       },
@@ -2649,6 +2739,10 @@
           "release_id": {
             "type": "integer",
             "nullable": true
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
           }
         }
       },
@@ -2679,6 +2773,14 @@
             "nullable": true
           },
           "release_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "is_expanded": {
             "type": "integer",
             "nullable": true
           }
@@ -3461,6 +3563,14 @@
           "requirementUserIdentifier": {
             "type": "string",
             "description": "User-facing name/ID"
+          },
+          "parentId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "displayOrder": {
+            "type": "integer",
+            "nullable": true
           },
           "history": {
             "type": "array",
