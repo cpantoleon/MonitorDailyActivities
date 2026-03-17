@@ -3374,8 +3374,8 @@ async function fetchJiraIssues(jql, token) {
                 jql,
                 startAt,
                 maxResults,
-                // ΕΔΩ ΕΙΝΑΙ ΤΟ ΚΛΕΙΔΙ: Ζητάμε ρητά το "issuelinks"
-                fields: ["summary", "status", "issuetype", "priority", "description", "issuelinks"]
+                fields: ["summary", "status", "issuetype", "priority", "description", "issuelinks", "created", "updated"],
+                expand: ["changelog"]
             })
         });
 
@@ -3518,7 +3518,7 @@ app.post("/api/jira/import/defects", async (req, res) => {
 
         for (const issue of issues) {
             const type = issue.fields.issuetype.name;
-            if (!['Bug', 'Defect'].includes(type)) {
+            if (type !== 'Defect') {
                 continue;
             }
 
@@ -3527,24 +3527,64 @@ app.post("/api/jira/import/defects", async (req, res) => {
 
             let defectId;
 
+            const title = issue.fields.summary;
+            const jiraStatus = issue.fields.status.name;
+            const issueCreatedDate = issue.fields.created ? new Date(issue.fields.created).toISOString() : now;
+            
+            let appStatus = 'Assigned to Developer';
+            let fixedDate = null;
+
+            const lowerStatus = jiraStatus.toLowerCase();
+            if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
+                appStatus = 'Done';
+                
+                // Ψάχνουμε στο changelog/history του Jira πότε ακριβώς πήγε σε Done
+                if (issue.changelog && issue.changelog.histories) {
+                    const sortedHistories = [...issue.changelog.histories].sort((a, b) => new Date(b.created) - new Date(a.created));
+                    for (const history of sortedHistories) {
+                        const statusItem = history.items.find(item => item.field === 'status');
+                        if (statusItem && statusItem.toString) {
+                            const newStatusStr = statusItem.toString.toLowerCase();
+                            if (newStatusStr === 'done' || newStatusStr === 'closed' || newStatusStr === 'resolved') {
+                                fixedDate = new Date(history.created).toISOString();
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Αν για κάποιο λόγο δεν βρεθεί στο history, παίρνουμε το updated date του ticket
+                if (!fixedDate) {
+                    fixedDate = issue.fields.updated ? new Date(issue.fields.updated).toISOString() : now;
+                }
+            }
+
             // ΑΛΛΑΓΗ: Αν υπάρχει, παίρνουμε το ID. Αλλιώς κάνουμε Insert.
             if (existingLinksMap.has(link)) {
                 skipped++;
                 defectId = existingLinksMap.get(link);
-            } else {
-                const title = issue.fields.summary;
-                const description = null;
-                const jiraStatus = issue.fields.status.name;
                 
-                let appStatus = 'Assigned to Developer';
-                const lowerStatus = jiraStatus.toLowerCase();
-                if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
-                    appStatus = 'Done';
+                if (appStatus === 'Done') {
+                    // Αν στο Jira έκλεισε (Done/Resolved), ενημερώνουμε ΤΑ ΠΑΝΤΑ (Status και Fixed Date)
+                    await dbRun(
+                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ? WHERE id = ? AND status != 'Closed'`,
+                        [appStatus, title, now, fixedDate, defectId]
+                    );
+                } else {
+                    // Αν είναι ακόμα ανοιχτό στο Jira, ΑΦΗΝΟΥΜΕ ΑΝΕΠΑΦΟ το τοπικό Status και το Fixed Date, 
+                    // ανανεώνουμε ΜΟΝΟ τον τίτλο και το updated_at
+                    await dbRun(
+                        `UPDATE defects SET title = ?, updated_at = ? WHERE id = ? AND status != 'Closed'`,
+                        [title, now, defectId]
+                    );
                 }
+            } else {
+                const description = null;
 
-                await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at) 
-                             VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?)`,
-                             [projectId, title, description, appStatus, link, now, now, now]);
+                // Κάνουμε INSERT βάζοντας σωστό created_date από το Jira και fixed_date
+                await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at, fixed_date) 
+                             VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?, ?)`,
+                             [projectId, title, description, appStatus, link, issueCreatedDate, now, now, fixedDate]);
                 
                 const row = await dbGet("SELECT last_insert_rowid() as id");
                 defectId = row.id;

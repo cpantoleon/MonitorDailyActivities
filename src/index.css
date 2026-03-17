@@ -678,6 +678,32 @@ body {
 .type-badge.sub-task { background-color: var(--type-subtask-bg); color: var(--type-subtask-text); border-color: var(--type-subtask-border); }
 .type-badge.default { background-color: var(--tag-gray-bg); color: var(--tag-gray-text); border-color: var(--tag-gray-border); }
 
+/* ---------------------------------------------------
+   DARK MODE: Solid backgrounds for Collapsed Type Bubbles
+   Αυτό επηρεάζει ΜΟΝΟ τα bubbles όταν η κάρτα είναι κλειστή
+--------------------------------------------------- */
+[data-theme='dark'] .type-bubble.bug { 
+  background-color: #3E1B1B !important; 
+}
+[data-theme='dark'] .type-bubble.change-request { 
+  background-color: #301952 !important; 
+}
+[data-theme='dark'] .type-bubble.story { 
+  background-color: #183A26 !important; 
+}
+[data-theme='dark'] .type-bubble.task { 
+  background-color: #1A3C63 !important; 
+}
+[data-theme='dark'] .type-bubble.incident { 
+  background-color: #2D3748 !important; 
+}
+[data-theme='dark'] .type-bubble.sub-task { 
+  background-color: #1A202C !important; 
+}
+[data-theme='dark'] .type-bubble.default { 
+  background-color: #1A202C !important; 
+}
+
 @media screen and (max-width: 1600px) and (max-width: 768px) {
     .main-layout-content {
         margin-left: calc(var(--sidebar-collapsed-width) / 0.88) !important;
