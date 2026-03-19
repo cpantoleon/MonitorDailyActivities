@@ -65,7 +65,7 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
         const safeTitleId = title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
         const handleCopy = () => {
-            navigator.clipboard.writeText(`${value}${unit}`);
+            navigator.clipboard.writeText(`${value}`);
             setCopyText('Copied!');
             setTimeout(() => setCopyText('Copy'), 2000);
         };
