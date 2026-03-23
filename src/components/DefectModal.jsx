@@ -40,8 +40,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const requirementsForSelectedProject = useMemo(() => {
     if (!formData.project || !allRequirements) return [];
-    // ΠΡΟΣΘΗΚΗ: !r.parentId για να μην έρχονται τα sub-tasks στη λίστα
-    return allRequirements.filter(r => r.project === formData.project && r.isActive && !r.parentId);
+    // Επιστρέφουμε ΚΑΙ τα sub-tasks
+    return allRequirements.filter(r => r.project === formData.project && r.isActive);
   }, [formData.project, allRequirements]);
 
   useEffect(() => {
@@ -414,7 +414,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                         onChange={(e) => setAvailableSearchQuery(e.target.value)}
                       />
                       <select multiple id="available-requirements-listbox" name="available-requirements" value={toAdd} onChange={(e) => handleSelectionChange(e, setToAdd)} disabled={requirementsForSelectedProject.length === 0}>
-                        {availableRequirements.map(req => <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>{req.requirementUserIdentifier}</option>)}
+                        {availableRequirements.map(req => {
+                          const hasParentInList = req.parentId && availableRequirements.some(p => p.id === req.parentId);
+                          return (
+                              <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
+                                  {req.parentId ? (hasParentInList ? `↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
+                              </option>
+                          );
+                      })}
                       </select>
                     </div>
                     <div id="listbox-actions-id" className="listbox-actions">
@@ -432,7 +439,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                         onChange={(e) => setSelectedSearchQuery(e.target.value)}
                       />
                       <select multiple id="selected-requirements-listbox" name="selected-requirements" value={toRemove} onChange={(e) => handleSelectionChange(e, setToRemove)} disabled={selectedRequirements.length === 0}>
-                        {selectedRequirements.map(req => <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>{req.requirementUserIdentifier}</option>)}
+                        {selectedRequirements.map(req => <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>{req.parentId ? `[Sub-task] ${req.requirementUserIdentifier}` : req.requirementUserIdentifier}</option>)}
                       </select>
                     </div>
                   </div>

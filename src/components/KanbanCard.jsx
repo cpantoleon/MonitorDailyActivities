@@ -269,7 +269,7 @@ const KanbanCard = React.memo(({
               </p>
             )}
 
-            {!isSubtask && requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
+            {requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
               <div id={`card-detail-item-defects-${requirement.id}`} className="card-detail-item">
                 <span className="detail-label">Linked Defects:</span>
                 <div id={`linked-items-container-${requirement.id}`} className="linked-items-container">

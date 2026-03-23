@@ -913,10 +913,21 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     const reqChartRef = useRef(null);
     const defectChartRef = useRef(null);
 
-    const releaseRequirements = useMemo(() => 
-        allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id),
-        [allProcessedRequirements, release.id]
-    );
+    const releaseRequirements = useMemo(() => {
+        // Βρίσκουμε τα κανονικά requirements (parents) που ανήκουν στη release
+        const directReqs = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
+        const directReqIds = new Set(directReqs.map(r => r.id));
+        
+        // Βρίσκουμε τα sub-tasks που ανήκουν σε αυτά τα parents (ανεξάρτητα από το αν έχουν δικό τους releaseId)
+        const subTasks = allProcessedRequirements.filter(r => r.parentId && directReqIds.has(r.parentId));
+        
+        // Τα ενώνουμε διασφαλίζοντας ότι δεν υπάρχουν διπλότυπα
+        const combinedMap = new Map();
+        directReqs.forEach(r => combinedMap.set(r.id, r));
+        subTasks.forEach(r => combinedMap.set(r.id, r));
+        
+        return Array.from(combinedMap.values());
+    }, [allProcessedRequirements, release.id]);
 
     const availableSprints = useMemo(() => {
         const sprints = new Set(releaseRequirements.map(r => r.currentStatusDetails.sprint).filter(Boolean));
