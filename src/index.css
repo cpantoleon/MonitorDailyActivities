@@ -382,6 +382,29 @@ body {
   transition: color 0.2s ease;
 }
 
+/* --- Sub-task Card Styling (Light Mode) --- */
+/* --- Sub-task Card Styling (Light Mode) --- */
+.kanban-card.is-subtask-card {
+  background-color: #FCF8F2; /* Απαλό ιβουάρ/ζαχαρί που δένει με το theme σου */
+  border-left: 4px solid var(--type-subtask-border);
+}
+
+.kanban-card.is-subtask-card:hover {
+  background-color: #F5EFE6; /* Σκουραίνει ελάχιστα στο hover */
+  border-left-color: var(--accent-color);
+}
+
+/* --- Sub-task Card Styling (Dark Mode) --- */
+[data-theme='dark'] .kanban-card.is-subtask-card {
+  background-color: #282E3A; /* Αισθητή διαφορά από το #1E1E1E (μαύρο/γκρι) των κανονικών cards */
+  border-left: 4px solid var(--type-subtask-border);
+}
+
+[data-theme='dark'] .kanban-card.is-subtask-card:hover {
+  background-color: #2D3442;
+  border-left-color: var(--accent-color);
+}
+
 .card-detail-item a.detail-value:hover {
   color: #2b6cb0;
   text-decoration: underline;

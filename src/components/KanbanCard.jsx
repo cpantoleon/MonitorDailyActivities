@@ -150,7 +150,7 @@ const KanbanCard = React.memo(({
     <div 
       id={`req-card-${requirement.id}`}
       data-id={requirement.id}
-      className={`kanban-card ${focusClass}`}
+      className={`kanban-card ${focusClass} ${isSubtask ? 'is-subtask-card' : ''}`}
       draggable="true"
       onDragStart={(e) => handleDragStart(e, requirement)}
       onDragEnd={handleDragEnd}
