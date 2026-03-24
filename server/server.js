@@ -520,34 +520,50 @@ app.post("/api/activities", async (req, res) => {
         tags = tags ? tags.trim() : null;
         const itemKey = key ? key.trim() : null;
         const finalReleaseId = release_id || null;
-        const finalParentId = parent_id || null; // <--- ΠΡΟΣΘΗΚΗ
+        const finalParentId = parent_id || null;
         const now = new Date().toISOString();
         const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
         const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
+        
         let finalDisplayOrder = display_order;
-        if (finalDisplayOrder === undefined || finalDisplayOrder === null) {
+        let finalIsExpanded = defaultExpanded; // Αρχικά παίρνει το default
+    
+        if (finalDisplayOrder === undefined || finalDisplayOrder === null || existingRequirementGroupId) {
             try {
-                // Βρίσκουμε το μεγαλύτερο order που υπάρχει ήδη στη συγκεκριμένη στήλη
-                const maxRow = await dbGet(
-                    `SELECT MAX(display_order) as maxOrder FROM activities WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1`, 
-                    [projectId, sprint, status]
-                );
-                finalDisplayOrder = (maxRow && maxRow.maxOrder !== null) ? maxRow.maxOrder + 1 : 0;
+                if (existingRequirementGroupId) {
+                    const oldRow = await dbGet(`SELECT display_order, status, sprint, is_expanded FROM activities WHERE requirementGroupId = ? AND isCurrent = 1`, [existingRequirementGroupId]);
+                    if (oldRow) {
+                        // 1. Διατηρούμε το Expand state αν υπάρχει ήδη
+                        if (oldRow.is_expanded !== undefined && oldRow.is_expanded !== null) {
+                            finalIsExpanded = oldRow.is_expanded;
+                        }
+
+                        // 2. Διατηρούμε το Order αν δεν άλλαξε στήλη
+                        if ((finalDisplayOrder === undefined || finalDisplayOrder === null) && oldRow.status === status && oldRow.sprint === sprint) {
+                            finalDisplayOrder = oldRow.display_order;
+                        }
+                    }
+                }
+                
+                if (finalDisplayOrder === undefined || finalDisplayOrder === null) {
+                    const maxRow = await dbGet(`SELECT MAX(display_order) as maxOrder FROM activities WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1`, [projectId, sprint, status]);
+                    finalDisplayOrder = (maxRow && maxRow.maxOrder !== null) ? maxRow.maxOrder + 1 : 0;
+                }
             } catch (err) {
-                console.error("Error getting max display_order:", err);
-                finalDisplayOrder = 0;
+                console.error("Error calculating display_order/is_expanded:", err);
+                if (finalDisplayOrder === undefined || finalDisplayOrder === null) finalDisplayOrder = 0;
             }
         }
 
         db.serialize(() => {
-            // Αν το item μπαίνει σε συγκεκριμένη θέση, σπρώχνουμε τα από κάτω +1 για να κάνουμε χώρο
             if (display_order !== undefined && display_order !== null) {
                 db.run(`UPDATE activities SET display_order = display_order + 1 WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1 AND display_order >= ?`, [projectId, sprint, status, display_order]);
             }
 
             const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, defaultExpanded], function(err) {
+            // Περνάμε το finalIsExpanded
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded], function(err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -569,11 +585,14 @@ app.post("/api/activities", async (req, res) => {
 
                                 let processed = 0;
                                 subtasks.forEach(sub => {
-                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order)
-                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`;
+                                    // Υπολογίζουμε το Expand state και για τα subtasks
+                                    const subExpanded = (sub.is_expanded !== undefined && sub.is_expanded !== null) ? sub.is_expanded : defaultExpanded;
+
+                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded)
+                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`;
                                     db.run(insertSubSql, [
                                         sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate, 
-                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999
+                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded
                                     ], function(errInsert) {
                                         if (!errInsert) {
                                             const newSubId = this.lastID;
@@ -2607,13 +2626,14 @@ app.get("/api/defects/:project", async (req, res) => {
     const statusType = req.query.statusType || 'active';
 
     try {
-        const projectId = await getProjectId(project);
-        let statusCondition = "d.status != 'Closed'";
-        let orderBy = "d.created_at DESC";
-        if (statusType === 'closed') {
-            statusCondition = "d.status = 'Closed'";
-            orderBy = "d.updated_at DESC";
-        }
+            const projectId = await getProjectId(project);
+            let statusCondition = "d.status != 'Closed'";
+            let orderBy = "d.display_order ASC, d.created_at DESC"; 
+            
+            if (statusType === 'closed') {
+                statusCondition = "d.status = 'Closed'";
+                orderBy = "d.updated_at DESC";
+            }
 
         const defectsSql = `
             WITH LastComment AS (
@@ -2892,11 +2912,21 @@ app.put("/api/defects/:id", (req, res) => {
 
             addChange("link", link, currentDefect.link);
 
-            // Expand State / Display Order changes (ADDED FOR SUMMARY FLAG TO FIRE)
-            if (is_expanded !== undefined && is_expanded !== currentDefect.is_expanded) {
-                updates.push(`is_expanded = ?`);
-                updateParamsList.push(is_expanded);
-                changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: is_expanded };
+            const isDragEvent = (status !== undefined && status !== currentDefect.status) || 
+                                (display_order !== undefined && display_order !== currentDefect.display_order);
+
+            if (is_expanded !== undefined) {
+                let expandedInt = (is_expanded === true || is_expanded === 'true' || is_expanded === 1 || is_expanded === '1') ? 1 : 0;
+                
+                if (isDragEvent) {
+                    expandedInt = currentDefect.is_expanded !== null ? currentDefect.is_expanded : 1;
+                }
+
+                if (expandedInt !== currentDefect.is_expanded) {
+                    updates.push(`is_expanded = ?`);
+                    updateParamsList.push(expandedInt);
+                    changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: expandedInt };
+                }
             }
             
             if (display_order !== undefined && display_order !== currentDefect.display_order) {
@@ -2927,12 +2957,11 @@ app.put("/api/defects/:id", (req, res) => {
                 return res.json({ message: "No changes detected.", defectId: defectId });
             }
 
-            // 5. Perform Updates Transaction
+            // 5. Perform Updates Transaction (Καθαρισμένο από το Shifting)
             db.serialize(() => {
                 db.run("BEGIN TRANSACTION", (beginErr) => {
                     if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
 
-                    // ΜΕΤΑΚΙΝΗΣΗ ΠΙΟ ΨΗΛΑ - Για να μην πετάει ReferenceError
                     const commitTransaction = () => {
                         db.run("COMMIT", (commitErr) => {
                             if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
@@ -2941,7 +2970,6 @@ app.put("/api/defects/:id", (req, res) => {
                         });
                     };
 
-                    // ΜΕΤΑΚΙΝΗΣΗ ΠΙΟ ΨΗΛΑ - Για να μην πετάει ReferenceError
                     const executeUpdate = () => {
                         if (hasFieldChanges) {
                             updates.push("updated_at = ?");
@@ -2991,7 +3019,6 @@ app.put("/api/defects/:id", (req, res) => {
                         }
 
                         const historyComment = comment ? comment.trim() : null;
-                        
                         const historyFields = { ...changedFieldsForSummary };
                         delete historyFields.is_expanded;
                         delete historyFields.display_order;
@@ -3006,10 +3033,10 @@ app.put("/api/defects/:id", (req, res) => {
                                     db.run("ROLLBACK");
                                     return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
                                 }
-                                executeUpdate(); // Πλέον βρίσκει τη συνάρτηση χωρίς πρόβλημα
+                                executeUpdate(); 
                             });
                         } else {
-                            executeUpdate(); // Πλέον βρίσκει τη συνάρτηση χωρίς πρόβλημα
+                            executeUpdate(); 
                         }
                     });
 
