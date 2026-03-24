@@ -171,6 +171,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
           navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
       }
   }, [navigate, showClosedView]);
+  
   useEffect(() => {
     if (selectedProject) {
       sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
@@ -179,8 +180,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    
-    // CHANGED: Read 'd_project' instead of 'project'
     let projectParam = params.get('d_project'); 
     const viewParam = params.get('view');
     const highlightId = params.get('highlight');
@@ -190,7 +189,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       const storedProject = sessionStorage.getItem('defectsPageSelectedProject');
       if (storedProject) {
         projectParam = storedProject;
-        // CHANGED: Set 'd_project' instead of 'project'
         params.set('d_project', storedProject);
         needsReplace = true;
       }
@@ -599,6 +597,34 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
     }
+  };
+
+  // ΠΡΟΣΘΗΚΗ: Reorder & Expand All
+  const handleReorderDefects = async (orderedIds) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/defects/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds })
+      });
+      if (!response.ok) throw new Error('Failed to save new order');
+      await refreshDefectsState(); 
+    } catch (error) {
+      showMessage("Failed to save order", "error");
+    }
+  };
+
+  const handleExpandAll = async (isExpanded) => {
+      try {
+          await fetch(`${API_BASE_URL}/defects/expand-all`, { 
+              method: 'PUT', 
+              headers: {'Content-Type': 'application/json'}, 
+              body: JSON.stringify({ project: selectedProject, is_expanded: isExpanded ? 1 : 0 }) 
+          });
+          await refreshDefectsState();
+      } catch (error) {
+          showMessage("Failed to update card visibility", "error");
+      }
   };
 
   const handleDeleteRequest = (defect) => { setDefectToDelete(defect); setIsDeleteConfirmModalOpen(true); };
@@ -1020,6 +1046,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             onDrop={handleDrop} 
             onMoveToClosed={handleMoveToClosed}
             onUpdateFixedDate={handleSaveFixedDate}
+            onReorder={handleReorderDefects}
           />
         ))}
       </div>
@@ -1067,6 +1094,25 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             </button>
         </div>
         <div className="page-actions-group">
+            
+            {/* ΠΡΟΣΘΗΚΗ: Expand / Collapse All */}
+            <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+                <button 
+                    onClick={() => handleExpandAll(true)} 
+                    className="btn-primary" 
+                    style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
+                    disabled={!selectedProject}>
+                    Expand All
+                </button>
+                <button 
+                    onClick={() => handleExpandAll(false)} 
+                    className="btn-primary" 
+                    style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
+                    disabled={!selectedProject}>
+                    Collapse All
+                </button>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <Tooltip content={defectChartTooltipContent} position="bottom" />
                 <button onClick={handleToggleCharts} className="btn-primary" disabled={!selectedProject || filteredDefects.length === 0}>

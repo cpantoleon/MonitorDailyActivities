@@ -423,6 +423,29 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         }
                     });
                 }
+
+                const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
+                if (!hasIsExpandedColumn) {
+                    db.run("ALTER TABLE defects ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding is_expanded column to defects:", alterErr.message);
+                        } else {
+                            console.log("Column 'is_expanded' added to defects table.");
+                        }
+                    });
+                }
+
+                const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
+                if (!hasDisplayOrderColumn) {
+                    db.run("ALTER TABLE defects ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
+                        if (alterErr) {
+                            console.error("Error adding display_order column to defects:", alterErr.message);
+                        } else {
+                            console.log("Column 'display_order' added to defects table.");
+                        }
+                    });
+                }
+
             });
 
             console.log("All table checks/creations complete.");

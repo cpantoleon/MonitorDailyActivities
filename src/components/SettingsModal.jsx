@@ -39,7 +39,7 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 <div>
                     <label style={{ margin: 0, fontSize: '1.1em', color: 'var(--text-primary)' }}>Default Card View</label>
                     <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>
-                        Choose how new requirements will appear on the Sprint Board.
+                        Choose how new cards (Requirements & Defects) will appear by default on their respective boards.
                     </p>
                 </div>
                 <ToggleSwitch

@@ -1,4 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+const ToggleIcon = ({ isExpanded }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform 0.3s ease', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
 
 const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed, onUpdateFixedDate }) => {
   
@@ -11,6 +17,26 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
 
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(getLocalDateTime(defect.fixed_date));
+  
+  // ΠΡΟΣΘΗΚΗ: State για το Expand / Collapse
+  const [isExpanded, setIsExpanded] = useState(defect.is_expanded !== 0);
+
+  // ΠΡΟΣΘΗΚΗ: Συγχρονισμός με αλλαγές από Expand All
+  useEffect(() => {
+    setIsExpanded(defect.is_expanded !== 0);
+  }, [defect.is_expanded]);
+
+  const handleToggleExpand = (e) => {
+    e.stopPropagation();
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    
+    fetch(`/api/defects/${defect.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_expanded: newState ? 1 : 0 })
+    }).catch(err => console.error("Failed to save expand state", err));
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -79,113 +105,145 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
       )}
 
       <div className="kanban-card-main-content" style={{ flexGrow: 1 }}>
-        <strong id={`defect-card-title-${defect.id}`} style={{ display: 'block', marginBottom: '12px', color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.05rem', wordBreak: 'break-word' }}>
-          {defect.title}
-        </strong>
-
-        <div className="kanban-card-details">
-          {defect.area !== 'Imported' && (
-            <div className="card-detail-item">
-              <span className="detail-label">Area:</span>
-              <span className="detail-value">{defect.area}</span>
-            </div>
-          )}
-
-          {defect.description && (
-            <div className="card-detail-item">
-              <span className="detail-label">Description:</span>
-              <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.description}</span>
-            </div>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <strong id={`defect-card-title-${defect.id}`} style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.05rem', wordBreak: 'break-word', paddingRight: '30px' }}>
+            {defect.title}
+          </strong>
           
-          {defect.lastComment && defect.lastComment.trim() !== '-' && defect.lastComment.trim() !== '' && (
-            <div className="card-detail-item">
-              <span className="detail-label">Last Comment:</span>
-              <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.lastComment}</span>
-            </div>
-          )}
-
-          {defect.link && (
-            <div className="card-detail-item">
-              <span className="detail-label">Link:</span>
-              <a href={defect.link} target="_blank" rel="noopener noreferrer" className="detail-value">{defect.link}</a>
-            </div>
-          )}
-
-          <div className="card-detail-item">
-            <span className="detail-label">Logged:</span>
-            <span className="detail-value">{formatDate(defect.created_date)}</span>
-          </div>
-          
-          {(defect.status === 'Done' || defect.status === 'Closed') && (
-            <div className="card-detail-item">
-                <span className="detail-label">Fixed Date:</span>
-                <span className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {isEditingDate ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <input 
-                                type="datetime-local" 
-                                value={tempDate} 
-                                onChange={(e) => setTempDate(e.target.value)}
-                                style={{ padding: '4px', fontSize: '0.9em', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                            />
-                            <button 
-                                onClick={handleSaveDate} 
-                                title="Save"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#28a745', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
-                            >
-                                ✓
-                            </button>
-                            <button 
-                                onClick={handleCancelDate} 
-                                title="Cancel"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
-                            >
-                                ✕
-                            </button>
-                        </span>
-                    ) : (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            {defect.fixed_date ? new Date(defect.fixed_date).toLocaleString() : 'N/A'}
-                            {defect.status === 'Done' && (
-                                <button 
-                                    onClick={() => { setIsEditingDate(true); setTempDate(getLocalDateTime(defect.fixed_date)); }}
-                                    title="Edit Fixed Date"
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-color)', padding: 0 }}
-                                >
-                                    ✏️
-                                </button>
-                            )}
-                        </span>
-                    )}
-                </span>
-            </div>
-          )}
-
-          <div className="card-detail-item">
-            <span className="detail-label">Last Update:</span>
-            <span className="detail-value">{new Date(defect.updated_at).toLocaleString()}</span>
-          </div>
-
-          {defect.linkedRequirements && defect.linkedRequirements.length > 0 && (
-            <div className="card-detail-item" style={{ marginTop: '10px' }}>
-              <span className="detail-label" style={{ marginBottom: '5px' }}>Linked Requirements:</span>
-              <div className="linked-items-container">
-                {defect.linkedRequirements.map(req => (
-                  <button 
-                    id={`linked-req-tag-${req.groupId}`}
-                    key={req.groupId} 
-                    className="linked-item-tag"
-                    onClick={() => onNavigate(defect.project, req.sprint, req.groupId)}
-                    title={`Go to requirement in Sprint: ${req.sprint}`}
-                  >
-                    {req.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* ΠΡΟΣΘΗΚΗ: Κουμπί Expand/Collapse */}
+          <button 
+              type="button" 
+              onClick={handleToggleExpand} 
+              onMouseDown={(e) => e.stopPropagation()}
+              title={isExpanded ? "Collapse Card" : "Expand Card"}
+              style={{ 
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0, 
+                  margin: 0, 
+                  marginRight: '15px',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  borderRadius: '50%',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0
+              }}
+          >
+              <ToggleIcon isExpanded={isExpanded} />
+          </button>
         </div>
+
+        {/* ΠΡΟΣΘΗΚΗ: Κρύβονται αν είναι Collapsed */}
+        {isExpanded && (
+          <div className="kanban-card-details">
+            {defect.area !== 'Imported' && (
+              <div className="card-detail-item">
+                <span className="detail-label">Area:</span>
+                <span className="detail-value">{defect.area}</span>
+              </div>
+            )}
+
+            {defect.description && (
+              <div className="card-detail-item">
+                <span className="detail-label">Description:</span>
+                <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.description}</span>
+              </div>
+            )}
+            
+            {defect.lastComment && defect.lastComment.trim() !== '-' && defect.lastComment.trim() !== '' && (
+              <div className="card-detail-item">
+                <span className="detail-label">Last Comment:</span>
+                <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{defect.lastComment}</span>
+              </div>
+            )}
+
+            {defect.link && (
+              <div className="card-detail-item">
+                <span className="detail-label">Link:</span>
+                <a href={defect.link} target="_blank" rel="noopener noreferrer" className="detail-value">{defect.link}</a>
+              </div>
+            )}
+
+            <div className="card-detail-item">
+              <span className="detail-label">Logged:</span>
+              <span className="detail-value">{formatDate(defect.created_date)}</span>
+            </div>
+            
+            {(defect.status === 'Done' || defect.status === 'Closed') && (
+              <div className="card-detail-item">
+                  <span className="detail-label">Fixed Date:</span>
+                  <span className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {isEditingDate ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <input 
+                                  type="datetime-local" 
+                                  value={tempDate} 
+                                  onChange={(e) => setTempDate(e.target.value)}
+                                  style={{ padding: '4px', fontSize: '0.9em', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                              />
+                              <button 
+                                  onClick={handleSaveDate} 
+                                  title="Save"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#28a745', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
+                              >
+                                  ✓
+                              </button>
+                              <button 
+                                  onClick={handleCancelDate} 
+                                  title="Cancel"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545', fontWeight: 'bold', padding: '0 5px', fontSize: '1.1em' }}
+                              >
+                                  ✕
+                              </button>
+                          </span>
+                      ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              {defect.fixed_date ? new Date(defect.fixed_date).toLocaleString() : 'N/A'}
+                              {defect.status === 'Done' && (
+                                  <button 
+                                      onClick={() => { setIsEditingDate(true); setTempDate(getLocalDateTime(defect.fixed_date)); }}
+                                      title="Edit Fixed Date"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-color)', padding: 0 }}
+                                  >
+                                      ✏️
+                                  </button>
+                              )}
+                          </span>
+                      )}
+                  </span>
+              </div>
+            )}
+
+            <div className="card-detail-item">
+              <span className="detail-label">Last Update:</span>
+              <span className="detail-value">{new Date(defect.updated_at).toLocaleString()}</span>
+            </div>
+
+            {defect.linkedRequirements && defect.linkedRequirements.length > 0 && (
+              <div className="card-detail-item" style={{ marginTop: '10px' }}>
+                <span className="detail-label" style={{ marginBottom: '5px' }}>Linked Requirements:</span>
+                <div className="linked-items-container">
+                  {defect.linkedRequirements.map(req => (
+                    <button 
+                      id={`linked-req-tag-${req.groupId}`}
+                      key={req.groupId} 
+                      className="linked-item-tag"
+                      onClick={() => onNavigate(defect.project, req.sprint, req.groupId)}
+                      title={`Go to requirement in Sprint: ${req.sprint}`}
+                    >
+                      {req.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="defect-card-actions">

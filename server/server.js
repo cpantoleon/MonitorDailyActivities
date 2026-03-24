@@ -2571,6 +2571,37 @@ app.get("/api/defects/all", (req, res) => {
     });
 });
 
+// --- ΠΡΟΣΘΗΚΗ: Reorder Defects ---
+app.put("/api/defects/reorder", async (req, res) => {
+    const { orderedIds } = req.body; 
+    if (!orderedIds || !Array.isArray(orderedIds)) return res.status(400).json({ error: "Invalid data format." });
+
+    try {
+        await dbRun("BEGIN TRANSACTION");
+        for (let i = 0; i < orderedIds.length; i++) {
+            await dbRun("UPDATE defects SET display_order = ? WHERE id = ?", [i, orderedIds[i]]);
+        }
+        await dbRun("COMMIT");
+        scheduleQdrantSync();
+        res.json({ message: "Order updated successfully." });
+    } catch (error) {
+        await dbRun("ROLLBACK");
+        res.status(500).json({ error: "Failed to save order." });
+    }
+});
+
+// --- ΠΡΟΣΘΗΚΗ: Expand/Collapse All Defects ---
+app.put("/api/defects/expand-all", async (req, res) => {
+    const { project, is_expanded } = req.body;
+    try {
+        const projectId = await getProjectId(project);
+        await dbRun("UPDATE defects SET is_expanded = ? WHERE project_id = ? AND status != 'Closed'", [is_expanded ? 1 : 0, projectId]);
+        res.json({ message: "Defect cards updated successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get("/api/defects/:project", async (req, res) => {
     const project = req.params.project.trim();
     const statusType = req.query.statusType || 'active';
@@ -2724,12 +2755,18 @@ app.post("/api/defects", async (req, res) => {
         comment = comment ? comment.trim() : null;
         const isFatDefect = is_fat_defect ? 1 : 0;
 
+        const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
+        const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
+
+        const maxRow = await dbGet(`SELECT MAX(display_order) as maxOrder FROM defects WHERE project_id = ? AND status = ?`, [projectId, status]);
+        const finalDisplayOrder = (maxRow && maxRow.maxOrder !== null) ? maxRow.maxOrder + 1 : 0;
+
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`;
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
             
-            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp];
+            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded];
             
             db.run(insertDefectSql, defectParams, function(err) {
                 if (err) {
@@ -2770,32 +2807,27 @@ app.post("/api/defects", async (req, res) => {
 
 app.put("/api/defects/:id", (req, res) => {
     const defectId = parseInt(req.params.id, 10);
-    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date } = req.body;
+    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date, display_order, is_expanded } = req.body;
 
     // 1. Fetch Basic Defect Info
     db.get("SELECT * FROM defects WHERE id = ?", [defectId], (err, currentDefect) => {
         if (err) return res.status(500).json({ error: "Error fetching current defect state." });
         if (!currentDefect) return res.status(404).json({ error: `Defect with id ${defectId} not found.` });
 
-        // 2. FIX: Explicitly fetch current links from the join table
+        // 2. Fetch current links from the join table
         const getLinksSql = "SELECT requirement_group_id FROM defect_requirement_links WHERE defect_id = ?";
         db.all(getLinksSql, [defectId], (linkErr, linkRows) => {
             if (linkErr) return res.status(500).json({ error: "Error fetching current links." });
 
-            // Flatten the rows into an array of IDs
             const currentLinks = linkRows.map(r => r.requirement_group_id);
             const newLinks = linkedRequirementGroupIds || [];
 
             // 3. Determine if links have changed
             let linksChanged = false;
             if (linkedRequirementGroupIds !== undefined) {
-                // Check length difference
                 if (currentLinks.length !== newLinks.length) {
                     linksChanged = true;
                 } else {
-                    // Check if every item in currentLinks exists in newLinks
-                    // We sort or use simple inclusion check. Since DB IDs are usually numbers/strings, standard check works.
-                    // (Using Set for safer comparison)
                     const currentSet = new Set(currentLinks.map(String));
                     const newSet = new Set(newLinks.map(String));
                     for (let id of currentSet) {
@@ -2860,6 +2892,19 @@ app.put("/api/defects/:id", (req, res) => {
 
             addChange("link", link, currentDefect.link);
 
+            // Expand State / Display Order changes (ADDED FOR SUMMARY FLAG TO FIRE)
+            if (is_expanded !== undefined && is_expanded !== currentDefect.is_expanded) {
+                updates.push(`is_expanded = ?`);
+                updateParamsList.push(is_expanded);
+                changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: is_expanded };
+            }
+            
+            if (display_order !== undefined && display_order !== currentDefect.display_order) {
+                updates.push(`display_order = ?`);
+                updateParamsList.push(display_order);
+                changedFieldsForSummary['display_order'] = { old: currentDefect.display_order, new: display_order };
+            }
+
             if (created_date !== undefined) {
                 const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
                 if (newCreatedAt !== currentDefect.created_at) {
@@ -2887,56 +2932,16 @@ app.put("/api/defects/:id", (req, res) => {
                 db.run("BEGIN TRANSACTION", (beginErr) => {
                     if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
 
-                    const handleLinks = (callback) => {
-                        if (linksChanged) {
-                            // Always delete old links first
-                            db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
-                                if (deleteErr) return callback(deleteErr);
-                                
-                                // Then add new links if any exist
-                                if (newLinks.length > 0) {
-                                    const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                                    let completed = 0;
-                                    newLinks.forEach(reqId => {
-                                        db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
-                                            if(insertErr) console.error("Error inserting link:", insertErr.message); 
-                                            completed++;
-                                            if (completed === newLinks.length) callback(null);
-                                        });
-                                    });
-                                } else {
-                                    // Payload was [], so we just stop here (links successfully cleared)
-                                    callback(null);
-                                }
-                            });
-                        } else {
-                            callback(null);
-                        }
+                    // ΜΕΤΑΚΙΝΗΣΗ ΠΙΟ ΨΗΛΑ - Για να μην πετάει ReferenceError
+                    const commitTransaction = () => {
+                        db.run("COMMIT", (commitErr) => {
+                            if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
+                            scheduleQdrantSync();
+                            res.json({ message: "Defect updated successfully.", defectId: defectId });
+                        });
                     };
 
-                    handleLinks((linkErr) => {
-                        if (linkErr) {
-                            db.run("ROLLBACK");
-                            return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
-                        }
-
-                        const historyComment = comment ? comment.trim() : null;
-                        if (hasFieldChanges || historyComment) {
-                            const changesSummaryString = hasFieldChanges ? JSON.stringify(changedFieldsForSummary) : null;
-                            const nowUTC = new Date().toISOString();
-                            const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
-                            db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
-                                if (historyErr) {
-                                    db.run("ROLLBACK");
-                                    return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
-                                }
-                                executeUpdate();
-                            });
-                        } else {
-                            executeUpdate();
-                        }
-                    });
-
+                    // ΜΕΤΑΚΙΝΗΣΗ ΠΙΟ ΨΗΛΑ - Για να μην πετάει ReferenceError
                     const executeUpdate = () => {
                         if (hasFieldChanges) {
                             updates.push("updated_at = ?");
@@ -2955,13 +2960,59 @@ app.put("/api/defects/:id", (req, res) => {
                         }
                     };
 
-                    const commitTransaction = () => {
-                        db.run("COMMIT", (commitErr) => {
-                            if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
-                            scheduleQdrantSync();
-                            res.json({ message: "Defect updated successfully.", defectId: defectId });
-                        });
+                    const handleLinks = (callback) => {
+                        if (linksChanged) {
+                            db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
+                                if (deleteErr) return callback(deleteErr);
+                                
+                                if (newLinks.length > 0) {
+                                    const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
+                                    let completed = 0;
+                                    newLinks.forEach(reqId => {
+                                        db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
+                                            if(insertErr) console.error("Error inserting link:", insertErr.message); 
+                                            completed++;
+                                            if (completed === newLinks.length) callback(null);
+                                        });
+                                    });
+                                } else {
+                                    callback(null);
+                                }
+                            });
+                        } else {
+                            callback(null);
+                        }
                     };
+
+                    handleLinks((linkErr) => {
+                        if (linkErr) {
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
+                        }
+
+                        const historyComment = comment ? comment.trim() : null;
+                        
+                        const historyFields = { ...changedFieldsForSummary };
+                        delete historyFields.is_expanded;
+                        delete historyFields.display_order;
+                        const hasRealHistoryChanges = Object.keys(historyFields).length > 0;
+
+                        if (hasRealHistoryChanges || historyComment) {
+                            const changesSummaryString = hasRealHistoryChanges ? JSON.stringify(historyFields) : null;
+                            const nowUTC = new Date().toISOString();
+                            const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
+                            db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
+                                if (historyErr) {
+                                    db.run("ROLLBACK");
+                                    return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
+                                }
+                                executeUpdate(); // Πλέον βρίσκει τη συνάρτηση χωρίς πρόβλημα
+                            });
+                        } else {
+                            executeUpdate(); // Πλέον βρίσκει τη συνάρτηση χωρίς πρόβλημα
+                        }
+                    });
+
                 });
             });
         });
