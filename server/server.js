@@ -2605,6 +2605,7 @@ app.put("/api/defects/reorder", async (req, res) => {
         res.json({ message: "Order updated successfully." });
     } catch (error) {
         await dbRun("ROLLBACK");
+        console.error("Reorder Error:", error);
         res.status(500).json({ error: "Failed to save order." });
     }
 });
@@ -2825,225 +2826,168 @@ app.post("/api/defects", async (req, res) => {
     }
 });
 
-app.put("/api/defects/:id", (req, res) => {
+app.put("/api/defects/:id", async (req, res) => {
     const defectId = parseInt(req.params.id, 10);
     const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date, display_order, is_expanded } = req.body;
 
-    // 1. Fetch Basic Defect Info
-    db.get("SELECT * FROM defects WHERE id = ?", [defectId], (err, currentDefect) => {
-        if (err) return res.status(500).json({ error: "Error fetching current defect state." });
+    try {
+        // 1. Fetch Basic Defect Info
+        const currentDefect = await dbGet("SELECT * FROM defects WHERE id = ?", [defectId]);
         if (!currentDefect) return res.status(404).json({ error: `Defect with id ${defectId} not found.` });
 
         // 2. Fetch current links from the join table
-        const getLinksSql = "SELECT requirement_group_id FROM defect_requirement_links WHERE defect_id = ?";
-        db.all(getLinksSql, [defectId], (linkErr, linkRows) => {
-            if (linkErr) return res.status(500).json({ error: "Error fetching current links." });
+        const linkRows = await dbAll("SELECT requirement_group_id FROM defect_requirement_links WHERE defect_id = ?", [defectId]);
+        const currentLinks = linkRows.map(r => r.requirement_group_id);
+        const newLinks = linkedRequirementGroupIds || [];
 
-            const currentLinks = linkRows.map(r => r.requirement_group_id);
-            const newLinks = linkedRequirementGroupIds || [];
-
-            // 3. Determine if links have changed
-            let linksChanged = false;
-            if (linkedRequirementGroupIds !== undefined) {
-                if (currentLinks.length !== newLinks.length) {
-                    linksChanged = true;
-                } else {
-                    const currentSet = new Set(currentLinks.map(String));
-                    const newSet = new Set(newLinks.map(String));
-                    for (let id of currentSet) {
-                        if (!newSet.has(id)) {
-                            linksChanged = true;
-                            break;
-                        }
+        // 3. Determine if links have changed
+        let linksChanged = false;
+        if (linkedRequirementGroupIds !== undefined) {
+            if (currentLinks.length !== newLinks.length) {
+                linksChanged = true;
+            } else {
+                const currentSet = new Set(currentLinks.map(String));
+                const newSet = new Set(newLinks.map(String));
+                for (let id of currentSet) {
+                    if (!newSet.has(id)) {
+                        linksChanged = true;
+                        break;
                     }
                 }
             }
+        }
 
-            // 4. Calculate Field Changes
-            let updates = [];
-            let updateParamsList = [];
-            let changedFieldsForSummary = {};
-            
-            const addChange = (field, newValue, oldValue) => {
-                if (newValue === undefined) return; 
+        // 4. Calculate Field Changes
+        let updates = [];
+        let updateParamsList = [];
+        let changedFieldsForSummary = {};
+        
+        const addChange = (field, newValue, oldValue) => {
+            if (newValue === undefined) return; 
+            const normalizedNewValue = (newValue === null) ? null : String(newValue).trim();
+            const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
+            if (normalizedNewValue !== normalizedOldValue) {
+                updates.push(`${field} = ?`);
+                updateParamsList.push(normalizedNewValue);
+                changedFieldsForSummary[field] = { old: normalizedOldValue, new: normalizedNewValue };
+            }
+        };
 
-                const normalizedNewValue = (newValue === null) ? null : String(newValue).trim();
-                const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
-                if (normalizedNewValue !== normalizedOldValue) {
-                    updates.push(`${field} = ?`);
-                    updateParamsList.push(normalizedNewValue);
-                    changedFieldsForSummary[field] = { old: normalizedOldValue, new: normalizedNewValue };
+        addChange("title", title, currentDefect.title);
+        addChange("description", description, currentDefect.description);
+        addChange("area", area, currentDefect.area);
+        
+        let targetFixedDate = currentDefect.fixed_date;
+        let fixedDateProvided = false;
+
+        if (fixed_date !== undefined) {
+            targetFixedDate = fixed_date === '' ? null : fixed_date;
+            fixedDateProvided = true;
+        }
+
+        if (status !== undefined && status !== currentDefect.status) {
+            addChange("status", status, currentDefect.status); 
+            if (status === 'Done' || status === 'Closed') {
+                if (!fixedDateProvided || targetFixedDate === null) {
+                    targetFixedDate = new Date().toISOString();
                 }
-            };
-
-            addChange("title", title, currentDefect.title);
-            addChange("description", description, currentDefect.description);
-            addChange("area", area, currentDefect.area);
-            
-            let targetFixedDate = currentDefect.fixed_date;
-            let fixedDateProvided = false;
-
-            if (fixed_date !== undefined) {
-                targetFixedDate = fixed_date === '' ? null : fixed_date;
-                fixedDateProvided = true;
+            } else if ((currentDefect.status === 'Done' || currentDefect.status === 'Closed') && status !== 'Done' && status !== 'Closed') {
+                targetFixedDate = null;
             }
+        }
 
-            if (status !== undefined && status !== currentDefect.status) {
-                addChange("status", status, currentDefect.status); 
+        const normalizedTarget = (targetFixedDate === null) ? null : String(targetFixedDate).trim();
+        const normalizedCurrent = (currentDefect.fixed_date === null) ? null : String(currentDefect.fixed_date).trim();
+        
+        if (normalizedTarget !== normalizedCurrent) {
+            updates.push(`fixed_date = ?`);
+            updateParamsList.push(normalizedTarget);
+            changedFieldsForSummary['fixed_date'] = { old: normalizedCurrent, new: normalizedTarget };
+        }
 
-                if (status === 'Done' || status === 'Closed') {
-                    if (!fixedDateProvided || targetFixedDate === null) {
-                        targetFixedDate = new Date().toISOString();
-                    }
-                } 
-                else if ((currentDefect.status === 'Done' || currentDefect.status === 'Closed') && status !== 'Done' && status !== 'Closed') {
-                    targetFixedDate = null;
+        addChange("link", link, currentDefect.link);
+
+        const isDragEvent = (status !== undefined && status !== currentDefect.status) || 
+                            (display_order !== undefined && display_order !== currentDefect.display_order);
+
+        if (is_expanded !== undefined) {
+            let expandedInt = (is_expanded === true || is_expanded === 'true' || is_expanded === 1 || is_expanded === '1') ? 1 : 0;
+            if (isDragEvent) expandedInt = currentDefect.is_expanded !== null ? currentDefect.is_expanded : 1;
+            
+            if (expandedInt !== currentDefect.is_expanded) {
+                updates.push(`is_expanded = ?`);
+                updateParamsList.push(expandedInt);
+                changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: expandedInt };
+            }
+        }
+        
+        if (display_order !== undefined && display_order !== currentDefect.display_order) {
+            updates.push(`display_order = ?`);
+            updateParamsList.push(display_order);
+            changedFieldsForSummary['display_order'] = { old: currentDefect.display_order, new: display_order };
+        }
+
+        if (created_date !== undefined) {
+            const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
+            if (newCreatedAt !== currentDefect.created_at) {
+                updates.push(`created_at = ?`);
+                updateParamsList.push(newCreatedAt);
+                changedFieldsForSummary['created_at'] = { old: currentDefect.created_at, new: newCreatedAt };
+            }
+        }
+
+        if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
+            updates.push(`is_fat_defect = ?`);
+            updateParamsList.push(is_fat_defect ? 1 : 0);
+            changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
+        }
+
+        const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
+        const hasComment = comment && comment.trim() !== "";
+        
+        if (!hasFieldChanges && !hasComment && !linksChanged) {
+            return res.json({ message: "No changes detected.", defectId: defectId });
+        }
+
+        // --- 5. ΕΚΤΕΛΕΣΗ ΟΛΩΝ ΤΩΝ ΕΝΗΜΕΡΩΣΕΩΝ ΜΕ ΑΣΦΑΛΕΙΑ (await) ---
+        
+        if (linksChanged) {
+            await dbRun(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId]);
+            if (newLinks.length > 0) {
+                for (const reqId of newLinks) {
+                    await dbRun(`INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`, [defectId, reqId]);
                 }
             }
+        }
 
-            const normalizedTarget = (targetFixedDate === null) ? null : String(targetFixedDate).trim();
-            const normalizedCurrent = (currentDefect.fixed_date === null) ? null : String(currentDefect.fixed_date).trim();
-            
-            if (normalizedTarget !== normalizedCurrent) {
-                updates.push(`fixed_date = ?`);
-                updateParamsList.push(normalizedTarget);
-                changedFieldsForSummary['fixed_date'] = { old: normalizedCurrent, new: normalizedTarget };
-            }
+        const historyComment = comment ? comment.trim() : null;
+        const historyFields = { ...changedFieldsForSummary };
+        delete historyFields.is_expanded;
+        delete historyFields.display_order;
+        const hasRealHistoryChanges = Object.keys(historyFields).length > 0;
 
-            addChange("link", link, currentDefect.link);
+        if (hasRealHistoryChanges || historyComment) {
+            const changesSummaryString = hasRealHistoryChanges ? JSON.stringify(historyFields) : null;
+            await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`, 
+                        [defectId, changesSummaryString, historyComment, new Date().toISOString()]);
+        }
 
-            const isDragEvent = (status !== undefined && status !== currentDefect.status) || 
-                                (display_order !== undefined && display_order !== currentDefect.display_order);
+        if (hasFieldChanges) {
+            updates.push("updated_at = ?");
+            updateParamsList.push(new Date().toISOString());
+            const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
+            updateParamsList.push(defectId);
+            await dbRun(sqlUpdate, updateParamsList);
+        }
 
-            if (is_expanded !== undefined) {
-                let expandedInt = (is_expanded === true || is_expanded === 'true' || is_expanded === 1 || is_expanded === '1') ? 1 : 0;
-                
-                if (isDragEvent) {
-                    expandedInt = currentDefect.is_expanded !== null ? currentDefect.is_expanded : 1;
-                }
+        scheduleQdrantSync();
+        res.json({ message: "Defect updated successfully.", defectId: defectId });
 
-                if (expandedInt !== currentDefect.is_expanded) {
-                    updates.push(`is_expanded = ?`);
-                    updateParamsList.push(expandedInt);
-                    changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: expandedInt };
-                }
-            }
-            
-            if (display_order !== undefined && display_order !== currentDefect.display_order) {
-                updates.push(`display_order = ?`);
-                updateParamsList.push(display_order);
-                changedFieldsForSummary['display_order'] = { old: currentDefect.display_order, new: display_order };
-            }
-
-            if (created_date !== undefined) {
-                const newCreatedAt = created_date ? new Date(created_date).toISOString() : currentDefect.created_at;
-                if (newCreatedAt !== currentDefect.created_at) {
-                    updates.push(`created_at = ?`);
-                    updateParamsList.push(newCreatedAt);
-                    changedFieldsForSummary['created_at'] = { old: currentDefect.created_at, new: newCreatedAt };
-                }
-            }
-
-            if (is_fat_defect !== undefined && (is_fat_defect ? 1 : 0) !== currentDefect.is_fat_defect) {
-                updates.push(`is_fat_defect = ?`);
-                updateParamsList.push(is_fat_defect ? 1 : 0);
-                changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
-            }
-
-            const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
-            const hasComment = comment && comment.trim() !== "";
-            
-            if (!hasFieldChanges && !hasComment && !linksChanged) {
-                return res.json({ message: "No changes detected.", defectId: defectId });
-            }
-
-            // 5. Perform Updates Transaction (Καθαρισμένο από το Shifting)
-            db.serialize(() => {
-                db.run("BEGIN TRANSACTION", (beginErr) => {
-                    if (beginErr) return res.status(500).json({ error: "Failed to start transaction: " + beginErr.message });
-
-                    const commitTransaction = () => {
-                        db.run("COMMIT", (commitErr) => {
-                            if(commitErr) return res.status(500).json({ error: "Failed to commit transaction: " + commitErr.message });
-                            scheduleQdrantSync();
-                            res.json({ message: "Defect updated successfully.", defectId: defectId });
-                        });
-                    };
-
-                    const executeUpdate = () => {
-                        if (hasFieldChanges) {
-                            updates.push("updated_at = ?");
-                            updateParamsList.push(new Date().toISOString());
-                            const sqlUpdate = `UPDATE defects SET ${updates.join(", ")} WHERE id = ?`;
-                            updateParamsList.push(defectId);
-                            db.run(sqlUpdate, updateParamsList, (updateErr) => {
-                                if (updateErr) {
-                                    db.run("ROLLBACK");
-                                    return res.status(500).json({ error: "Failed to update defect: " + updateErr.message });
-                                }
-                                commitTransaction();
-                            });
-                        } else {
-                            commitTransaction();
-                        }
-                    };
-
-                    const handleLinks = (callback) => {
-                        if (linksChanged) {
-                            db.run(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId], (deleteErr) => {
-                                if (deleteErr) return callback(deleteErr);
-                                
-                                if (newLinks.length > 0) {
-                                    const insertLinkSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                                    let completed = 0;
-                                    newLinks.forEach(reqId => {
-                                        db.run(insertLinkSql, [defectId, reqId], (insertErr) => {
-                                            if(insertErr) console.error("Error inserting link:", insertErr.message); 
-                                            completed++;
-                                            if (completed === newLinks.length) callback(null);
-                                        });
-                                    });
-                                } else {
-                                    callback(null);
-                                }
-                            });
-                        } else {
-                            callback(null);
-                        }
-                    };
-
-                    handleLinks((linkErr) => {
-                        if (linkErr) {
-                            db.run("ROLLBACK");
-                            return res.status(500).json({ error: "Failed to update links: " + linkErr.message });
-                        }
-
-                        const historyComment = comment ? comment.trim() : null;
-                        const historyFields = { ...changedFieldsForSummary };
-                        delete historyFields.is_expanded;
-                        delete historyFields.display_order;
-                        const hasRealHistoryChanges = Object.keys(historyFields).length > 0;
-
-                        if (hasRealHistoryChanges || historyComment) {
-                            const changesSummaryString = hasRealHistoryChanges ? JSON.stringify(historyFields) : null;
-                            const nowUTC = new Date().toISOString();
-                            const historySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
-                            db.run(historySql, [defectId, changesSummaryString, historyComment, nowUTC], (historyErr) => {
-                                if (historyErr) {
-                                    db.run("ROLLBACK");
-                                    return res.status(500).json({ error: "Failed to log history: " + historyErr.message });
-                                }
-                                executeUpdate(); 
-                            });
-                        } else {
-                            executeUpdate(); 
-                        }
-                    });
-
-                });
-            });
-        });
-    });
+    } catch (err) {
+        console.error("Defect Update Error:", err);
+        // Εδώ πλέον δεν краσάρει ο server, απλά γυρνάει 500 error!
+        res.status(500).json({ error: "Failed to update defect: " + err.message });
+    }
 });
 
 app.delete("/api/defects/:id", (req, res) => {

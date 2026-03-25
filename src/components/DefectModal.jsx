@@ -28,7 +28,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [isCustomArea, setIsCustomArea] = useState(false);
   const [modalAreas, setModalAreas] = useState([]);
-  const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
+  const [activeTab, setActiveTab] = useState('core');
 
   const [availableRequirements, setAvailableRequirements] = useState([]);
   const [selectedRequirements, setSelectedRequirements] = useState([]);
@@ -40,7 +40,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const requirementsForSelectedProject = useMemo(() => {
     if (!formData.project || !allRequirements) return [];
-    // Επιστρέφουμε ΚΑΙ τα sub-tasks
     return allRequirements.filter(r => r.project === formData.project && r.isActive);
   }, [formData.project, allRequirements]);
 
@@ -66,7 +65,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
       }
       setFormData(initialData);
       setInitialFormData(initialData);
-      setActiveTab('core'); // Πάντα άνοιγμα στην πρώτη καρτέλα
+      setActiveTab('core');
     } else {
       setFormData(getInitialFormState(''));
       setInitialFormData(null);
@@ -135,8 +134,36 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         );
       }
 
-      setAvailableRequirements(available);
-      setSelectedRequirements(selected);
+      const buildHierarchy = (reqsList) => {
+        const result = [];
+        const parents = reqsList.filter(r => !r.parentId);
+        const subtasks = reqsList.filter(r => r.parentId);
+
+        const subtasksByParent = {};
+        subtasks.forEach(sub => {
+            if (!subtasksByParent[sub.parentId]) {
+                subtasksByParent[sub.parentId] = [];
+            }
+            subtasksByParent[sub.parentId].push(sub);
+        });
+
+        parents.forEach(parent => {
+            result.push(parent);
+            if (subtasksByParent[parent.id]) {
+                result.push(...subtasksByParent[parent.id]);
+                delete subtasksByParent[parent.id];
+            }
+        });
+
+        Object.values(subtasksByParent).forEach(orphanedSubtasks => {
+            result.push(...orphanedSubtasks);
+        });
+
+        return result;
+      };
+
+      setAvailableRequirements(buildHierarchy(available));
+      setSelectedRequirements(buildHierarchy(selected));
     } else {
         setAvailableRequirements([]);
         setSelectedRequirements([]);
@@ -320,7 +347,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
           <form id="defect-modal-form-id" onSubmit={handleSubmit}>
             
-            {/* TAB 1: CORE DETAILS */}
             <div style={{ display: activeTab === 'core' ? 'block' : 'none' }}>
               <div id="form-group-project-id" className="form-group">
                 <label id="defect-project-label" htmlFor="defect-project-button">Project:</label>
@@ -364,7 +390,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               </div>
             </div>
 
-            {/* TAB 2: TRACKING & LINKS */}
             <div style={{ display: activeTab === 'tracking' ? 'block' : 'none' }}>
               <div id="form-group-status-id" className="form-group">
                 <label id="defect-status-label" htmlFor="defect-status-button">Status:</label>
@@ -390,7 +415,6 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                     dateFormat="MM/dd/yyyy" 
                     className="notes-datepicker" 
                     wrapperClassName="date-picker-wrapper" 
-                    // CHANGE HERE: Add portalId, strategy, and set to top
                     popperPlacement="top-start" 
                     portalId="root"
                     popperProps={{
@@ -418,7 +442,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                           const hasParentInList = req.parentId && availableRequirements.some(p => p.id === req.parentId);
                           return (
                               <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
-                                  {req.parentId ? (hasParentInList ? `↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
+                                  {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
                               </option>
                           );
                       })}
@@ -439,7 +463,14 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                         onChange={(e) => setSelectedSearchQuery(e.target.value)}
                       />
                       <select multiple id="selected-requirements-listbox" name="selected-requirements" value={toRemove} onChange={(e) => handleSelectionChange(e, setToRemove)} disabled={selectedRequirements.length === 0}>
-                        {selectedRequirements.map(req => <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>{req.parentId ? `[Sub-task] ${req.requirementUserIdentifier}` : req.requirementUserIdentifier}</option>)}
+                        {selectedRequirements.map(req => {
+                          const hasParentInList = req.parentId && selectedRequirements.some(p => p.id === req.parentId);
+                          return (
+                              <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
+                                  {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
+                              </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
