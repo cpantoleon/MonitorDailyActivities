@@ -330,6 +330,37 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               color: #fff !important;
           }
 
+          /* CKEditor Dropdown Panel Styling (for table insert row/column) */
+          .ck.ck-dropdown__panel {
+              background: var(--bg-secondary) !important;
+              border: 1px solid var(--border-color) !important;
+              box-shadow: var(--card-shadow) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list {
+              background: var(--bg-secondary) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list__item {
+              color: var(--text-primary) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list__item:hover {
+              background: var(--bg-tertiary) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list__item .ck-button {
+              color: var(--text-primary) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list__item .ck-button:hover {
+              background: var(--bg-tertiary) !important;
+          }
+          .ck.ck-dropdown__panel .ck-list__item.ck-on .ck-button {
+              background: var(--accent-color) !important;
+              color: #fff !important;
+          }
+          .ck.ck-tooltip {
+              background: var(--bg-tertiary) !important;
+              color: var(--text-primary) !important;
+              border: 1px solid var(--border-color) !important;
+          }
+
           .today-button {
             padding: 0 16px;
             height: 42px;
