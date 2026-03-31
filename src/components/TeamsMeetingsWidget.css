@@ -1,0 +1,126 @@
+.meetings-widget-container {
+    width: 100%;
+    /* Αντί για max-height, του λέμε να γεμίσει τον διαθέσιμο χώρο: */
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 5px;
+    padding-top: 4px; 
+}
+
+/* Ομορφαίνουμε την μπάρα κύλισης */
+.meetings-widget-container::-webkit-scrollbar { width: 6px; }
+.meetings-widget-container::-webkit-scrollbar-track { background: transparent; }
+.meetings-widget-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+.meetings-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.meeting-item {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-primary); /* Παίρνει το χρώμα του φόντου του Dashboard σου */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 15px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.meeting-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
+    border-color: var(--accent-color);
+    z-index: 10;
+}
+
+/* --- ΧΡΩΜΑΤΙΣΜΟΣ ΑΝΑΛΟΓΑ ΜΕ ΤΟ STATUS --- */
+.meeting-item.status-past {
+    opacity: 0.5; /* Ξεθωριάζουν τα παλιά */
+    background-color: transparent;
+}
+.meeting-item.status-current {
+    border-left: 4px solid #28a745; /* Πράσινη γραμμή αριστερά */
+    background-color: rgba(40, 167, 69, 0.05);
+}
+.meeting-item.status-future {
+    border-left: 4px solid var(--accent-color); /* Το καφέ/χρυσό χρώμα σου */
+}
+
+/* --- ΔΙΑΤΑΞΗ (Αριστερά Ώρα, Δεξιά Τίτλος) --- */
+.meeting-time-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 75px;
+    flex-shrink: 0;
+}
+
+.time-start {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.time-separator {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1;
+    margin: 2px 0;
+}
+
+.time-end {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Μια κάθετη γραμμή στη μέση */
+.meeting-divider {
+    width: 1px;
+    background-color: var(--border-color);
+    margin: 0 15px;
+    align-self: stretch;
+}
+
+.meeting-details-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-grow: 1;
+    min-width: 0; 
+}
+
+.meeting-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    /* Αν είναι πολύ μεγάλος ο τίτλος, τον κόβει στις 2 γραμμές με ... */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.meeting-now-badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #28a745;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    animation: pulse 2s infinite; /* Αναβοσβήνει διακριτικά */
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}

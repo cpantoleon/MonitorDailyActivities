@@ -1,29 +1,34 @@
+// src/context/GlobalContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const GlobalContext = createContext();
 
 export const GlobalProvider = ({ children }) => {
-  // UI Settings (Theme/Sidebar) -> Keep in localStorage (Persist forever)
   const [theme, setTheme] = useState(() => localStorage.getItem('appTheme') || 'light');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
-
-  // Global Project Selection -> Change to sessionStorage (Clear on browser close)
   const [globalProject, setGlobalProject] = useState(() => sessionStorage.getItem('globalProject') || '');
 
-  // Apply theme to document body automatically
+  const defaultLayout = ['overview', 'weather', 'timeline', 'calendar', 'meetings', 'celebrations'];
+  const [dashboardLayout, setDashboardLayout] = useState(() => {
+    const saved = localStorage.getItem('dashboardLayout');
+    return saved ? JSON.parse(saved) : defaultLayout;
+  });
+
+  const [dashboardGridStyle, setDashboardGridStyle] = useState(() => {
+    return localStorage.getItem('dashboardGridStyle') || 'layout-dense';
+  });
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('appTheme', theme);
   }, [theme]);
 
-  // Handle Sidebar Collapse State
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
     const width = sidebarCollapsed ? '80px' : '260px';
     document.documentElement.style.setProperty('--sidebar-width', width);
   }, [sidebarCollapsed]);
 
-  // Persist project selection to Session Storage (Clears when browser closes)
   useEffect(() => {
     if (globalProject) {
       sessionStorage.setItem('globalProject', globalProject);
@@ -31,6 +36,14 @@ export const GlobalProvider = ({ children }) => {
       sessionStorage.removeItem('globalProject');
     }
   }, [globalProject]);
+
+  useEffect(() => {
+    localStorage.setItem('dashboardLayout', JSON.stringify(dashboardLayout));
+  }, [dashboardLayout]);
+
+  useEffect(() => {
+    localStorage.setItem('dashboardGridStyle', dashboardGridStyle);
+  }, [dashboardGridStyle]);
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
@@ -41,7 +54,18 @@ export const GlobalProvider = ({ children }) => {
   };
 
   return (
-    <GlobalContext.Provider value={{ theme, toggleTheme, globalProject, setGlobalProject, sidebarCollapsed, toggleSidebar }}>
+    <GlobalContext.Provider value={{ 
+      theme, 
+      toggleTheme, 
+      globalProject, 
+      setGlobalProject, 
+      sidebarCollapsed, 
+      toggleSidebar,
+      dashboardLayout, 
+      setDashboardLayout,
+      dashboardGridStyle,
+      setDashboardGridStyle
+    }}>
       {children}
     </GlobalContext.Provider>
   );

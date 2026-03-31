@@ -1,3 +1,4 @@
+// src/pages/DashboardPage.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGlobal } from '../context/GlobalContext';
@@ -5,6 +6,7 @@ import ProjectSelector from '../components/ProjectSelector';
 import WeatherWidget from '../components/WeatherWidget';
 import DailyInfoWidget from '../components/DailyInfoWidget';
 import DashboardCalendarWidget from '../components/DashboardCalendarWidget';
+import TeamsMeetingsWidget from '../components/TeamsMeetingsWidget';
 import './DashboardPage.css';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
@@ -14,13 +16,15 @@ ChartJS.register(ArcElement, ChartTooltip, Legend);
 const API_BASE_URL = '/api';
 
 const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect }) => {
-  const { globalProject, setGlobalProject } = useGlobal();
+  const { globalProject, setGlobalProject, dashboardLayout, setDashboardLayout, dashboardGridStyle } = useGlobal();
   const { projectName } = useParams();
   const navigate = useNavigate();
   const [allDefects, setAllDefects] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
   const [chartFilter, setChartFilter] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverItem, setDragOverItem] = useState(null);
 
   useEffect(() => {
     const checkTheme = () => {
@@ -58,6 +62,9 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   useEffect(() => {
     setChartFilter(null);
+    if (globalProject) {
+      setIsEditMode(false);
+    }
   }, [globalProject]);
 
   const handleProjectSelect = (projName) => {
@@ -87,14 +94,8 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     return allProcessedRequirements.filter(r => {
       if (r.project !== globalProject) return false;
       if (r.currentStatusDetails?.releaseId !== currentProjectActiveRelease.id) return false;
-      
       const isDone = r.currentStatusDetails?.status === 'Done';
-      
-      if (chartFilter === 'Done') {
-        return isDone;
-      } else {
-        return !isDone;
-      }
+      return chartFilter === 'Done' ? isDone : !isDone;
     });
   }, [globalProject, currentProjectActiveRelease, allProcessedRequirements, chartFilter]);
 
@@ -111,12 +112,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
           r.currentStatusDetails?.status !== 'Done'
         ).length;
       }
-      return {
-        name: proj,
-        activeDefects: activeDefs,
-        pendingReqs: pendingReqs,
-        totalIssues: activeDefs + pendingReqs 
-      };
+      return { name: proj, activeDefects: activeDefs, pendingReqs: pendingReqs, totalIssues: activeDefs + pendingReqs };
     }).sort((a, b) => b.totalIssues - a.totalIssues);
   }, [projects, activeDefectsAll, allReleases, allProcessedRequirements]);
 
@@ -129,12 +125,9 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const activeReleaseChartData = useMemo(() => {
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return null;
-
     const releaseReqs = allProcessedRequirements.filter(r => 
-      r.project === globalProject && 
-      r.currentStatusDetails?.releaseId === currentProjectActiveRelease.id
+      r.project === globalProject && r.currentStatusDetails?.releaseId === currentProjectActiveRelease.id
     );
-
     if (releaseReqs.length === 0) return null;
 
     let done = 0;
@@ -178,6 +171,116 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     }
   };
 
+  const handleDragStart = (e, id) => {
+    if (!isEditMode) return;
+    setDraggedItem(id);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { e.target.classList.add('dragging'); }, 0);
+  };
+
+  const handleDragEnd = (e) => {
+    e.target.classList.remove('dragging');
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleDragOver = (e, id) => {
+    e.preventDefault();
+    if (!isEditMode || draggedItem === id) return;
+    setDragOverItem(id);
+  };
+
+  const handleDrop = (e, targetId) => {
+    e.preventDefault();
+    if (!isEditMode || !draggedItem || draggedItem === targetId) {
+      setDragOverItem(null);
+      return;
+    }
+
+    const currentIndex = dashboardLayout.indexOf(draggedItem);
+    const targetIndex = dashboardLayout.indexOf(targetId);
+    const newLayout = [...dashboardLayout];
+    newLayout.splice(currentIndex, 1);
+    newLayout.splice(targetIndex, 0, draggedItem);
+    setDashboardLayout(newLayout);
+    setDragOverItem(null);
+    setDraggedItem(null);
+  };
+
+  const widgets = {
+    overview: (
+      <div className="card overview-card">
+        <h3>Project Overview</h3>
+        <div className="project-overview-wrapper">
+          {projectSummaries.length > 0 ? (
+            <ul className="project-overview-list">
+              {projectSummaries.map(p => (
+                <li key={p.name} onClick={() => handleProjectSelect(p.name)} style={{ transition: 'all 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
+                  <span className="proj-name">{p.name}</span>
+                  <div className="proj-stats-pills">
+                     {p.activeDefects > 0 && <span className="pill defect-pill">{p.activeDefects} Defects</span>}
+                     {p.pendingReqs > 0 && <span className="pill req-pill">{p.pendingReqs} Reqs</span>}
+                     {p.activeDefects === 0 && p.pendingReqs === 0 && <span className="pill clear-pill">Clear</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="placeholder-text">No projects available.</p>
+          )}
+        </div>
+      </div>
+    ),
+    timeline: (
+      <div className="card timeline-card">
+        <h3>Upcoming Roadmaps</h3>
+        {upcomingRoadmaps.length > 0 ? (
+          <ul className="dashboard-release-list">
+            {upcomingRoadmaps.map(r => (
+              <li key={r.id}>
+                <div className="release-info-basic">
+                  <strong>{r.name}</strong>
+                  <small className="project-tag">{r.project}</small>
+                </div>
+                <span className="due-badge">
+                  {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="placeholder-text">No active releases upcoming.</p>
+        )}
+      </div>
+    ),
+    calendar: (
+      <div className="card widget-card calendar-card">
+        <h3>Release Calendar</h3>
+        <DashboardCalendarWidget allReleases={allReleases} />
+      </div>
+    ),
+    weather: (
+      <div className="card widget-card weather-card">
+        <h3>Local Weather</h3>
+        <WeatherWidget showMessage={() => {}} /> 
+      </div>
+    ),
+    meetings: (
+      <div className="card widget-card meetings-card">
+        <h3>Today's Schedule</h3>
+        <TeamsMeetingsWidget />
+      </div>
+    ),
+    celebrations: (
+      <div className="card widget-card eortologio-wrapper celebrations-card">
+         <h3>Celebrations Today</h3>
+         <div className="iframe-box">
+           <DailyInfoWidget />
+         </div>
+      </div>
+    )
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header-toolbar">
@@ -192,7 +295,15 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
             </h2>
         </div>
         
-        <div className="header-project-selector">
+        <div className="header-project-selector" style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
+          {!globalProject && (
+            <button 
+              className={`dashboard-edit-btn ${isEditMode ? 'active' : ''}`}
+              onClick={() => setIsEditMode(!isEditMode)}
+            >
+              {isEditMode ? '✅ Save Layout' : '⚙️ Edit Dashboard'}
+            </button>
+          )}
           <ProjectSelector
             projects={projects}
             selectedProject={globalProject}
@@ -201,14 +312,13 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
         </div>
       </div>
 
-      <div className={`bento-grid ${globalProject ? 'project-focused' : 'global-view'}`}>
-        
-        <div className="grid-main-area">
-          <div className="card overview-card">
-            <h3>{globalProject ? 'Current Status' : 'Project Overview'}</h3>
-            
-            {globalProject ? (
-              <div className="project-detail-view">
+      <div className={`bento-grid ${globalProject ? 'project-focused' : `global-view ${dashboardGridStyle}`} ${isEditMode ? 'edit-mode-active' : ''}`}>
+        {globalProject ? (
+          <>
+            <div className="grid-main-area">
+              <div className="card overview-card">
+                <h3>Current Status</h3>
+                <div className="project-detail-view">
                   <div className="stats-row">
                     <div className="stat-box">
                       <span className="stat-label">Active Defects</span>
@@ -219,13 +329,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                         {chartFilter === 'Done' ? 'Completed Requirements' : 'Pending Requirements'}
                       </span>
                       {currentProjectActiveRelease ? (
-                        <span 
-                          className="stat-number" 
-                          style={{ 
-                            fontSize: 'clamp(2rem, 4vw, 3.5rem)', 
-                            color: chartFilter === 'Done' ? '#28a745' : 'var(--accent-color)' 
-                          }}
-                        >
+                        <span className="stat-number" style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)', color: chartFilter === 'Done' ? '#28a745' : 'var(--accent-color)' }}>
                           {currentProjectFilteredReqsList.length}
                         </span>
                       ) : (
@@ -233,194 +337,124 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                       )}
                     </div>
                   </div>
-
                   <div className="status-details-grid">
-                      <div className="detail-column">
-                          <h4>Active Defects</h4>
-                          {currentProjectDefectList.length > 0 ? (
-                              <ul className="detail-list defect-list-dash">
-                                  {currentProjectDefectList.map(d => (
-                                      <li key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                          <button 
-                                              type="button" 
-                                              className="link-button item-title" 
-                                              onClick={() => onNavigateToDefect(d, false)}
-                                              title={`Go to ${d.title} on the Defects Board`}
-                                          >
-                                              {d.title}
-                                          </button>
-                                          <span className="item-status" style={getStatusBadgeStyle(d.status)}>{d.status}</span>
-                                      </li>
-                                  ))}
-                              </ul>
-                          ) : (
-                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', opacity: 0.7 }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                <p style={{ marginTop: '10px' }}>No active defects.</p>
-                            </div>
-                          )}
-                      </div>
-                      
-                      <div className="detail-column">
-                          <h4 style={{ display: 'flex', alignItems: 'center' }}>
-                              {chartFilter === 'Done' ? 'Completed Requirements' : 'Pending Requirements'}
-                              {chartFilter && (
-                                  <button 
-                                      onClick={() => setChartFilter(null)}
-                                      title="Clear filter"
-                                      style={{ 
-                                          marginLeft: '10px', 
-                                          fontSize: '0.75rem', 
-                                          cursor: 'pointer', 
-                                          background: 'none', 
-                                          border: 'none', 
-                                          color: 'var(--accent-color)', 
-                                          textDecoration: 'underline',
-                                          padding: 0
-                                      }}
-                                  >
-                                      (Clear)
-                                  </button>
-                              )}
-                          </h4>
-                          {currentProjectFilteredReqsList.length > 0 ? (
-                              <ul className="detail-list req-list-dash">
-                                  {currentProjectFilteredReqsList.map(r => (
-                                      <li key={r.id}>
-                                          <button 
-                                              type="button" 
-                                              className="link-button item-title" 
-                                              onClick={() => onNavigateToRequirement(r)}
-                                              title={`Go to ${r.requirementUserIdentifier} on the Sprint Board`}
-                                          >
-                                              {r.requirementUserIdentifier}
-                                          </button>
-                                          <span className="item-status" style={getStatusBadgeStyle(r.currentStatusDetails?.status)}>{r.currentStatusDetails?.status}</span>
-                                      </li>
-                                  ))}
-                              </ul>
-                          ) : (
-                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', opacity: 0.7 }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                                <p style={{ marginTop: '10px' }}>
-                                  {chartFilter === 'Done' ? 'No completed requirements.' : 'No pending requirements.'}
-                                </p>
-                            </div>
-                          )}
-                      </div>
-                  </div>
-              </div>
-            ) : (
-              <div className="project-overview-wrapper">
-                {projectSummaries.length > 0 ? (
-                  <ul className="project-overview-list">
-                    {projectSummaries.map(p => (
-                      <li key={p.name} onClick={() => handleProjectSelect(p.name)} style={{ transition: 'all 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
-                        <span className="proj-name">{p.name}</span>
-                        <div className="proj-stats-pills">
-                           {p.activeDefects > 0 && (
-                             <span className="pill defect-pill">{p.activeDefects} Defects</span>
-                           )}
-                           {p.pendingReqs > 0 && (
-                             <span className="pill req-pill">{p.pendingReqs} Reqs</span>
-                           )}
-                           {p.activeDefects === 0 && p.pendingReqs === 0 && (
-                             <span className="pill clear-pill">Clear</span>
-                           )}
+                    <div className="detail-column">
+                      <h4>Active Defects</h4>
+                      {currentProjectDefectList.length > 0 ? (
+                        <ul className="detail-list defect-list-dash">
+                          {currentProjectDefectList.map(d => (
+                            <li key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <button type="button" className="link-button item-title" onClick={() => onNavigateToDefect(d, false)} title={`Go to ${d.title} on the Defects Board`}>
+                                {d.title}
+                              </button>
+                              <span className="item-status" style={getStatusBadgeStyle(d.status)}>{d.status}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', opacity: 0.7 }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                          <p style={{ marginTop: '10px' }}>No active defects.</p>
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="placeholder-text">No projects available.</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="dashboard-bottom-row">
-            <div className="card timeline-card">
-              <h3>Upcoming Roadmaps</h3>
-              {upcomingRoadmaps.length > 0 ? (
-                <ul className="dashboard-release-list">
-                  {upcomingRoadmaps.map(r => (
-                    <li key={r.id}>
-                      <div className="release-info-basic">
-                        <strong>{r.name}</strong>
-                        {!globalProject && <small className="project-tag">{r.project}</small>}
-                      </div>
-                      <span className="due-badge">
-                        {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="placeholder-text">No active releases upcoming.</p>
-              )}
-
-              {globalProject && activeReleaseChartData && (
-                <div className="dashboard-release-chart-wrapper">
-                  <h4 className="dashboard-release-chart-title">Current Release Progress</h4>
-                  <div className="dashboard-release-chart-container">
-                    <Pie 
-                      data={activeReleaseChartData} 
-                      options={{ 
-                        responsive: true, 
-                        maintainAspectRatio: false, 
-                        onClick: handleChartClick,
-                        onHover: (event, chartElement) => { 
-                          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-                        },
-                        plugins: { 
-                          legend: { 
-                            position: 'right',
-                            labels: { 
-                              color: chartTextColor,
-                              font: { size: 12 }, 
-                              boxWidth: 12,
-                              padding: 15
-                            }
-                          },
-                          tooltip: {
-                            callbacks: {
-                              label: (c) => ` ${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)`
-                            }
-                          }
-                        } 
-                      }} 
-                    />
+                      )}
+                    </div>
+                    <div className="detail-column">
+                      <h4 style={{ display: 'flex', alignItems: 'center' }}>
+                        {chartFilter === 'Done' ? 'Completed Requirements' : 'Pending Requirements'}
+                        {chartFilter && (
+                          <button onClick={() => setChartFilter(null)} title="Clear filter" style={{ marginLeft: '10px', fontSize: '0.75rem', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--accent-color)', textDecoration: 'underline', padding: 0 }}>
+                            (Clear)
+                          </button>
+                        )}
+                      </h4>
+                      {currentProjectFilteredReqsList.length > 0 ? (
+                        <ul className="detail-list req-list-dash">
+                          {currentProjectFilteredReqsList.map(r => (
+                            <li key={r.id}>
+                              <button type="button" className="link-button item-title" onClick={() => onNavigateToRequirement(r)} title={`Go to ${r.requirementUserIdentifier} on the Sprint Board`}>
+                                {r.requirementUserIdentifier}
+                              </button>
+                              <span className="item-status" style={getStatusBadgeStyle(r.currentStatusDetails?.status)}>{r.currentStatusDetails?.status}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', opacity: 0.7 }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                          <p style={{ marginTop: '10px' }}>
+                            {chartFilter === 'Done' ? 'No completed requirements.' : 'No pending requirements.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* MOVED CALENDAR WIDGET */}
-            {!globalProject && (
-              <div className="card widget-card calendar-card">
-                <h3>Release Calendar</h3>
-                <DashboardCalendarWidget allReleases={allReleases} />
               </div>
-            )}
-          </div>
-        </div>
-
-         {!globalProject && (
-          <div className="grid-sidebar-area">
-            <div className="card widget-card weather-card">
-              <h3>Local Weather</h3>
-              <WeatherWidget showMessage={() => {}} /> 
+              <div className="dashboard-bottom-row">
+                <div className="card timeline-card">
+                  <h3>Upcoming Roadmaps</h3>
+                  {upcomingRoadmaps.length > 0 ? (
+                    <ul className="dashboard-release-list">
+                      {upcomingRoadmaps.map(r => (
+                        <li key={r.id}>
+                          <div className="release-info-basic">
+                            <strong>{r.name}</strong>
+                          </div>
+                          <span className="due-badge">
+                            {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="placeholder-text">No active releases upcoming.</p>
+                  )}
+                  {activeReleaseChartData && (
+                    <div className="dashboard-release-chart-wrapper">
+                      <h4 className="dashboard-release-chart-title">Current Release Progress</h4>
+                      <div className="dashboard-release-chart-container">
+                        <Pie 
+                          data={activeReleaseChartData} 
+                          options={{ 
+                            responsive: true, 
+                            maintainAspectRatio: false, 
+                            onClick: handleChartClick,
+                            onHover: (event, chartElement) => { 
+                              event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                            },
+                            plugins: { 
+                              legend: { position: 'right', labels: { color: chartTextColor, font: { size: 12 }, boxWidth: 12, padding: 15 } },
+                              tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.parsed} (${((c.parsed / c.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` } }
+                            } 
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-
-            <div className="card widget-card eortologio-wrapper celebrations-card">
-               <h3>Celebrations Today</h3>
-               <div className="iframe-box">
-                 <DailyInfoWidget />
-               </div>
-            </div>
-          </div>
+          </>
+        ) : (
+          dashboardLayout.map(widgetId => {
+            const widgetContent = widgets[widgetId];
+            if (!widgetContent) return null;
+            return (
+              <div 
+                key={widgetId}
+                className={`draggable-widget widget-${widgetId} ${dragOverItem === widgetId ? 'drag-over' : ''}`}
+                draggable={isEditMode}
+                onDragStart={(e) => handleDragStart(e, widgetId)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, widgetId)}
+                onDrop={(e) => handleDrop(e, widgetId)}
+              >
+                <div className="drag-handle" title="Drag to reorder">⋮⋮</div>
+                {widgetContent}
+              </div>
+            );
+          })
         )}
-
       </div>
     </div>
   );

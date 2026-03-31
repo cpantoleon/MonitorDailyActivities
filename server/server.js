@@ -3,7 +3,13 @@ const cors = require('cors');
 const db = require('./database.js');
 const path = require('path');
 const util = require('util');
+
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+const ical = require('node-ical');
+const OUTLOOK_ICS_URL = process.env.OUTLOOK_ICS_URL;
+
+let cachedTodayMeetings = [];
 
 const ensureGeneralProjectExists = () => {
     const projectName = 'General';
@@ -64,6 +70,75 @@ try {
   console.warn("**************************************************");
   isChatbotEnabled = false;
 }
+
+// --- BACKGROUND JOB ΓΙΑ ΤΑ MEETINGS ---
+const fetchAndParseMeetings = () => {
+    if (!OUTLOOK_ICS_URL) {
+        console.warn("⚠️ WARNING: OUTLOOK_ICS_URL is missing in .env file! Calendar sync is disabled.");
+        return;
+    }
+    
+    console.log("Fetching latest calendar events from Outlook...");
+    ical.fromURL(OUTLOOK_ICS_URL, {}, function (err, data) {
+        if (err) {
+            console.error("Failed to fetch ICS:", err.message);
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const meetings = [];
+
+        for (let k in data) {
+            if (!data.hasOwnProperty(k)) continue;
+            const ev = data[k];
+            
+            if (ev.type === 'VEVENT') {
+                if (ev.start >= today && ev.start < tomorrow) {
+                    meetings.push(ev);
+                } 
+                else if (ev.rrule) {
+                    const dates = ev.rrule.between(today, tomorrow);
+                    if (dates.length > 0) {
+                        const duration = ev.end.getTime() - ev.start.getTime();
+                        const newStart = new Date(dates[0]);
+                        newStart.setHours(ev.start.getHours(), ev.start.getMinutes());
+                        const newEnd = new Date(newStart.getTime() + duration);
+                        
+                        meetings.push({ ...ev, start: newStart, end: newEnd });
+                    }
+                }
+            }
+        }
+
+        cachedTodayMeetings = meetings
+            .map(m => {
+                const desc = m.description || '';
+                const loc = m.location || '';
+                const urlRegex = /(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>\s]+)/i;
+                const match = desc.match(urlRegex) || loc.match(urlRegex);
+                
+                return {
+                    id: m.uid,
+                    title: m.summary,
+                    start: m.start.toISOString(),
+                    end: m.end.toISOString(),
+                    link: match ? match[0] : null
+                };
+            })
+            .sort((a, b) => new Date(a.start) - new Date(b.start));
+            
+        console.log(`Calendar updated. Found ${cachedTodayMeetings.length} meetings for today.`);
+    });
+};
+
+// ΞΕΚΙΝΑΜΕ ΤΗ ΔΙΑΔΙΚΑΣΙΑ ΕΔΩ (Αυτό έλειπε!)
+fetchAndParseMeetings();
+setInterval(fetchAndParseMeetings, 15 * 60 * 1000);
+// ----------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -3689,6 +3764,10 @@ if (isChatbotEnabled) {
   app.post("/api/chatbot/sync", chatbotDisabledHandler);
   app.post("/api/chatbot", chatbotDisabledHandler);
 }
+
+app.get("/api/meetings/today", (req, res) => {
+    res.json({ message: "success", data: cachedTodayMeetings });
+});
 
 app.use(function(req, res){
     res.status(404).json({"error": "Endpoint not found"});

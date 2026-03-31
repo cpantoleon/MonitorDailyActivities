@@ -66,6 +66,22 @@ This application supports importing Requirements and Defects directly from Jira 
 
 ---
 
+## Outlook Calendar Integration (Today's Schedule)
+
+The Dashboard includes a "Today's Schedule" widget that fetches your daily meetings automatically in the background. To enable this, you need to provide an ICS (iCalendar) link from your Outlook account.
+
+### How to get the Outlook ICS Link:
+1. Log in to **Outlook Web** (via your browser).
+2. Go to **Settings (Gear Icon)** -> **Calendar** -> **Shared Calendars**.
+3. Under the "Publish a calendar" section, select your Calendar.
+4. Choose **"Can view all details"** and click **Publish**.
+5. Outlook will generate two links (HTML and ICS). Copy the **ICS link**.
+6. Paste this link into your `server/.env` file under the `OUTLOOK_ICS_URL` variable.
+
+*Note: This link is protected by obscurity (it contains a long, randomized token). As long as your `.env` file is kept secure and not committed to version control, your calendar data remains private.*
+
+---
+
 ## AI Chatbot Setup
 
 The chatbot uses **LanceDB** (an embedded vector database) to store project data locally. You can power the LLM (Large Language Model) using a Local provider (Ollama).
@@ -99,6 +115,9 @@ The chatbot uses **LanceDB** (an embedded vector database) to store project data
     # Weather Integration (Required for Chatbot/UI)
     OPENWEATHER_API_KEY={api_key}
     VITE_OPENWEATHER_API_KEY={api_key}
+
+    # Outlook Calendar Integration (Required for "Today's Schedule" widget)
+    OUTLOOK_ICS_URL=https://outlook.office365.com/owa/calendar/.../reachcalendar.ics
 
     # AI Configuration (Local - Ollama)
     USE_OLLAMA=true
@@ -154,6 +173,7 @@ Once synced, you can start asking questions! For a full list of example commands
 
 #### 1. Dashboard
 -   **Project Overview:** Centralized hub displaying high-level metrics and project health.
+-   **Today's Schedule:** Automatically fetches and displays your daily Teams/Outlook meetings.
 -   **Charts:** Aggregated visualizations for Sprint progress and Defect statistics.
 -   **Quick Stats:** Immediate insight into open defects, active sprint status, and upcoming releases.
 

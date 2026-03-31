@@ -2,7 +2,7 @@ import React from 'react';
 import CustomDropdown from './CustomDropdown';
 
 const SprintSelector = ({ sprints, selectedSprint, onSelectSprint, disabled }) => {
-  const sprintOptions = sprints.map(s => ({ value: s, label: s }));
+  const sprintOptions = sprints.map(s => ({ value: s, label: s, description: s }));
 
   const handleChange = (e) => {
     onSelectSprint(e.target.value);
