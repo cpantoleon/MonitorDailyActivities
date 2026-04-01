@@ -244,6 +244,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 else {
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['weather_location', 'Marousi, Athens']);
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['default_card_expanded', '1']);
+                    db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['check_git_updates', '1']);
                 }
             });
 

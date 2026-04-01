@@ -608,7 +608,7 @@ const handleChatbotQuery = (dbInstance, getProjectId, port) => async (req, res) 
             }
         }
 
-        if (lowerCaseMessage === 'github pull') {
+        if (lowerCaseMessage === 'git pull') {
             try {
                 const projectRoot = path.resolve(__dirname, '..'); 
                 await promisifiedExec('git pull', { cwd: projectRoot });

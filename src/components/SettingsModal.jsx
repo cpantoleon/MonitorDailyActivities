@@ -1,4 +1,3 @@
-// src/components/SettingsModal.jsx
 import React, { useState, useEffect } from 'react';
 import Modal from './ReleaseModal';
 import ToggleSwitch from './ToggleSwitch';
@@ -54,6 +53,7 @@ const LayoutIcon = ({ type, isActive }) => {
 const SettingsModal = ({ isOpen, onClose, showMessage }) => {
     const { dashboardGridStyle, setDashboardGridStyle } = useGlobal();
     const [isDefaultExpanded, setIsDefaultExpanded] = useState(true);
+    const [isGitCheckEnabled, setIsGitCheckEnabled] = useState(true);
     const [localGridStyle, setLocalGridStyle] = useState(dashboardGridStyle);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -67,10 +67,16 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
     useEffect(() => {
         if (isOpen) {
             setLocalGridStyle(dashboardGridStyle);
+            
             fetch('/api/settings/default-expanded')
                 .then(res => res.json())
                 .then(data => setIsDefaultExpanded(data.isExpanded))
-                .catch(err => console.error(err));
+                .catch(() => {});
+            
+            fetch('/api/settings/git-check')
+                .then(res => res.json())
+                .then(data => setIsGitCheckEnabled(data.isEnabled))
+                .catch(() => {});
         }
     }, [isOpen, dashboardGridStyle]);
 
@@ -78,12 +84,19 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
         setIsLoading(true);
         try {
             setDashboardGridStyle(localGridStyle);
-            const res = await fetch('/api/settings/default-expanded', {
+            
+            await fetch('/api/settings/default-expanded', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isExpanded: isDefaultExpanded })
             });
-            if (!res.ok) throw new Error("Failed to save settings");
+
+            await fetch('/api/settings/git-check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isEnabled: isGitCheckEnabled })
+            });
+
             showMessage("Settings saved successfully!", "success");
             onClose();
         } catch (error) {
@@ -152,6 +165,24 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                     onChange={(e) => setIsDefaultExpanded(e.target.checked)}
                     option1="Expanded"
                     option2="Collapsed"
+                />
+            </div>
+
+            <div className="settings-section-divider" style={{ margin: '15px 0' }}></div>
+
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
+                <div>
+                    <label style={{ margin: 0, fontSize: '1.1em', color: 'var(--text-primary)' }}>Daily Git Update Check</label>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>
+                        Allows the chatbot to check once a day if your local code is behind the remote repository.
+                    </p>
+                </div>
+                <ToggleSwitch
+                    id="git-check-toggle"
+                    checked={isGitCheckEnabled}
+                    onChange={(e) => setIsGitCheckEnabled(e.target.checked)}
+                    option1="On"
+                    option2="Off"
                 />
             </div>
 

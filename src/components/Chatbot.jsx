@@ -31,7 +31,6 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
             const isOpen = storedIsOpen ? JSON.parse(storedIsOpen) : false;
             return { messages, isOpen };
         } catch (error) {
-            console.error("Failed to parse chatbot state from sessionStorage", error);
             return {
                 messages: [{ from: 'bot', text: 'Hello! How can I help you with your project today?' }],
                 isOpen: false
@@ -45,6 +44,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
     const [isLoading, setIsLoading] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isTtsEnabled, setIsTtsEnabled] = useState(false);
+    const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const utteranceRef = useRef(null);
@@ -69,6 +69,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
         if (isOpen) {
             scrollToBottom();
             inputRef.current?.focus();
+            setHasUnreadNotification(false);
         }
     }, [isOpen]);
 
@@ -78,6 +79,51 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
             setIsSpeaking(false);
         }
     }, [isTtsEnabled]);
+
+    useEffect(() => {
+        const checkGitStatus = async () => {
+            try {
+                const settingsRes = await fetch('/api/settings/git-check');
+                const settingsData = await settingsRes.json();
+                if (!settingsData.isEnabled) return;
+
+                const today = new Date().toISOString().split('T')[0];
+                const lastCheckDate = localStorage.getItem('lastGitCheckDate');
+                
+                if (lastCheckDate === today) return;
+
+                const gitRes = await fetch('/api/git/check-updates');
+                const gitData = await gitRes.json();
+
+                if (gitData.isBehind) {
+                    const cuteMessage = { 
+                        from: 'bot', 
+                        text: `Hi there! 🐙 Just a heads-up: your local code is **${gitData.commitsBehind} commit(s) behind** the remote repository.<br/><br/>If you want to get the latest updates, just type <b>"git pull"</b>!<br/><span style="font-size:0.8em; color:var(--text-secondary);">(You can disable these daily checks from the Settings menu)</span>`
+                    };
+                    setMessages(prev => [...prev, cuteMessage]);
+                    setHasUnreadNotification(true);
+                }
+                
+                localStorage.setItem('lastGitCheckDate', today);
+            } catch (error) {}
+        };
+
+        // 1. Τρέχει 3 δευτερόλεπτα μετά το αρχικό φόρτωμα της σελίδας
+        const initialTimer = setTimeout(() => {
+            checkGitStatus();
+        }, 3000);
+
+        // 2. Ελέγχει κάθε 1 ώρα (3600000 ms) αν άλλαξε η μέρα. 
+        // Αν το tab μείνει ανοιχτό 24/7, όταν περάσει τα μεσάνυχτα το lastCheckDate δεν θα ταιριάζει με το today, οπότε θα κάνει το check!
+        const intervalTimer = setInterval(() => {
+            checkGitStatus();
+        }, 3600000); 
+
+        return () => {
+            clearTimeout(initialTimer);
+            clearInterval(intervalTimer);
+        };
+    }, []);
 
     const handleSpeak = (text) => {
         if (isSpeaking && utteranceRef.current?.text === text) {
@@ -96,8 +142,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
             setIsSpeaking(false);
             utteranceRef.current = null;
         };
-        utterance.onerror = (event) => {
-            console.error("Speech synthesis error", event);
+        utterance.onerror = () => {
             setIsSpeaking(false);
             utteranceRef.current = null;
         };
@@ -135,7 +180,6 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
             }
 
         } catch (error) {
-            console.error("Chatbot fetch error:", error);
             const errorMessage = { from: 'bot', text: 'Sorry, something went wrong. Please try again.' };
             setMessages(prev => [...prev, errorMessage]);
         } finally {
@@ -259,6 +303,9 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
                 aria-label="Toggle chatbot window"
             >
                 🤖
+                {!isOpen && hasUnreadNotification && (
+                    <span className="chatbot-notification-badge">1</span>
+                )}
             </button>
         </div>
     );

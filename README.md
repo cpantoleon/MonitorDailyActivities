@@ -34,7 +34,7 @@ Follow these steps to get the application running locally.
     npm run dev
     ```
 2.  The frontend will be available at `http://localhost:5173` (or another port if 5173 is busy).
-3.  The backend server will run on `http://localhost:3001`.
+3.  The backend server will run on `http://localhost:3001` by default. *(Note: You can change the backend port by defining a `PORT` variable in your `server/.env` file).*
 
 ---
 
@@ -109,6 +109,9 @@ The chatbot uses **LanceDB** (an embedded vector database) to store project data
 
     **Configuration:**
     ```env
+    # Server Configuration (Optional - Defaults to 3001)
+    PORT=3001
+
     # Jira Integration (Required for Import features)
     JIRA_BASE_URL=https://jira.your-company-domain.com
 
@@ -132,6 +135,7 @@ For the chatbot to create the local vector index from your project data inside L
 
 1.  Make sure your application is running (`npm run dev`).
 2.  Open a **new terminal window** and run:
+    *(If you changed the `PORT` in your `.env`, replace `3001` below with your custom port)*
     ```bash
     # Windows PowerShell
     Invoke-WebRequest -Uri http://localhost:3001/api/chatbot/sync -Method POST
@@ -215,4 +219,5 @@ Once synced, you can start asking questions! For a full list of example commands
 ## API Documentation
 
 The backend API is documented using Swagger/OpenAPI. Once the server is running, visit:
-**[http://localhost:3001/api-docs](http://localhost:3001/api-docs)**
+**[http://localhost:3001/api-docs](http://localhost:3001/api-docs)** 
+*(If you changed the `PORT` in your `.env`, replace `3001` with your custom port).*

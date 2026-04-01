@@ -103,16 +103,34 @@ const fetchAndParseMeetings = () => {
                 else if (ev.rrule) {
                     const dates = ev.rrule.between(today, tomorrow);
                     if (dates.length > 0) {
-                        const duration = ev.end.getTime() - ev.start.getTime();
-                        const newStart = new Date(dates[0]);
-                        newStart.setHours(ev.start.getHours(), ev.start.getMinutes());
-                        const newEnd = new Date(newStart.getTime() + duration);
-                        
-                        meetings.push({ ...ev, start: newStart, end: newEnd });
+                        for (let date of dates) {
+                            const duration = ev.end.getTime() - ev.start.getTime();
+                            const newStart = new Date(date);
+                            newStart.setHours(ev.start.getHours(), ev.start.getMinutes(), 0, 0);
+                            const newEnd = new Date(newStart.getTime() + duration);
+                            
+                            let overrideEvent = null;
+                            if (ev.recurrences) {
+                                for (let rKey in ev.recurrences) {
+                                    if (new Date(rKey).toDateString() === newStart.toDateString()) {
+                                        overrideEvent = ev.recurrences[rKey];
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (overrideEvent) {
+                                meetings.push({ ...overrideEvent, start: newStart, end: newEnd });
+                            } else {
+                                meetings.push({ ...ev, start: newStart, end: newEnd });
+                            }
+                        }
                     }
                 }
             }
         }
+
+        let canceledCount = 0;
 
         cachedTodayMeetings = meetings
             .map(m => {
@@ -122,16 +140,34 @@ const fetchAndParseMeetings = () => {
                 const match = desc.match(urlRegex) || loc.match(urlRegex);
                 
                 return {
-                    id: m.uid,
-                    title: m.summary,
-                    start: m.start.toISOString(),
-                    end: m.end.toISOString(),
-                    link: match ? match[0] : null
+                    id: m.uid + (m.recurrenceid ? new Date(m.recurrenceid).getTime() : ''),
+                    title: m.summary || '',
+                    start: typeof m.start === 'string' ? m.start : m.start.toISOString(),
+                    end: typeof m.end === 'string' ? m.end : m.end.toISOString(),
+                    link: match ? match[0] : null,
+                    status: m.status || ''
                 };
+            })
+            .filter(m => {
+                const titleUpper = m.title.toUpperCase();
+                const isCanceled = titleUpper.includes('CANCELED:') || 
+                                   titleUpper.includes('CANCELLED:') || 
+                                   m.status === 'CANCELLED';
+                
+                if (isCanceled) {
+                    canceledCount++;
+                    return false;
+                }
+                return true;
             })
             .sort((a, b) => new Date(a.start) - new Date(b.start));
             
-        console.log(`Calendar updated. Found ${cachedTodayMeetings.length} meetings for today.`);
+        let logMsg = `Calendar updated. Found ${cachedTodayMeetings.length} meetings for today.`;
+        if (canceledCount > 0) {
+            logMsg += ` (${canceledCount} canceled)`;
+        }
+        
+        console.log(logMsg);
     });
 };
 
@@ -3749,6 +3785,49 @@ app.post("/api/settings/default-expanded", async (req, res) => {
         await dbRun("INSERT INTO app_settings (key, value) VALUES ('default_card_expanded', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [val]);
         res.json({ message: "Settings saved" });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/settings/git-check", async (req, res) => {
+    try {
+        const row = await dbGet("SELECT value FROM app_settings WHERE key = 'check_git_updates'");
+        res.json({ isEnabled: row ? row.value === '1' : true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Αποθήκευση του setting για το Git Check
+app.post("/api/settings/git-check", async (req, res) => {
+    try {
+        const val = req.body.isEnabled ? '1' : '0';
+        await dbRun("INSERT INTO app_settings (key, value) VALUES ('check_git_updates', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [val]);
+        res.json({ message: "Settings saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Έλεγχος αν το τοπικό repo είναι πίσω σε commits
+app.get("/api/git/check-updates", async (req, res) => {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const promisifiedExec = util.promisify(exec);
+    
+    try {
+        const projectRoot = path.resolve(__dirname, '..'); // Προσαρμόζεις το path αν χρειάζεται
+        // Κάνουμε fetch για να φέρουμε τις πληροφορίες από το remote
+        await promisifiedExec('git fetch', { cwd: projectRoot });
+        // Ελέγχουμε το status
+        const { stdout } = await promisifiedExec('git status', { cwd: projectRoot });
+        
+        // Ψάχνουμε αν το output λέει ότι είμαστε πίσω
+        const match = stdout.match(/Your branch is behind .* by (\d+) commit/i);
+        
+        if (match) {
+            return res.json({ isBehind: true, commitsBehind: parseInt(match[1], 10) });
+        }
+        return res.json({ isBehind: false, commitsBehind: 0 });
+    } catch (error) {
+        // Αν αποτύχει, δεν κρασάρουμε το app, απλά λέμε ότι δεν είναι behind
+        console.error("Git check failed:", error.message);
+        res.status(500).json({ isBehind: false, error: error.message });
+    }
 });
 
 if (isChatbotEnabled) {
