@@ -98,7 +98,7 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
                 if (gitData.isBehind) {
                     const cuteMessage = { 
                         from: 'bot', 
-                        text: `Hi there! 🐙 Just a heads-up: your local code is **${gitData.commitsBehind} commit(s) behind** the remote repository.<br/><br/>If you want to get the latest updates, just type <b>"git pull"</b>!<br/><span style="font-size:0.8em; color:var(--text-secondary);">(You can disable these daily checks from the Settings menu)</span>`
+                        text: `Hi there! 🐙 Just a heads-up: your local code is <b>${gitData.commitsBehind}</b> commit(s) behind the remote repository.<br/><br/>If you want to get the latest updates, just type <b>"git pull"</b>!<br/><span style="font-size:0.8em; color:var(--text-secondary);">(You can disable these daily checks from the Settings menu)</span>`
                     };
                     setMessages(prev => [...prev, cuteMessage]);
                     setHasUnreadNotification(true);
