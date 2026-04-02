@@ -97,18 +97,31 @@ const fetchAndParseMeetings = () => {
             const ev = data[k];
             
             if (ev.type === 'VEVENT') {
+                // 1. Απλά (non-recurring) events ή overrides που έρχονται ως top-level
                 if (ev.start >= today && ev.start < tomorrow) {
                     meetings.push(ev);
                 } 
+                // 2. Επαναλαμβανόμενα (recurring) events
                 else if (ev.rrule) {
                     const dates = ev.rrule.between(today, tomorrow);
                     if (dates.length > 0) {
                         for (let date of dates) {
-                            const duration = ev.end.getTime() - ev.start.getTime();
                             const newStart = new Date(date);
                             newStart.setHours(ev.start.getHours(), ev.start.getMinutes(), 0, 0);
-                            const newEnd = new Date(newStart.getTime() + duration);
                             
+                            // Έλεγχος αν η σημερινή μέρα είναι στις εξαιρέσεις (ακυρώθηκε ή μεταφέρθηκε)
+                            let isExcluded = false;
+                            if (ev.exdates) {
+                                for (let ex in ev.exdates) {
+                                    if (new Date(ex).toDateString() === newStart.toDateString()) {
+                                        isExcluded = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isExcluded) continue; // Αν εξαιρείται, αγνοήσε το
+
+                            // Έλεγχος αν υπάρχει τροποποίηση (override) για αυτή τη συγκεκριμένη μέρα
                             let overrideEvent = null;
                             if (ev.recurrences) {
                                 for (let rKey in ev.recurrences) {
@@ -120,8 +133,15 @@ const fetchAndParseMeetings = () => {
                             }
 
                             if (overrideEvent) {
-                                meetings.push({ ...overrideEvent, start: newStart, end: newEnd });
+                                // Αν υπάρχει override, ελέγχουμε αν το ΝΕΟ του start time είναι ακόμα σήμερα.
+                                // Αν μεταφέρθηκε για άλλη μέρα, ΔΕΝ το κάνουμε push στο σημερινό array.
+                                if (overrideEvent.start >= today && overrideEvent.start < tomorrow) {
+                                    meetings.push(overrideEvent); 
+                                }
                             } else {
+                                // Κανονική εμφάνιση του recurring meeting
+                                const duration = ev.end.getTime() - ev.start.getTime();
+                                const newEnd = new Date(newStart.getTime() + duration);
                                 meetings.push({ ...ev, start: newStart, end: newEnd });
                             }
                         }
