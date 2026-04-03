@@ -97,52 +97,61 @@ const fetchAndParseMeetings = () => {
             const ev = data[k];
             
             if (ev.type === 'VEVENT') {
-                // 1. Απλά (non-recurring) events ή overrides που έρχονται ως top-level
-                if (ev.start >= today && ev.start < tomorrow) {
-                    meetings.push(ev);
+                
+                // 1. ΑΠΛΑ (NON-RECURRING) EVENTS
+                if (!ev.rrule) {
+                    if (ev.start >= today && ev.start < tomorrow) {
+                        meetings.push(ev);
+                    }
                 } 
-                // 2. Επαναλαμβανόμενα (recurring) events
-                else if (ev.rrule) {
+                // 2. RECURRING EVENTS
+                else {
+                    // Α. Έλεγχος των κανονικών εμφανίσεων που θα έπρεπε να γίνουν ΣΗΜΕΡΑ
                     const dates = ev.rrule.between(today, tomorrow);
-                    if (dates.length > 0) {
-                        for (let date of dates) {
+                    for (let date of dates) {
+                        const originalDateStr = new Date(date).toDateString();
+                        
+                        // Εξαιρείται εντελώς; (ακυρώθηκε)
+                        let isExcluded = false;
+                        if (ev.exdates) {
+                            for (let ex in ev.exdates) {
+                                if (new Date(ex).toDateString() === originalDateStr) {
+                                    isExcluded = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (isExcluded) continue;
+
+                        // Υπάρχει override; (μετακινήθηκε)
+                        let hasOverride = false;
+                        if (ev.recurrences) {
+                            for (let rKey in ev.recurrences) {
+                                if (new Date(rKey).toDateString() === originalDateStr) {
+                                    hasOverride = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Αν ΔΕΝ έχει μετακινηθεί και ΔΕΝ έχει ακυρωθεί, το βάζουμε κανονικά για σήμερα
+                        if (!hasOverride) {
                             const newStart = new Date(date);
                             newStart.setHours(ev.start.getHours(), ev.start.getMinutes(), 0, 0);
+                            const duration = ev.end.getTime() - ev.start.getTime();
+                            const newEnd = new Date(newStart.getTime() + duration);
                             
-                            // Έλεγχος αν η σημερινή μέρα είναι στις εξαιρέσεις (ακυρώθηκε ή μεταφέρθηκε)
-                            let isExcluded = false;
-                            if (ev.exdates) {
-                                for (let ex in ev.exdates) {
-                                    if (new Date(ex).toDateString() === newStart.toDateString()) {
-                                        isExcluded = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (isExcluded) continue; // Αν εξαιρείται, αγνοήσε το
+                            meetings.push({ ...ev, start: newStart, end: newEnd });
+                        }
+                    }
 
-                            // Έλεγχος αν υπάρχει τροποποίηση (override) για αυτή τη συγκεκριμένη μέρα
-                            let overrideEvent = null;
-                            if (ev.recurrences) {
-                                for (let rKey in ev.recurrences) {
-                                    if (new Date(rKey).toDateString() === newStart.toDateString()) {
-                                        overrideEvent = ev.recurrences[rKey];
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (overrideEvent) {
-                                // Αν υπάρχει override, ελέγχουμε αν το ΝΕΟ του start time είναι ακόμα σήμερα.
-                                // Αν μεταφέρθηκε για άλλη μέρα, ΔΕΝ το κάνουμε push στο σημερινό array.
-                                if (overrideEvent.start >= today && overrideEvent.start < tomorrow) {
-                                    meetings.push(overrideEvent); 
-                                }
-                            } else {
-                                // Κανονική εμφάνιση του recurring meeting
-                                const duration = ev.end.getTime() - ev.start.getTime();
-                                const newEnd = new Date(newStart.getTime() + duration);
-                                meetings.push({ ...ev, start: newStart, end: newEnd });
+                    // Β. Έλεγχος ΟΛΩΝ των overrides του κανόνα, μήπως κάποιο μετακινήθηκε ΠΡΟΣ το σήμερα
+                    if (ev.recurrences) {
+                        for (let rKey in ev.recurrences) {
+                            const overrideEv = ev.recurrences[rKey];
+                            // Αν η *νέα* ημερομηνία έναρξης είναι σήμερα (άσχετα με το πότε ήταν αρχικά)
+                            if (overrideEv.start >= today && overrideEv.start < tomorrow) {
+                                meetings.push(overrideEv);
                             }
                         }
                     }
@@ -151,23 +160,30 @@ const fetchAndParseMeetings = () => {
         }
 
         let canceledCount = 0;
+        const meetingsMap = new Map();
 
-        cachedTodayMeetings = meetings
-            .map(m => {
-                const desc = m.description || '';
-                const loc = m.location || '';
-                const urlRegex = /(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>\s]+)/i;
-                const match = desc.match(urlRegex) || loc.match(urlRegex);
-                
-                return {
-                    id: m.uid + (m.recurrenceid ? new Date(m.recurrenceid).getTime() : ''),
-                    title: m.summary || '',
-                    start: typeof m.start === 'string' ? m.start : m.start.toISOString(),
-                    end: typeof m.end === 'string' ? m.end : m.end.toISOString(),
-                    link: match ? match[0] : null,
-                    status: m.status || ''
-                };
-            })
+        meetings.forEach(m => {
+            const desc = m.description || '';
+            const loc = m.location || '';
+            const urlRegex = /(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>\s]+)/i;
+            const match = desc.match(urlRegex) || loc.match(urlRegex);
+            
+            // Το μοναδικό ID αποτελείται από το UID και το ID της συγκεκριμένης επανάληψης (αν υπάρχει)
+            const uniqueId = m.uid + (m.recurrenceid ? new Date(m.recurrenceid).getTime() : '');
+            
+            // Το βάζουμε σε Map. Αν υπάρχει ήδη από άλλο σημείο του parse, απλά θα το κάνει overwrite 
+            // και δεν θα έχουμε διπλότυπα!
+            meetingsMap.set(uniqueId, {
+                id: uniqueId,
+                title: m.summary || '',
+                start: typeof m.start === 'string' ? m.start : m.start.toISOString(),
+                end: typeof m.end === 'string' ? m.end : m.end.toISOString(),
+                link: match ? match[0] : null,
+                status: m.status || ''
+            });
+        });
+
+        cachedTodayMeetings = Array.from(meetingsMap.values())
             .filter(m => {
                 const titleUpper = m.title.toUpperCase();
                 const isCanceled = titleUpper.includes('CANCELED:') || 
