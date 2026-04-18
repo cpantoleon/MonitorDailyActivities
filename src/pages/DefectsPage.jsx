@@ -826,10 +826,18 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     setStatusUpdateInfo({ defect: null, newStatus: '' });
   };
 
-  const handleConfirmDefectStatusUpdate = async (comment) => {
+  const handleConfirmDefectStatusUpdate = async ({ comment, timeData }) => {
     const { defect, newStatus } = statusUpdateInfo;
     if (!defect) return;
-    const payload = { ...defect, status: newStatus, comment };
+
+    // Προσθέτουμε τον χρόνο που γύρισε το Modal στο payload
+    const payload = { 
+        ...defect, 
+        status: newStatus, 
+        comment,
+        real_time: timeData.real_time !== undefined ? timeData.real_time : defect.real_time
+    };
+
     try {
       const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
         method: 'PUT',
@@ -1152,7 +1160,15 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
       {!isLoading && (isSearching ? (filteredDefects.length > 0 ? renderBoard(filteredDefects) : <div className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(filteredDefects) : null))}
 
-      <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmDefectStatusUpdate} requirement={statusUpdateInfo.defect ? { requirementUserIdentifier: statusUpdateInfo.defect.title } : null} newStatus={statusUpdateInfo.newStatus} />
+      <UpdateStatusModal 
+        isOpen={isUpdateStatusModalOpen} 
+        onClose={handleCloseUpdateStatusModal} 
+        onSave={handleConfirmDefectStatusUpdate} 
+        item={statusUpdateInfo.defect} 
+        itemType="defect" 
+        newStatus={statusUpdateInfo.newStatus} 
+        showMessage={showMessage} 
+      />
       <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
       {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} onSaveComment={handleUpdateHistoryComment} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />

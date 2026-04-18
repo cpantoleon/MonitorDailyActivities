@@ -58,7 +58,10 @@ function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // ΠΡΟΣΘΗΚΗ: parent_id: null στο αρχικό state
-  const [newReqFormState, setNewReqFormState] = useState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null });
+  const [newReqFormState, setNewReqFormState] = useState({ 
+    project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null,
+    expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h' 
+  });
   
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
@@ -529,16 +532,11 @@ const [filterOptions, setFilterOptions] = useState({
 
     setNewReqFormState({
       project: isParent ? parentReq.project : (selectedProject || ''), 
-      requirementName: '', 
-      status: 'To Do', 
+      requirementName: '', status: 'To Do', 
       sprint: isParent ? (parentReq.currentStatusDetails.sprint === 'Backlog' ? '1' : parentReq.currentStatusDetails.sprint.replace('Sprint ', '')) : '1', 
-      comment: '', 
-      link: '', 
-      isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false, 
-      type: isParent ? 'Sub-task' : '', 
-      tags: '', 
-      release_id: isParent ? parentReq.currentStatusDetails.releaseId : '',
-      parent_id: isParent ? parentReq.id : null 
+      comment: '', link: '', isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false, 
+      type: isParent ? 'Sub-task' : '', tags: '', release_id: isParent ? parentReq.currentStatusDetails.releaseId : '', parent_id: isParent ? parentReq.id : null,
+      expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h'
     });
     setIsAddModalOpen(true);
   }, [selectedProject]);
@@ -546,7 +544,7 @@ const [filterOptions, setFilterOptions] = useState({
   // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleCloseAddModal
   const handleCloseAddModal = useCallback(() => {
     setIsAddModalOpen(false);
-    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null });
+    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null, expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h' });
   }, []);
   
   const handleNewReqFormChange = useCallback((e) => { 
@@ -578,10 +576,20 @@ const [filterOptions, setFilterOptions] = useState({
   const handleNavigateToRequirement = (req) => { navigate(`/sprint-board?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`); };
   const handleNavigateToDefect = (defect, isClosed = false) => { navigate(`/defects?d_project=${encodeURIComponent(defect.project)}&highlight=${defect.id}${isClosed ? '&view=closed' : ''}`); };
 
-  const handleConfirmStatusUpdate = async (comment) => {
+  const handleConfirmStatusUpdate = async ({ comment, timeData }) => {
     const { requirement, newStatus, targetIndex } = statusUpdateInfo;
     if (!requirement) return;
-    const payload = { project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex };
+    
+    const payload = { 
+        project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, 
+        sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, 
+        type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, 
+        release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, 
+        statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex,
+        expected_time: requirement.currentStatusDetails.expected_time,
+        real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
+        real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing
+    };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error('Failed to update status.');
@@ -591,7 +599,7 @@ const [filterOptions, setFilterOptions] = useState({
     } catch (error) { showMainMessage(`Error: ${error.message}`, 'error'); } 
     finally { handleCloseUpdateStatusModal(); }
   };
-
+  
   // Πρόσθεσε αυτή τη συνάρτηση μέσα στο App (π.χ. κάτω από το handleConfirmStatusUpdate)
 const handleReorderRequirements = async (orderedIds) => {
     try {
@@ -616,6 +624,8 @@ const handleReorderRequirements = async (orderedIds) => {
 
   const handleSaveRequirementEdit = useCallback(async (formData) => {
     try {
+      const calcHours = (val, unit) => val ? (unit === 'd' ? parseFloat(val) * 8 : parseFloat(val)) : null;
+
       if (formData.name !== editingRequirement.requirementUserIdentifier) {
         await fetch(`${API_BASE_URL}/requirements/${editingRequirement.id}/rename`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -627,10 +637,14 @@ const handleReorderRequirements = async (orderedIds) => {
         project: editingRequirement.project, requirementName: formData.name, status: formData.status,
         sprint: newSprint, comment: formData.comment, link: formData.link, type: formData.type,
         tags: formData.tags, release_id: formData.release_id, 
-        parent_id: formData.type === 'Sub-task' ? formData.parent_id : null, // Καθαρίζει το parent_id αν ο χρήστης το αλλάξει σε κανονικό Task
+        parent_id: formData.type === 'Sub-task' ? formData.parent_id : null,
         statusDate: new Date().toISOString().split('T')[0],
-        existingRequirementGroupId: editingRequirement.id
+        existingRequirementGroupId: editingRequirement.id,
+        expected_time: calcHours(formData.expected_time, formData.expected_time_unit),
+        real_time_tc_creation: calcHours(formData.real_time_tc_creation, formData.real_time_tc_creation_unit),
+        real_time_testing: calcHours(formData.real_time_testing, formData.real_time_testing_unit)
       };
+      // ... rest of function
       const response = await fetch(`${API_BASE_URL}/activities`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
@@ -689,6 +703,7 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
   const handleAddNewRequirement = useCallback(async () => {
     const targetProject = newReqFormState.project;
     const targetSprint = newReqFormState.isBacklog ? 'Backlog' : `Sprint ${newReqFormState.sprint}`;
+    const calcHours = (val, unit) => val ? (unit === 'd' ? parseFloat(val) * 8 : parseFloat(val)) : null;
 
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, {
@@ -697,8 +712,11 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
           project: targetProject, requirementName: newReqFormState.requirementName, status: newReqFormState.status,
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
           tags: newReqFormState.tags, release_id: newReqFormState.release_id, 
-          parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null, // Εξασφαλίζει ότι το parent_id σώζεται μόνο σε sub-tasks
-          statusDate: new Date().toISOString().split('T')[0]
+          parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null,
+          statusDate: new Date().toISOString().split('T')[0],
+          expected_time: calcHours(newReqFormState.expected_time, newReqFormState.expected_time_unit),
+          real_time_tc_creation: calcHours(newReqFormState.real_time_tc_creation, newReqFormState.real_time_tc_creation_unit),
+          real_time_testing: calcHours(newReqFormState.real_time_testing, newReqFormState.real_time_testing_unit)
         }),
       });
       
@@ -990,7 +1008,15 @@ if (isLoading) {
         <EditReleaseModal isOpen={isEditReleaseModalOpen} onClose={() => setIsEditReleaseModalOpen(false)} onSave={handleEditRelease} onDelete={(release) => handleDeleteRequest('release', release)} releases={allReleases} projects={projects} currentProject={selectedProject} />
         <EditProjectModal isOpen={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} onSave={handleEditProject} onDelete={(project) => handleDeleteRequest('project', project)} projects={projects} currentProject={selectedProject} />
         <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} allRequirements={allProcessedRequirements} selectedSprint={selectedSprint} />
-        <UpdateStatusModal isOpen={isUpdateStatusModalOpen} onClose={handleCloseUpdateStatusModal} onSave={handleConfirmStatusUpdate} requirement={statusUpdateInfo.requirement} newStatus={statusUpdateInfo.newStatus} showMessage={showMainMessage} />
+        <UpdateStatusModal 
+            isOpen={isUpdateStatusModalOpen} 
+            onClose={handleCloseUpdateStatusModal} 
+            onSave={handleConfirmStatusUpdate} 
+            item={statusUpdateInfo.requirement} 
+            itemType="requirement" 
+            newStatus={statusUpdateInfo.newStatus} 
+            showMessage={showMainMessage} 
+        />
         <FilterSidebar 
             isOpen={isFilterSidebarOpen} 
             onClose={() => setIsFilterSidebarOpen(false)} 

@@ -21,6 +21,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     comment: '',
     linkedRequirementGroupIds: [],
     is_fat_defect: false,
+    real_time: '',
+    real_time_unit: 'h'
   });
 
   const [formData, setFormData] = useState(getInitialFormState(currentSelectedProject));
@@ -47,6 +49,10 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     if (isOpen) {
       let initialData;
       if (defect) {
+        const rTime = defect.real_time;
+        const initRTime = { val: rTime || '', unit: (rTime > 0 && rTime % 8 === 0) ? 'd' : 'h' };
+        if (initRTime.unit === 'd') initRTime.val = initRTime.val / 8;
+
         initialData = {
           project: defect.project,
           title: defect.title || '',
@@ -58,6 +64,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           comment: '',
           linkedRequirementGroupIds: defect.linkedRequirements ? defect.linkedRequirements.map(r => r.groupId) : [],
           is_fat_defect: defect.is_fat_defect || false,
+          real_time: initRTime.val,
+          real_time_unit: initRTime.unit
         };
       } else {
         const initialProject = currentSelectedProject || '';
@@ -88,6 +96,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
            formData.created_date.toISOString().split('T')[0] !== initialFormData.created_date.toISOString().split('T')[0] ||
            formData.comment.trim() !== '' ||
            formData.is_fat_defect !== initialFormData.is_fat_defect ||
+           formData.real_time !== initialFormData.real_time ||
+           formData.real_time_unit !== initialFormData.real_time_unit ||
            linksChanged;
   }, [formData, initialFormData]);
 
@@ -245,7 +255,13 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
       return;
     }
 
-    onSubmit({ ...formData, area: formData.area.trim() });
+    const calcH = (v, u) => (v !== '' && v !== null && !isNaN(v) ? parseFloat(v) * (u === 'd' ? 8 : 1) : null);
+    
+    onSubmit({ 
+        ...formData, 
+        area: formData.area.trim(),
+        real_time: calcH(formData.real_time, formData.real_time_unit)
+    });
   };
 
   if (!isOpen) return null;
@@ -480,6 +496,19 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                 <label htmlFor="defect-comment" className="optional-label">Comment:</label>
                 <textarea id="defect-comment" name="comment" value={formData.comment} onChange={handleChange} rows="2" />
               </div>
+
+              {/* NEW TIME TRACKING BLOCK FOR DEFECT */}
+              <div id="form-group-real-time-id" className="form-group" style={{ marginTop: '10px' }}>
+                  <label style={{ fontSize: '0.85em' }} className="optional-label">Real Time Spent</label>
+                  <div style={{ display: 'flex', gap: '5px', maxWidth: '200px' }}>
+                      <input type="number" name="real_time" value={formData.real_time} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                      <select name="real_time_unit" value={formData.real_time_unit} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
+                          <option value="h">hours</option>
+                          <option value="d">days</option>
+                      </select>
+                  </div>
+              </div>
+
             </div>
 
             <div id="modal-actions-id" className="modal-actions">

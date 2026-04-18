@@ -12,7 +12,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const [changeReason, setChangeReason] = useState('');
   const [isLogChangeVisible, setIsLogChangeVisible] = useState(false);
   const [acknowledgeDefects, setAcknowledgeDefects] = useState(false);
-  const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
+  const [activeTab, setActiveTab] = useState('core');
 
   const openDefects = useMemo(() => {
     if (!requirement || formData.status !== 'Done') return [];
@@ -20,6 +20,13 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       (defect) => defect.status === 'Assigned to Developer' || defect.status === 'Assigned to Tester'
     ) || [];
   }, [requirement, formData.status]);
+
+  const parseTimeToObj = (hours) => {
+      if (hours === null || hours === undefined || hours === '') return { val: '', unit: 'h' };
+      const h = parseFloat(hours);
+      if (h > 0 && h % 8 === 0) return { val: h / 8, unit: 'd' };
+      return { val: h, unit: 'h' };
+  };
 
   useEffect(() => {
     if (requirement && isOpen) {
@@ -30,6 +37,10 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       if (!isBacklog && currentSprint.startsWith('Sprint ')) {
         sprintNumber = currentSprint.split(' ')[1] || '1';
       }
+
+      const exp = parseTimeToObj(requirement.currentStatusDetails?.expected_time);
+      const rTc = parseTimeToObj(requirement.currentStatusDetails?.real_time_tc_creation);
+      const rTest = parseTimeToObj(requirement.currentStatusDetails?.real_time_testing);
 
       const initialData = {
         name: requirement.requirementUserIdentifier || '',
@@ -42,13 +53,16 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
         tags: requirement.currentStatusDetails?.tags || '',
         release_id: requirement.currentStatusDetails?.releaseId || '',
         parent_id: requirement.parentId || '',
+        expected_time: exp.val, expected_time_unit: exp.unit,
+        real_time_tc_creation: rTc.val, real_time_tc_creation_unit: rTc.unit,
+        real_time_testing: rTest.val, real_time_testing_unit: rTest.unit
       };
       setFormData(initialData);
       setInitialFormData(initialData);
       setChangeReason('');
       setIsLogChangeVisible(false);
       setAcknowledgeDefects(false);
-      setActiveTab('core'); // Reset to first tab
+      setActiveTab('core');
     }
   }, [requirement, isOpen]);
 
@@ -76,7 +90,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // If on Core tab, just go to Tracking
     if (activeTab === 'core') {
       setActiveTab('tracking');
       return;
@@ -88,12 +101,21 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       return;
     }
 
-    // If on Tracking tab, perform validation and save
     if (openDefects.length > 0 && !acknowledgeDefects) {
       showMessage('Please acknowledge the open defects before proceeding.', 'error');
       return;
     }
-    onSave(formData);
+
+    const calcH = (v, u) => (v !== '' && v !== null && !isNaN(v) ? parseFloat(v) * (u === 'd' ? 8 : 1) : null);
+    
+    const finalPayload = {
+        ...formData,
+        expected_time: calcH(formData.expected_time, formData.expected_time_unit),
+        real_time_tc_creation: calcH(formData.real_time_tc_creation, formData.real_time_tc_creation_unit),
+        real_time_testing: calcH(formData.real_time_testing, formData.real_time_testing_unit)
+    };
+
+    onSave(finalPayload);
   };
 
   const handleLogChangeClick = async () => {
@@ -109,10 +131,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
 
   const parentOptions = useMemo(() => {
     if (!requirement || !requirement.project || !allRequirements) return [];
-    
-    // ΠΛΕΟΝ ΧΡΗΣΙΜΟΠΟΙΕΙ ΤΟ SPRINT ΤΟΥ BOARD:
     const targetSprint = selectedSprint || 'Sprint 1'; 
-    
     return allRequirements
       .filter(r => r.project === requirement.project && r.currentStatusDetails?.sprint === targetSprint && !r.parentId && r.id !== requirement.id)
       .map(r => ({ value: r.id, label: r.requirementUserIdentifier }));
@@ -135,7 +154,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
     </div>
   );
 
-  // Ελέγχουμε αν το requirement δημιουργήθηκε εξαρχής ως sub-task
   const isOriginallySubtask = !!requirement.parentId;
 
   return (
@@ -143,7 +161,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       <div ref={modalRef} className="add-new-modal-content">
         <h2>Edit Requirement</h2>
 
-        {/* TAB NAVIGATION */}
         <div className="modal-tabs">
             <button 
               type="button" 
@@ -200,7 +217,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               <CustomDropdown name="status" value={formData.status} onChange={handleChange} options={statusOptions} />
             </div>
 
-            {/* DEFECT WARNING (Only shown in Tracking Tab) */}
             {openDefects.length > 0 && (
               <div className="warning-box" style={{marginBottom: '15px'}}>
                 <p className="warning-text">
@@ -220,7 +236,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </div>
             )}
 
-            {/* Αν δεν ήταν εξαρχής Sub-task, αφήνουμε το Sprint ανοιχτό για να βρίσκει parents */}
             {!isOriginallySubtask && (
               <>
                 <div className="form-group">
@@ -234,7 +249,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </>
             )}
 
-            {/* Κρύβουμε το Release αν είναι Sub-task */}
             {!isOriginallySubtask && formData.type !== 'Sub-task' && (
               <div className="form-group">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -256,10 +270,48 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               <label htmlFor="editReqTags" className="optional-label">Tags:</label>
               <input type="text" id="editReqTags" name="tags" value={formData.tags || ''} onChange={handleChange} placeholder="e.g., Sprint 4, PreA Tools" />
             </div>
+            
             <div className="form-group">
               <label htmlFor="editReqLink" className="optional-label">Link (e.g., JIRA):</label>
               <input type="url" id="editReqLink" name="link" value={formData.link || ''} onChange={handleChange} placeholder="https://example.com/issue/123" />
             </div>
+
+            {/* NEW TIME TRACKING BLOCK */}
+            <fieldset style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '15px', marginTop: '10px' }}>
+                <legend className="optional-label" style={{ padding: '0 5px', fontSize: '0.9em', color: 'var(--text-secondary)' }}>Time Tracking (Optional)</legend>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+                    <div>
+                        <label style={{ fontSize: '0.85em' }}>Expected Time</label>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <input type="number" name="expected_time" value={formData.expected_time || ''} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                            <select name="expected_time_unit" value={formData.expected_time_unit || 'h'} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                <option value="h">hours</option>
+                                <option value="d">days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.85em' }}>Real (Test Cases)</label>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <input type="number" name="real_time_tc_creation" value={formData.real_time_tc_creation || ''} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                            <select name="real_time_tc_creation_unit" value={formData.real_time_tc_creation_unit || 'h'} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                <option value="h">hours</option>
+                                <option value="d">days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.85em' }}>Real (Testing)</label>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <input type="number" name="real_time_testing" value={formData.real_time_testing || ''} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                            <select name="real_time_testing_unit" value={formData.real_time_testing_unit || 'h'} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                <option value="h">hours</option>
+                                <option value="d">days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
           </div>
 
           <div className="modal-actions">
@@ -280,7 +332,6 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
           </div>
         </form>
 
-        {/* LOG SCOPE CHANGE SECTION - Κρύβεται αν είναι sub-task */}
         {!isOriginallySubtask && formData.type !== 'Sub-task' && (
           <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

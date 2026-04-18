@@ -17,11 +17,8 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
 
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(getLocalDateTime(defect.fixed_date));
-  
-  // ΠΡΟΣΘΗΚΗ: State για το Expand / Collapse
   const [isExpanded, setIsExpanded] = useState(defect.is_expanded !== 0);
 
-  // ΠΡΟΣΘΗΚΗ: Συγχρονισμός με αλλαγές από Expand All
   useEffect(() => {
     setIsExpanded(defect.is_expanded !== 0);
   }, [defect.is_expanded]);
@@ -49,7 +46,7 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
 
   const isDraggable = defect.status !== 'Closed';
 
-  const handleDragStart = (e, def) => {
+  const handleDragStartLocal = (e, def) => {
     if (!isDraggable) {
       e.preventDefault();
       return;
@@ -77,12 +74,21 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
       setIsEditingDate(false);
   };
 
+  const formatTimeHelper = (hours) => {
+      if (!hours || isNaN(hours) || hours <= 0) return null;
+      const d = Math.floor(hours / 8);
+      const h = hours % 8;
+      if (d > 0 && h > 0) return `${d}d ${h}h`;
+      if (d > 0) return `${d}d`;
+      return `${h}h`;
+  };
+
   return (
     <div 
       id={`defect-card-${defect.id}`}
       className="defect-card kanban-card"
       draggable={isDraggable}
-      onDragStart={(e) => handleDragStart(e, defect)}
+      onDragStart={(e) => handleDragStartLocal(e, defect)}
       onDragEnd={handleDragEnd}
       style={{ cursor: isDraggable ? 'grab' : 'default', position: 'relative' }}
     >
@@ -110,7 +116,6 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
             {defect.title}
           </strong>
           
-          {/* ΠΡΟΣΘΗΚΗ: Κουμπί Expand/Collapse */}
           <button 
               type="button" 
               onClick={handleToggleExpand} 
@@ -138,7 +143,6 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
           </button>
         </div>
 
-        {/* ΠΡΟΣΘΗΚΗ: Κρύβονται αν είναι Collapsed */}
         {isExpanded && (
           <div className="kanban-card-details">
             {defect.area !== 'Imported' && (
@@ -223,6 +227,13 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
               <span className="detail-label">Last Update:</span>
               <span className="detail-value">{new Date(defect.updated_at).toLocaleString()}</span>
             </div>
+
+            {defect.real_time && (
+                <div className="card-detail-item" style={{ backgroundColor: 'var(--bg-tertiary)', padding: '6px 10px', borderRadius: '6px', borderLeft: '3px solid #dc3545', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="detail-label" style={{ color: 'var(--text-primary)', margin: 0 }}>Real Time:</span>
+                  <span className="detail-value" style={{ fontWeight: 'bold' }}>{formatTimeHelper(defect.real_time)}</span>
+                </div>
+            )}
 
             {defect.linkedRequirements && defect.linkedRequirements.length > 0 && (
               <div className="card-detail-item" style={{ marginTop: '10px' }}>

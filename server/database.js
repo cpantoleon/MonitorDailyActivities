@@ -55,6 +55,9 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 isCurrent INTEGER DEFAULT 0,
                 release_id INTEGER,
                 parent_id INTEGER DEFAULT NULL,
+                expected_time REAL DEFAULT NULL,
+                real_time_tc_creation REAL DEFAULT NULL,
+                real_time_testing REAL DEFAULT NULL,
                 created_at TEXT,
                 updated_at TEXT,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -158,6 +161,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 status TEXT NOT NULL CHECK(status IN ('Assigned to Developer', 'Assigned to Tester', 'Done', 'Closed')),
                 link TEXT,
                 created_date TEXT NOT NULL,
+                real_time REAL DEFAULT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -369,22 +373,16 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 const hasParentIdColumn = columns.some(col => col.name === 'parent_id');
                 if (!hasParentIdColumn) {
                     db.run("ALTER TABLE activities ADD COLUMN parent_id INTEGER DEFAULT NULL", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding parent_id column to activities:", alterErr.message);
-                        } else {
-                            console.log("Column 'parent_id' added to activities table.");
-                        }
+                        if (alterErr) console.error("Error adding parent_id column:", alterErr.message);
+                        else console.log("Column 'parent_id' added to activities table.");
                     });
                 }
 
                 const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
                 if (!hasDisplayOrderColumn) {
                     db.run("ALTER TABLE activities ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding display_order column to activities:", alterErr.message);
-                        } else {
-                            console.log("Column 'display_order' added to activities table.");
-                        }
+                        if (alterErr) console.error("Error adding display_order column:", alterErr.message);
+                        else console.log("Column 'display_order' added to activities table.");
                     });
                 }
 
@@ -393,6 +391,31 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     db.run("ALTER TABLE activities ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
                         if (alterErr) console.error("Error adding is_expanded column:", alterErr.message);
                         else console.log("Column 'is_expanded' added to activities table.");
+                    });
+                }
+
+                // NEW COLUMNS FOR TIME TRACKING
+                const hasExpectedTimeColumn = columns.some(col => col.name === 'expected_time');
+                if (!hasExpectedTimeColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN expected_time REAL DEFAULT NULL", (alterErr) => {
+                        if (alterErr) console.error("Error adding expected_time column:", alterErr.message);
+                        else console.log("Column 'expected_time' added to activities table.");
+                    });
+                }
+
+                const hasRealTimeTcCreationColumn = columns.some(col => col.name === 'real_time_tc_creation');
+                if (!hasRealTimeTcCreationColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN real_time_tc_creation REAL DEFAULT NULL", (alterErr) => {
+                        if (alterErr) console.error("Error adding real_time_tc_creation column:", alterErr.message);
+                        else console.log("Column 'real_time_tc_creation' added to activities table.");
+                    });
+                }
+
+                const hasRealTimeTestingColumn = columns.some(col => col.name === 'real_time_testing');
+                if (!hasRealTimeTestingColumn) {
+                    db.run("ALTER TABLE activities ADD COLUMN real_time_testing REAL DEFAULT NULL", (alterErr) => {
+                        if (alterErr) console.error("Error adding real_time_testing column:", alterErr.message);
+                        else console.log("Column 'real_time_testing' added to activities table.");
                     });
                 }
             });
@@ -406,47 +429,43 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 const hasIsFatDefectColumn = columns.some(col => col.name === 'is_fat_defect');
                 if (!hasIsFatDefectColumn) {
                     db.run("ALTER TABLE defects ADD COLUMN is_fat_defect INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding is_fat_defect column to defects:", alterErr.message);
-                        } else {
-                            console.log("Column 'is_fat_defect' added to defects table.");
-                        }
+                        if (alterErr) console.error("Error adding is_fat_defect column to defects:", alterErr.message);
+                        else console.log("Column 'is_fat_defect' added to defects table.");
                     });
                 }
 
                 const hasFixedDateColumn = columns.some(col => col.name === 'fixed_date');
                 if (!hasFixedDateColumn) {
                     db.run("ALTER TABLE defects ADD COLUMN fixed_date TEXT", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding fixed_date column to defects:", alterErr.message);
-                        } else {
-                            console.log("Column 'fixed_date' added to defects table.");
-                        }
+                        if (alterErr) console.error("Error adding fixed_date column to defects:", alterErr.message);
+                        else console.log("Column 'fixed_date' added to defects table.");
                     });
                 }
 
                 const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
                 if (!hasIsExpandedColumn) {
                     db.run("ALTER TABLE defects ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding is_expanded column to defects:", alterErr.message);
-                        } else {
-                            console.log("Column 'is_expanded' added to defects table.");
-                        }
+                        if (alterErr) console.error("Error adding is_expanded column to defects:", alterErr.message);
+                        else console.log("Column 'is_expanded' added to defects table.");
                     });
                 }
 
                 const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
                 if (!hasDisplayOrderColumn) {
                     db.run("ALTER TABLE defects ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding display_order column to defects:", alterErr.message);
-                        } else {
-                            console.log("Column 'display_order' added to defects table.");
-                        }
+                        if (alterErr) console.error("Error adding display_order column to defects:", alterErr.message);
+                        else console.log("Column 'display_order' added to defects table.");
                     });
                 }
-
+                
+                // NEW COLUMN FOR DEFECT REAL TIME TRACKING
+                const hasRealTimeColumn = columns.some(col => col.name === 'real_time');
+                if (!hasRealTimeColumn) {
+                    db.run("ALTER TABLE defects ADD COLUMN real_time REAL DEFAULT NULL", (alterErr) => {
+                        if (alterErr) console.error("Error adding real_time column:", alterErr.message);
+                        else console.log("Column 'real_time' added to defects table.");
+                    });
+                }
             });
 
             console.log("All table checks/creations complete.");

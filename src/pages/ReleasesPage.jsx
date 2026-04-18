@@ -19,6 +19,15 @@ ChartJS.register(ArcElement, ChartTooltip, Legend, Title);
 
 const API_BASE_URL = '/api';
 
+const formatTimeHelper = (hours) => {
+    if (!hours || isNaN(hours) || hours <= 0) return '0h';
+    const d = Math.floor(hours / 8);
+    const h = hours % 8;
+    if (d > 0 && h > 0) return `${d}d ${h}h`;
+    if (d > 0) return `${d}d`;
+    return `${h}h`;
+};
+
 const useTheme = () => {
     const [isDarkMode, setIsDarkMode] = useState(false);
     useEffect(() => {
@@ -914,14 +923,11 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     const defectChartRef = useRef(null);
 
     const releaseRequirements = useMemo(() => {
-        // Βρίσκουμε τα κανονικά requirements (parents) που ανήκουν στη release
         const directReqs = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
         const directReqIds = new Set(directReqs.map(r => r.id));
         
-        // Βρίσκουμε τα sub-tasks που ανήκουν σε αυτά τα parents (ανεξάρτητα από το αν έχουν δικό τους releaseId)
         const subTasks = allProcessedRequirements.filter(r => r.parentId && directReqIds.has(r.parentId));
         
-        // Τα ενώνουμε διασφαλίζοντας ότι δεν υπάρχουν διπλότυπα
         const combinedMap = new Map();
         directReqs.forEach(r => combinedMap.set(r.id, r));
         subTasks.forEach(r => combinedMap.set(r.id, r));
@@ -1041,6 +1047,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             key={release.id} 
             release={release} 
             requirements={filteredRequirements} 
+            defects={displayDefects}
             defectCount={defectCount}
             onNavigate={onNavigateToRequirement}
             onFinalize={() => onFinalize(release)}
@@ -1200,7 +1207,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
     );
 };
 
-const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef, chartTitle, chartAriaLabel, legendItems }) => {
+const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef, chartTitle, chartAriaLabel, legendItems }) => {
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const exportContainerRef = useRef(null);
 
@@ -1223,6 +1230,10 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
             tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed} (${((c.parsed / (c.dataset.data.reduce((a, b) => a + b, 0) || 1)) * 100).toFixed(1)}%)` } }
         },
     };
+
+    const totalExpectedReqs = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.expected_time || 0), 0);
+    const totalRealReqs = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_tc_creation || 0) + (r.currentStatusDetails.real_time_testing || 0), 0);
+    const totalRealDefects = (defects || []).reduce((sum, d) => sum + (d.real_time || 0), 0);
 
     return (
         <div id={`release-card-${release.id}`} className="release-card">
@@ -1263,6 +1274,21 @@ const ReleaseCard = ({ release, requirements, defectCount, onNavigate, onFinaliz
                 </div>
             </div>
             
+            <div className="release-time-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed var(--border-color)', fontSize: '0.85em', textAlign: 'center' }}>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Expected (Reqs)</div>
+                    <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalExpectedReqs)}</strong>
+                </div>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Reqs)</div>
+                    <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealReqs)}</strong>
+                </div>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Defects)</div>
+                    <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealDefects)}</strong>
+                </div>
+            </div>
+
             <div id={`release-card-footer-${release.id}`} className="release-card-footer">
                 {sprintFilter && (
                     <div id={`sprint-filter-controls-${release.id}`} className="sprint-filter-controls">
@@ -1528,6 +1554,18 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         return 'height-250';
     }, [satChartData, bugLabelsChartData]);
 
+    const totalExpectedReqs = items.reduce((sum, item) => {
+        const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
+        return sum + (req?.currentStatusDetails.expected_time || 0);
+    }, 0);
+
+    const totalRealReqs = items.reduce((sum, item) => {
+        const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
+        return sum + (req?.currentStatusDetails.real_time_tc_creation || 0) + (req?.currentStatusDetails.real_time_testing || 0);
+    }, 0);
+
+    const totalRealDefects = defects.reduce((sum, d) => sum + (d.real_time || 0), 0);
+
     return (
         <div id={`archived-details-view-${archive.id}`} className="archived-details-view">
             {isPdfExporting && (
@@ -1582,6 +1620,22 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                 <ChartLegend items={bugLabelsLegendItems} />
                             </div>
                         )}
+                        
+                        <div className="release-time-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '20px', fontSize: '0.85em', textAlign: 'center', width: '100%', maxWidth: '500px' }}>
+                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Expected (Reqs)</div>
+                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalExpectedReqs)}</strong>
+                            </div>
+                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Reqs)</div>
+                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealReqs)}</strong>
+                            </div>
+                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
+                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Defects)</div>
+                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealDefects)}</strong>
+                            </div>
+                        </div>
+
                     </div>
 
                     {archive.sat_report && (
@@ -2070,7 +2124,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [isFatFinalizeConfirmOpen, setIsFatFinalizeConfirmOpen] = useState(false);
     const [finalizeAction, setFinalizeAction] = useState(null);
 
-    // ✅ ΠΡΟΣΘΕΣΕ ΤΙΣ ΔΥΟ ΓΡΑΜΜΕΣ ΑΚΡΙΒΩΣ ΕΔΩ:
     const [isArchiveDeleteConfirmOpen, setIsArchiveDeleteConfirmOpen] = useState(false);
     const [archiveToDelete, setArchiveToDelete] = useState(null);
 
@@ -2120,7 +2173,6 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const arch = archivedReleases.find(a => a.id === id);
             setSelectedArchive(prev => {
                  if (arch) {
-                     // Update if the ID is different OR if the SAT report data changed
                      if (!prev || prev.id !== id || JSON.stringify(prev.sat_report) !== JSON.stringify(arch.sat_report)) {
                          return arch;
                      }
@@ -2199,7 +2251,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
                 showMainMessage('Active FAT period has been automatically completed.', 'success');
-                setActiveFatPeriod(null); // Clear from local state immediately
+                setActiveFatPeriod(null);
             } catch (error) {
                 showMainMessage(`Error completing FAT period: ${error.message}`, 'error');
                 setIsFatFinalizeConfirmOpen(false);
@@ -2376,7 +2428,6 @@ const releasesPageTooltipContent = (
     };
 
     const handleConfirmDelete = async () => {
-        // Handled directly by App.jsx
     };
 
     const handleDeleteArchivedReleaseWrapper = (archive) => {
@@ -2384,7 +2435,6 @@ const releasesPageTooltipContent = (
     };
 
     const handleConfirmArchiveDelete = async () => {
-        // Handled directly by App.jsx
     };
 
     const handleOpenSatModal = (archive) => {

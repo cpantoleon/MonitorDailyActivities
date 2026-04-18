@@ -370,6 +370,35 @@ input:focus, select:focus, textarea:focus {
     color: white !important;
 }
 
+/* --- TIME TRACKING BADGES --- */
+.time-tracking-badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.time-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-badge.expected {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.time-badge.real {
+  background-color: var(--tag-blue-bg);
+  color: var(--tag-blue-text);
+  border: 1px solid var(--tag-blue-border);
+}
+
 /* -----------------------------------------
    GLOBAL OPTIONS MENU (Dropdowns)
 ----------------------------------------- */

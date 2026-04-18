@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Επαγγελματικό SVG Icon (Μάτι)
 const FocusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -9,7 +8,6 @@ const FocusIcon = () => (
   </svg>
 );
 
-// Εικονίδιο Expand/Collapse (Απλό, καθαρό chevron)
 const ToggleIcon = ({ isExpanded }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -25,19 +23,6 @@ const ToggleIcon = ({ isExpanded }) => (
       transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
     }}
   >
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);
-
-// Εικονίδια για Expand / Collapse
-const ChevronUp = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="18 15 12 9 6 15"></polyline>
-  </svg>
-);
-
-const ChevronDown = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
@@ -68,11 +53,8 @@ const KanbanCard = React.memo(({
   const { comment, link, type, tags, releaseName, releaseDate, activityId, is_expanded } = requirement.currentStatusDetails;
   const navigate = useNavigate();
 
-  // State για το Expand / Collapse
-  // Αν το is_expanded είναι undefined (π.χ. παλιές εγγραφές πριν το migration), το θεωρούμε true (1)
   const [isExpanded, setIsExpanded] = useState(is_expanded !== 0);
 
-  // Συγχρονισμός με το global state (όταν πατιέται το Expand All / Collapse All)
   useEffect(() => {
     setIsExpanded(is_expanded !== 0);
   }, [is_expanded]);
@@ -82,7 +64,6 @@ const KanbanCard = React.memo(({
     const newState = !isExpanded;
     setIsExpanded(newState);
     
-    // Ενημέρωση της βάσης στο background
     if (activityId) {
       fetch(`/api/activities/${activityId}`, {
         method: 'PUT',
@@ -92,7 +73,6 @@ const KanbanCard = React.memo(({
     }
   };
 
-  // Υπολογισμοί για Sub-tasks & Focus Mode
   const isSubtask = !!requirement.parentId;
   const hasSubtasks = allRequirements ? allRequirements.some(r => r.parentId === requirement.id) : false;
   const showFocusIcon = isSubtask || hasSubtasks;
@@ -123,7 +103,7 @@ const KanbanCard = React.memo(({
     navigate(url);
   };
 
-  const handleDragStart = (e, req) => {
+  const handleDragStartLocal = (e, req) => {
     onDragStart(e, req);
     const draggedElement = e.currentTarget;
     setTimeout(() => { draggedElement.classList.add('dragging'); }, 0);
@@ -146,17 +126,25 @@ const KanbanCard = React.memo(({
     }
   };
 
+  const formatTimeHelper = (hours) => {
+      if (!hours || isNaN(hours) || hours <= 0) return null;
+      const d = Math.floor(hours / 8);
+      const h = hours % 8;
+      if (d > 0 && h > 0) return `${d}d ${h}h`;
+      if (d > 0) return `${d}d`;
+      return `${h}h`;
+  };
+
   return (
     <div 
       id={`req-card-${requirement.id}`}
       data-id={requirement.id}
       className={`kanban-card ${focusClass} ${isSubtask ? 'is-subtask-card' : ''}`}
       draggable="true"
-      onDragStart={(e) => handleDragStart(e, requirement)}
+      onDragStart={(e) => handleDragStartLocal(e, requirement)}
       onDragEnd={handleDragEnd}
       style={{ position: 'relative' }}
     >
-      {/* Drag Handle */}
       <div style={{
           position: 'absolute', top: '8px', right: '8px', cursor: 'grab',
           color: 'var(--text-secondary)', opacity: 0.4, fontSize: '14px',
@@ -165,7 +153,6 @@ const KanbanCard = React.memo(({
         ⋮⋮
       </div>
 
-      {/* Type Bubble (Εμφανίζεται ΜΟΝΟ όταν η κάρτα είναι collapsed) */}
       {!isExpanded && type && (
         <div className={`type-bubble type-badge ${getTypeClass(type)}`}>
           {type}
@@ -174,7 +161,6 @@ const KanbanCard = React.memo(({
 
       <div id={`kanban-card-main-content-${requirement.id}`} className="kanban-card-main-content">
         
-        {/* Top Header: Μάτι (αριστερά) και Κουμπί Expand/Collapse (δεξιά) */}
         <div className="card-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '24px' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
                 {showFocusIcon && (
@@ -197,7 +183,6 @@ const KanbanCard = React.memo(({
                 )}
             </div>
             
-            {/* Νέο, διακριτικό κυκλικό κουμπί */}
             <button 
                 type="button" 
                 onClick={handleToggleExpand} 
@@ -213,7 +198,7 @@ const KanbanCard = React.memo(({
                     justifyContent: 'center',
                     padding: 0, 
                     margin: 0, 
-                    marginRight: '20px', /* Αφήνει χώρο για το drag handle */
+                    marginRight: '20px',
                     color: 'var(--text-secondary)',
                     cursor: 'pointer',
                     borderRadius: '50%',
@@ -229,7 +214,6 @@ const KanbanCard = React.memo(({
 
         <strong id={`requirement-identifier-${requirement.id}`}>{requirement.requirementUserIdentifier}</strong>
 
-        {/* Λεπτομέρειες (Κρύβονται αν η κάρτα είναι Collapsed) */}
         {isExpanded && (
           <div id={`kanban-card-details-${requirement.id}`} className="kanban-card-details">
             {!isSubtask && releaseName && (
@@ -269,6 +253,31 @@ const KanbanCard = React.memo(({
               </p>
             )}
 
+            {/* NEW TIME TRACKING DISPLAY */}
+            {(requirement.currentStatusDetails.expected_time || requirement.currentStatusDetails.real_time_tc_creation || requirement.currentStatusDetails.real_time_testing) && (
+              <div className="card-detail-item time-tracking-details" style={{ backgroundColor: 'var(--bg-tertiary)', padding: '10px', borderRadius: '6px', marginTop: '10px', borderLeft: '3px solid var(--accent-color)' }}>
+                  {requirement.currentStatusDetails.expected_time && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span className="detail-label" style={{ color: 'var(--text-primary)' }}>Expected Time:</span> 
+                          <span className="detail-value" style={{ fontWeight: 'bold' }}>{formatTimeHelper(requirement.currentStatusDetails.expected_time)}</span>
+                      </div>
+                  )}
+                  {(requirement.currentStatusDetails.real_time_tc_creation || requirement.currentStatusDetails.real_time_testing) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '5px', borderTop: '1px dashed var(--border-color)', paddingTop: '5px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span className="detail-label" style={{ color: 'var(--text-primary)' }}>Total Real Time:</span> 
+                              <span className="detail-value" style={{ fontWeight: 'bold' }}>
+                                  {formatTimeHelper((requirement.currentStatusDetails.real_time_tc_creation || 0) + (requirement.currentStatusDetails.real_time_testing || 0))}
+                              </span>
+                          </div>
+                          <span style={{ fontSize: '0.80em', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                              {`[TC: ${formatTimeHelper(requirement.currentStatusDetails.real_time_tc_creation) || '0h'}, Test: ${formatTimeHelper(requirement.currentStatusDetails.real_time_testing) || '0h'}]`}
+                          </span>
+                      </div>
+                  )}
+              </div>
+            )}
+
             {requirement.linkedDefects && requirement.linkedDefects.length > 0 && (
               <div id={`card-detail-item-defects-${requirement.id}`} className="card-detail-item">
                 <span className="detail-label">Linked Defects:</span>
@@ -291,7 +300,6 @@ const KanbanCard = React.memo(({
         )}
       </div>
 
-      {/* Κουμπί Add Sub-task (Ορατό μόνο αν δεν είναι subtask ΚΑΙ η κάρτα είναι ανοιχτή) */}
       {!isSubtask && isExpanded && (
           <button 
             type="button"

@@ -8,16 +8,14 @@ import SearchableDropdown from './SearchableDropdown';
 const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSubmit, projects, releases, allRequirements = [], selectedSprint }) => {
   const [initialFormData, setInitialFormData] = useState(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('core'); // 'core' or 'tracking'
+  const [activeTab, setActiveTab] = useState('core');
 
-  // FIX: Αφαιρέσαμε το `formData` από τα dependencies. 
-  // Τώρα το tab γίνεται reset ΜΟΝΟ όταν ανοίγει το modal (isOpen αλλάζει σε true).
   useEffect(() => {
     if (isOpen) {
       setInitialFormData(formData);
       setActiveTab('core'); 
     }
-  }, [isOpen]);
+  }, [isOpen, formData]);
 
   useEffect(() => {
     if (initialFormData && formData.project !== initialFormData.project) {
@@ -53,7 +51,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validate required fields before allowing user to proceed or save
     if (!formData.project || !formData.project.trim()) {
         alert("Project is required.");
         setActiveTab('core');
@@ -75,20 +72,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
         return;
     }
 
-    // If we are on the first tab and everything is valid, move to next tab
     if (activeTab === 'core') {
         setActiveTab('tracking');
         return;
     }
 
-    // If we are on the tracking tab, save the requirement
     onSubmit();
   };
 
   const parentOptions = useMemo(() => {
     if (!formData.project || !allRequirements) return [];
     
-    // ΠΛΕΟΝ ΧΡΗΣΙΜΟΠΟΙΕΙ ΤΟ SPRINT ΤΟΥ BOARD:
     const targetSprint = selectedSprint || 'Sprint 1'; 
     
     return allRequirements
@@ -113,7 +107,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
     </div>
   );
 
-  // We determine if it was opened from the "Add Sub-task" button on a card by checking initialFormData
   const isOpenedFromCard = initialFormData ? !!initialFormData.parent_id : false;
 
   return (
@@ -151,7 +144,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                     value={formData.project}
                     onChange={onFormChange}
                     options={projectOptions}
-                    disabled={projects.length === 0 || isOpenedFromCard} // Κλειδωμένο στο project του γονέα αν ανοίξει από την κάρτα
+                    disabled={projects.length === 0 || isOpenedFromCard}
                     placeholder={projects.length === 0 ? "-- No projects available --" : "-- Select a Project --"}
                   />
                 </div>
@@ -160,7 +153,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   <input type="text" id="newReqName" name="requirementName" value={formData.requirementName} onChange={onFormChange} placeholder={isOpenedFromCard || formData.type === 'Sub-task' ? "e.g., Update database schema" : "e.g., User Login Feature TEST-INT-01"} />
                 </div>
                 
-                {/* Κρύβουμε το Type ΜΟΝΟ αν ανοίξει απευθείας από το κουμπί της κάρτας */}
                 {!isOpenedFromCard && (
                   <div id="form-group-type-id" className="form-group">
                     <label id="newReqType-label" htmlFor="newReqType-button">Type:</label>
@@ -175,7 +167,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   </div>
                 )}
 
-                {/* Αν ο χρήστης επιλέξει Sub-task χειροκίνητα, εμφανίζουμε το Parent Dropdown */}
                 {!isOpenedFromCard && formData.type === 'Sub-task' && (
                   <div id="form-group-parent-id" className="form-group">
                     <label id="newReqParent-label" htmlFor="newReqParentSelect-button">Parent Requirement:</label>
@@ -208,7 +199,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   />
                 </div>
                 
-                {/* Εμφανίζουμε το Sprint για να μπορεί ο χρήστης να βρει το Parent, εκτός αν άνοιξε από κάρτα */}
                 {!isOpenedFromCard && (
                   <>
                     <div id="form-group-sprint-id" className="form-group">
@@ -229,7 +219,6 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   </>
                 )}
                 
-                {/* Κρύβουμε το Release αν είναι Sub-task (κληρονομεί από το parent) */}
                 {!isOpenedFromCard && formData.type !== 'Sub-task' && (
                   <div id="form-group-release-id" className="form-group">
                     <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -252,10 +241,48 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                   <label htmlFor="newReqTags" className="optional-label">Tags:</label>
                   <input type="text" id="newReqTags" name="tags" value={formData.tags} onChange={onFormChange} placeholder="e.g., Sprint 4, Project Tools" />
                 </div>
+                
                 <div id="form-group-link-id" className="form-group">
                   <label htmlFor="newReqLink" className="optional-label">Link (e.g., JIRA):</label>
                   <input type="url" id="newReqLink" name="link" value={formData.link} onChange={onFormChange} placeholder="https://example.com/issue/123" />
                 </div>
+
+                {/* NEW TIME TRACKING BLOCK */}
+                <fieldset style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '15px', marginTop: '10px' }}>
+                    <legend className="optional-label" style={{ padding: '0 5px', fontSize: '0.9em', color: 'var(--text-secondary)' }}>Time Tracking (Optional)</legend>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+                        <div>
+                            <label style={{ fontSize: '0.85em' }}>Expected Time</label>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <input type="number" name="expected_time" value={formData.expected_time} onChange={onFormChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                                <select name="expected_time_unit" value={formData.expected_time_unit} onChange={onFormChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                    <option value="h">hours</option>
+                                    <option value="d">days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85em' }}>Real (Test Cases)</label>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <input type="number" name="real_time_tc_creation" value={formData.real_time_tc_creation} onChange={onFormChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                                <select name="real_time_tc_creation_unit" value={formData.real_time_tc_creation_unit} onChange={onFormChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                    <option value="h">hours</option>
+                                    <option value="d">days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85em' }}>Real (Testing)</label>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <input type="number" name="real_time_testing" value={formData.real_time_testing} onChange={onFormChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                                <select name="real_time_testing_unit" value={formData.real_time_testing_unit} onChange={onFormChange} style={{ padding: '6px', flexGrow: 1 }}>
+                                    <option value="h">hours</option>
+                                    <option value="d">days</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
             </div>
 
             <div id="modal-actions-id" className="modal-actions">

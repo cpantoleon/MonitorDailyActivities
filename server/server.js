@@ -541,19 +541,19 @@ app.put("/api/projects/:name", (req, res) => {
 });
 
 app.get("/api/requirements", (req, res) => {
-    // 1. ΔΙΟΡΘΩΣΗ ΣΤΟ SQL QUERY (αφαιρέθηκε το : row.is_expanded και μπήκε κόμμα)
     const activitiesSql = `SELECT
                             act.id as activityDbId, act.requirementGroupId, p.name as project,
                             act.requirementUserIdentifier, act.status, act.statusDate,
                             act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
                             act.created_at, act.release_id, act.parent_id, act.display_order, act.is_expanded,
+                            act.expected_time, act.real_time_tc_creation, act.real_time_testing,
                             rel.name as release_name, rel.release_date
                  FROM activities act
                  JOIN projects p ON act.project_id = p.id
                  LEFT JOIN releases rel ON act.release_id = rel.id
                  ORDER BY act.requirementGroupId, act.created_at DESC`;
     
-    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect
+    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect, d.real_time
                     FROM defect_requirement_links l
                     JOIN defects d ON l.defect_id = d.id
                     JOIN projects p ON d.project_id = p.id`;
@@ -570,7 +570,15 @@ app.get("/api/requirements", (req, res) => {
             if (!linksMap.has(link.requirement_group_id)) {
                 linksMap.set(link.requirement_group_id, []);
             }
-            linksMap.get(link.requirement_group_id).push({ id: link.defect_id, title: link.defect_title, status: link.defect_status, link: link.defect_link, project: link.project_name, is_fat_defect: link.is_fat_defect });
+            linksMap.get(link.requirement_group_id).push({ 
+                id: link.defect_id, 
+                title: link.defect_title, 
+                status: link.defect_status, 
+                link: link.defect_link, 
+                project: link.project_name, 
+                is_fat_defect: link.is_fat_defect,
+                real_time: link.real_time // <-- ΠΡΟΣΘΕΣΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ
+            });
         });
 
         const changesMap = new Map();
@@ -598,7 +606,6 @@ app.get("/api/requirements", (req, res) => {
             }
             const reqGroupEntry = requirementsGroupMap.get(groupId);
             if (reqGroupEntry) {
-                // 2. ΠΡΟΣΘΗΚΗ ΤΟΥ is_expanded ΕΔΩ
                 reqGroupEntry.history.push({
                     activityId: row.activityDbId, status: row.status, date: row.statusDate,
                     comment: row.comment, sprint: row.sprint ? row.sprint.trim() : row.sprint,
@@ -609,7 +616,10 @@ app.get("/api/requirements", (req, res) => {
                     releaseDate: row.release_date,
                     parentId: row.parent_id,
                     display_order: row.display_order,
-                    is_expanded: row.is_expanded // <--- ΑΥΤΟ
+                    is_expanded: row.is_expanded,
+                    expected_time: row.expected_time,
+                    real_time_tc_creation: row.real_time_tc_creation,
+                    real_time_testing: row.real_time_testing
                 });
             }
         });
@@ -651,7 +661,7 @@ app.get("/api/requirements", (req, res) => {
 });
 
 app.post("/api/activities", async (req, res) => {
-    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id, display_order } = req.body;
+    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id, display_order, expected_time, real_time_tc_creation, real_time_testing } = req.body;
     if (!project || !requirementName || !status || !statusDate || !sprint) {
         return res.status(400).json({ error: "Missing required fields (project, requirementName, status, statusDate, sprint)" });
     }
@@ -673,19 +683,16 @@ app.post("/api/activities", async (req, res) => {
         const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
         
         let finalDisplayOrder = display_order;
-        let finalIsExpanded = defaultExpanded; // Αρχικά παίρνει το default
+        let finalIsExpanded = defaultExpanded; 
     
         if (finalDisplayOrder === undefined || finalDisplayOrder === null || existingRequirementGroupId) {
             try {
                 if (existingRequirementGroupId) {
                     const oldRow = await dbGet(`SELECT display_order, status, sprint, is_expanded FROM activities WHERE requirementGroupId = ? AND isCurrent = 1`, [existingRequirementGroupId]);
                     if (oldRow) {
-                        // 1. Διατηρούμε το Expand state αν υπάρχει ήδη
                         if (oldRow.is_expanded !== undefined && oldRow.is_expanded !== null) {
                             finalIsExpanded = oldRow.is_expanded;
                         }
-
-                        // 2. Διατηρούμε το Order αν δεν άλλαξε στήλη
                         if ((finalDisplayOrder === undefined || finalDisplayOrder === null) && oldRow.status === status && oldRow.sprint === sprint) {
                             finalDisplayOrder = oldRow.display_order;
                         }
@@ -707,10 +714,9 @@ app.post("/api/activities", async (req, res) => {
                 db.run(`UPDATE activities SET display_order = display_order + 1 WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1 AND display_order >= ?`, [projectId, sprint, status, display_order]);
             }
 
-            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?)`;
-            // Περνάμε το finalIsExpanded
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded], function(err) {
+            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, ?)`;
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded, expected_time || null, real_time_tc_creation || null, real_time_testing || null], function(err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -732,14 +738,13 @@ app.post("/api/activities", async (req, res) => {
 
                                 let processed = 0;
                                 subtasks.forEach(sub => {
-                                    // Υπολογίζουμε το Expand state και για τα subtasks
                                     const subExpanded = (sub.is_expanded !== undefined && sub.is_expanded !== null) ? sub.is_expanded : defaultExpanded;
 
-                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded)
-                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`;
+                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
+                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`;
                                     db.run(insertSubSql, [
                                         sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate, 
-                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded
+                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded, sub.expected_time || null, sub.real_time_tc_creation || null, sub.real_time_testing || null
                                     ], function(errInsert) {
                                         if (!errInsert) {
                                             const newSubId = this.lastID;
@@ -809,7 +814,7 @@ app.put("/api/activities/expand-all", async (req, res) => {
 });
 
 app.put("/api/activities/:activityId", (req, res) => {
-    let { comment, statusDate, link, type, tags, release_id, parent_id, is_expanded } = req.body;
+    let { comment, statusDate, link, type, tags, release_id, parent_id, is_expanded, expected_time, real_time_tc_creation, real_time_testing } = req.body;
     const activityDbId = req.params.activityId;
     
     let fieldsToUpdate = [];
@@ -822,6 +827,9 @@ app.put("/api/activities/:activityId", (req, res) => {
     if (release_id !== undefined) { fieldsToUpdate.push("release_id = ?"); params.push(release_id); }
     if (parent_id !== undefined) { fieldsToUpdate.push("parent_id = ?"); params.push(parent_id); }
     if (is_expanded !== undefined) { fieldsToUpdate.push("is_expanded = ?"); params.push(is_expanded); }
+    if (expected_time !== undefined) { fieldsToUpdate.push("expected_time = ?"); params.push(expected_time); }
+    if (real_time_tc_creation !== undefined) { fieldsToUpdate.push("real_time_tc_creation = ?"); params.push(real_time_tc_creation); }
+    if (real_time_testing !== undefined) { fieldsToUpdate.push("real_time_testing = ?"); params.push(real_time_testing); }
 
     if (fieldsToUpdate.length === 0) {
         return res.status(400).json({ error: "No fields to update provided" });
@@ -2907,7 +2915,7 @@ app.put("/api/defects/history/:historyId", (req, res) => {
 });
 
 app.post("/api/defects", async (req, res) => {
-    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect } = req.body;
+    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, real_time } = req.body;
     if (!project || !title || !area || !status || !created_date) {
         return res.status(400).json({ error: "Missing required fields" });
     }
@@ -2932,9 +2940,9 @@ app.post("/api/defects", async (req, res) => {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded, real_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
             
-            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded];
+            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded, real_time || null];
             
             db.run(insertDefectSql, defectParams, function(err) {
                 if (err) {
@@ -2975,7 +2983,7 @@ app.post("/api/defects", async (req, res) => {
 
 app.put("/api/defects/:id", async (req, res) => {
     const defectId = parseInt(req.params.id, 10);
-    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date, display_order, is_expanded } = req.body;
+    const { title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, fixed_date, display_order, is_expanded, real_time } = req.body;
 
     try {
         // 1. Fetch Basic Defect Info
@@ -3015,7 +3023,7 @@ app.put("/api/defects/:id", async (req, res) => {
             const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
             if (normalizedNewValue !== normalizedOldValue) {
                 updates.push(`${field} = ?`);
-                updateParamsList.push(normalizedNewValue);
+                updateParamsList.push(newValue); // using actual value here for correct typing
                 changedFieldsForSummary[field] = { old: normalizedOldValue, new: normalizedNewValue };
             }
         };
@@ -3023,6 +3031,7 @@ app.put("/api/defects/:id", async (req, res) => {
         addChange("title", title, currentDefect.title);
         addChange("description", description, currentDefect.description);
         addChange("area", area, currentDefect.area);
+        addChange("real_time", real_time, currentDefect.real_time);
         
         let targetFixedDate = currentDefect.fixed_date;
         let fixedDateProvided = false;
@@ -3097,7 +3106,6 @@ app.put("/api/defects/:id", async (req, res) => {
         }
 
         // --- 5. ΕΚΤΕΛΕΣΗ ΟΛΩΝ ΤΩΝ ΕΝΗΜΕΡΩΣΕΩΝ ΜΕ ΑΣΦΑΛΕΙΑ (await) ---
-        
         if (linksChanged) {
             await dbRun(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId]);
             if (newLinks.length > 0) {
@@ -3132,7 +3140,6 @@ app.put("/api/defects/:id", async (req, res) => {
 
     } catch (err) {
         console.error("Defect Update Error:", err);
-        // Εδώ πλέον δεν краσάρει ο server, απλά γυρνάει 500 error!
         res.status(500).json({ error: "Failed to update defect: " + err.message });
     }
 });
