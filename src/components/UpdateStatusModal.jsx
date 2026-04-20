@@ -18,6 +18,8 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
   const [realTimeDefect, setRealTimeDefect] = useState('');
   const [realTimeDefectUnit, setRealTimeDefectUnit] = useState('h');
 
+  const [noTestingRequired, setNoTestingRequired] = useState(false);
+
   const openDefects = useMemo(() => {
     if (!item || itemType !== 'requirement' || newStatus !== 'Done') return [];
     return item.linkedDefects?.filter(
@@ -37,6 +39,7 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
     if (isOpen && item) {
       setComment('');
       setAcknowledgeDefects(false);
+      setNoTestingRequired(false);
 
       if (itemType === 'requirement') {
         const tc = parseTimeToObj(item.currentStatusDetails?.real_time_tc_creation);
@@ -76,8 +79,8 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
         const tcHours = calcH(realTimeTc, realTimeTcUnit) || 0;
         const testHours = calcH(realTimeTesting, realTimeTestingUnit) || 0;
         
-        if (tcHours + testHours <= 0) {
-          showMessage('Please fill in the real time spent (Test Cases or Testing) before closing this requirement.', 'error');
+        if (!noTestingRequired && (tcHours + testHours <= 0)) {
+          showMessage('Please fill in the real time spent (Test Cases or Testing) before closing this requirement, or check "No testing/fixing required".', 'error');
           return;
         }
         finalTimeData = {
@@ -87,8 +90,8 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
       } else if (itemType === 'defect') {
         const defectHours = calcH(realTimeDefect, realTimeDefectUnit) || 0;
         
-        if (defectHours <= 0) {
-          showMessage('Please fill in the real time spent before closing this defect.', 'error');
+        if (!noTestingRequired && defectHours <= 0) {
+          showMessage('Please fill in the real time spent before closing this defect, or check "No testing/fixing required".', 'error');
           return;
         }
         finalTimeData = { real_time: calcH(realTimeDefect, realTimeDefectUnit) };
@@ -141,7 +144,7 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
           {newStatus === 'Done' && (
             <fieldset style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '15px', marginTop: '15px' }}>
                 <legend style={{ padding: '0 5px', fontSize: '0.9em', color: 'var(--text-primary)', fontWeight: '600' }}>
-                    Time Tracking <span style={{ color: 'var(--danger-color)' }}>*</span>
+                    Time Tracking {!noTestingRequired && <span style={{ color: 'var(--danger-color)' }}>*</span>}
                 </legend>
                 <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginTop: 0, marginBottom: '15px' }}>
                     Please log the real time spent before marking this item as Done.
@@ -182,6 +185,18 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                         </div>
                     </div>
                 )}
+
+                <div className="new-project-toggle" style={{ marginTop: '15px', marginBottom: 0 }}>
+                  <input
+                    type="checkbox"
+                    id="noTestingRequiredCheckbox"
+                    checked={noTestingRequired}
+                    onChange={(e) => setNoTestingRequired(e.target.checked)}
+                  />
+                  <label htmlFor="noTestingRequiredCheckbox" className="checkbox-label" style={{fontSize: '0.9em'}}>
+                    Acknowledge to continue without logging time (No testing/fixing required)
+                  </label>
+                </div>
             </fieldset>
           )}
 

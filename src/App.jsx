@@ -50,26 +50,26 @@ function App() {
   const [error, setError] = useState(null);
   const [allReleases, setAllReleases] = useState([]);
   const [projectReleases, setProjectReleases] = useState([]);
-  
+
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [requirementForHistory, setRequirementForHistory] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  
+
   // ΠΡΟΣΘΗΚΗ: parent_id: null στο αρχικό state
-  const [newReqFormState, setNewReqFormState] = useState({ 
+  const [newReqFormState, setNewReqFormState] = useState({
     project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null,
-    expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h' 
+    expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h'
   });
-  
+
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isJiraImportModalOpen, setIsJiraImportModalOpen] = useState(false);
   const [isAddReleaseModalOpen, setIsAddReleaseModalOpen] = useState(false);
   const [isEditReleaseModalOpen, setIsEditReleaseModalOpen] = useState(false);
-  
+
   const [toastInfo, setToastInfo] = useState({ message: null, type: 'success', key: null });
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -84,7 +84,7 @@ function App() {
   const [highlightedReqId, setHighlightedReqId] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  
+
   const [availableTypes, setAvailableTypes] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -93,10 +93,10 @@ function App() {
   const [selectedReleases, setSelectedReleases] = useState([]);
   const [showArchivedSprints, setShowArchivedSprints] = useState(false);
 
-const [filterOptions, setFilterOptions] = useState({ 
-    enabledTypes: [], 
-    enabledReleases: [], 
-    isLinkedDefectsYesEnabled: false, 
+  const [filterOptions, setFilterOptions] = useState({
+    enabledTypes: [],
+    enabledReleases: [],
+    isLinkedDefectsYesEnabled: false,
     isLinkedDefectsNoEnabled: false,
     hasNoReleaseItems: false
   });
@@ -122,48 +122,48 @@ const [filterOptions, setFilterOptions] = useState({
     let needsReplace = false;
 
     if (location.pathname === '/sprint-board') {
-        if (!projectParam) {
-            const storedProject = sessionStorage.getItem('sprintBoardProject');
-            const storedSprint = sessionStorage.getItem('sprintBoardSprint');
-            if (storedProject) {
-                projectParam = storedProject;
-                params.set('project', storedProject);
-                needsReplace = true;
-                
-                if (storedSprint) {
-                    sprintParam = storedSprint;
-                    params.set('sprint', storedSprint);
-                }
-            }
-        }
+      if (!projectParam) {
+        const storedProject = sessionStorage.getItem('sprintBoardProject');
+        const storedSprint = sessionStorage.getItem('sprintBoardSprint');
+        if (storedProject) {
+          projectParam = storedProject;
+          params.set('project', storedProject);
+          needsReplace = true;
 
-        if ((projectParam || '') !== selectedProject) {
-            setSelectedProject(projectParam || '');
-            if (projectParam) sessionStorage.setItem('sprintBoardProject', projectParam);
-            else sessionStorage.removeItem('sprintBoardProject');
+          if (storedSprint) {
+            sprintParam = storedSprint;
+            params.set('sprint', storedSprint);
+          }
         }
-        
-        if ((sprintParam || '') !== selectedSprint) {
-            setSelectedSprint(sprintParam || '');
-            if (sprintParam) sessionStorage.setItem('sprintBoardSprint', sprintParam);
-            else sessionStorage.removeItem('sprintBoardSprint');
-        }
+      }
+
+      if ((projectParam || '') !== selectedProject) {
+        setSelectedProject(projectParam || '');
+        if (projectParam) sessionStorage.setItem('sprintBoardProject', projectParam);
+        else sessionStorage.removeItem('sprintBoardProject');
+      }
+
+      if ((sprintParam || '') !== selectedSprint) {
+        setSelectedSprint(sprintParam || '');
+        if (sprintParam) sessionStorage.setItem('sprintBoardSprint', sprintParam);
+        else sessionStorage.removeItem('sprintBoardSprint');
+      }
     } else {
-        if (projectParam !== null && projectParam !== selectedProject) {
-            setSelectedProject(projectParam);
-        }
+      if (projectParam !== null && projectParam !== selectedProject) {
+        setSelectedProject(projectParam);
+      }
     }
 
     if (sprintParam && sprintParam.startsWith('Archived_')) {
       setShowArchivedSprints(true);
     }
-    
+
     if (highlightId) {
       setHighlightedReqId(highlightId);
       params.delete('highlight');
       needsReplace = true;
     }
-    
+
     if (needsReplace) {
       const newSearch = params.toString() ? `?${params.toString()}` : '';
       navigate(`${location.pathname}${newSearch}`, { replace: true });
@@ -174,71 +174,71 @@ const [filterOptions, setFilterOptions] = useState({
   useEffect(() => {
     let sprintsForProject = [];
     if (selectedProject) {
-        sprintsForProject = getSprintsForProject(allProcessedRequirements, selectedProject);
+      sprintsForProject = getSprintsForProject(allProcessedRequirements, selectedProject);
     }
 
     const visibleSprints = showArchivedSprints
-        ? sprintsForProject
-        : sprintsForProject.filter(s => !s.startsWith('Archived_'));
+      ? sprintsForProject
+      : sprintsForProject.filter(s => !s.startsWith('Archived_'));
 
     setAvailableSprints(visibleSprints);
 
     if (selectedProject && selectedSprint && !visibleSprints.includes(selectedSprint)) {
-        let sprintToSelect = '';
-        if (visibleSprints.length > 0) {
-            const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
-            if (nonArchivedSprints.length > 0) {
-                sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1];
-            } else {
-                sprintToSelect = visibleSprints[0];
-            }
-        }
-        
-        if (sprintToSelect) {
-            if (location.pathname === '/sprint-board') {
-                navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprintToSelect)}`, { replace: true });
-            }
+      let sprintToSelect = '';
+      if (visibleSprints.length > 0) {
+        const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
+        if (nonArchivedSprints.length > 0) {
+          sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1];
         } else {
-            if (location.pathname === '/sprint-board') {
-                navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}`, { replace: true });
-            }
+          sprintToSelect = visibleSprints[0];
         }
+      }
+
+      if (sprintToSelect) {
+        if (location.pathname === '/sprint-board') {
+          navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprintToSelect)}`, { replace: true });
+        }
+      } else {
+        if (location.pathname === '/sprint-board') {
+          navigate(`/sprint-board?project=${encodeURIComponent(selectedProject)}`, { replace: true });
+        }
+      }
     }
-  }, [selectedProject, selectedSprint, allProcessedRequirements, showArchivedSprints, navigate, location.pathname]); 
+  }, [selectedProject, selectedSprint, allProcessedRequirements, showArchivedSprints, navigate, location.pathname]);
 
   const handleManualProjectSelect = useCallback((project) => {
     setSelectedProject(project);
 
     if (!project) {
-        setSelectedSprint('');
-        sessionStorage.removeItem('sprintBoardProject');
-        sessionStorage.removeItem('sprintBoardSprint');
-        navigate(`/sprint-board`, { replace: true });
-        return;
+      setSelectedSprint('');
+      sessionStorage.removeItem('sprintBoardProject');
+      sessionStorage.removeItem('sprintBoardSprint');
+      navigate(`/sprint-board`, { replace: true });
+      return;
     }
 
     sessionStorage.setItem('sprintBoardProject', project);
 
     const sprintsForProject = getSprintsForProject(allProcessedRequirements, project);
     const visibleSprints = showArchivedSprints
-        ? sprintsForProject
-        : sprintsForProject.filter(s => !s.startsWith('Archived_'));
+      ? sprintsForProject
+      : sprintsForProject.filter(s => !s.startsWith('Archived_'));
 
     let sprintToSelect = '';
     if (visibleSprints.length > 0) {
-        const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
-        if (nonArchivedSprints.length > 0) {
-            sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1]; 
-        } else {
-            sprintToSelect = visibleSprints[0];
-        }
+      const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
+      if (nonArchivedSprints.length > 0) {
+        sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1];
+      } else {
+        sprintToSelect = visibleSprints[0];
+      }
     }
 
     setSelectedSprint(sprintToSelect);
     if (sprintToSelect) {
-        sessionStorage.setItem('sprintBoardSprint', sprintToSelect);
+      sessionStorage.setItem('sprintBoardSprint', sprintToSelect);
     } else {
-        sessionStorage.removeItem('sprintBoardSprint');
+      sessionStorage.removeItem('sprintBoardSprint');
     }
 
     const newUrl = `/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprintToSelect)}`;
@@ -249,30 +249,30 @@ const [filterOptions, setFilterOptions] = useState({
   const handleManualSprintSelect = useCallback((sprint) => {
     setSelectedSprint(sprint);
     if (sprint) {
-        sessionStorage.setItem('sprintBoardSprint', sprint);
+      sessionStorage.setItem('sprintBoardSprint', sprint);
     } else {
-        sessionStorage.removeItem('sprintBoardSprint');
+      sessionStorage.removeItem('sprintBoardSprint');
     }
-    
+
     if (selectedProject) {
-        const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprint)}`;
-        navigate(newUrl, { replace: true });
+      const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprint)}`;
+      navigate(newUrl, { replace: true });
     }
   }, [selectedProject, navigate]);
 
   // Effect για highlighting
   useEffect(() => {
     if (highlightedReqId && displayableRequirements.length > 0) {
-        const timer = setTimeout(() => {
-            const element = document.getElementById(`req-card-${highlightedReqId}`);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                element.classList.add('highlight-item');
-                setTimeout(() => element.classList.remove('highlight-item'), 3000);
-            }
-            setHighlightedReqId(null);
-        }, 300);
-        return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`req-card-${highlightedReqId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('highlight-item');
+          setTimeout(() => element.classList.remove('highlight-item'), 3000);
+        }
+        setHighlightedReqId(null);
+      }, 300);
+      return () => clearTimeout(timer);
     }
   }, [highlightedReqId, displayableRequirements, selectedProject, selectedSprint]);
 
@@ -287,18 +287,18 @@ const [filterOptions, setFilterOptions] = useState({
   const fetchAllProjectData = useCallback(async () => {
     if (projects.length === 0) { setAllReleases([]); return; }
     try {
-        const releasePromises = projects.map(p => fetch(`${API_BASE_URL}/releases/${p}`).then(res => res.json()));
-        const results = await Promise.all(releasePromises);
-        const all = results.flatMap(result => result.data || []);
-        setAllReleases(all);
+      const releasePromises = projects.map(p => fetch(`${API_BASE_URL}/releases/${p}`).then(res => res.json()));
+      const results = await Promise.all(releasePromises);
+      const all = results.flatMap(result => result.data || []);
+      setAllReleases(all);
     } catch (error) { showMainMessage('Could not load full release list.', 'error'); }
   }, [projects, showMainMessage]);
 
   useEffect(() => { fetchAllProjectData(); }, [fetchAllProjectData]);
 
   useEffect(() => {
-      if (selectedProject) setProjectReleases(allReleases.filter(r => r.project === selectedProject));
-      else setProjectReleases([]);
+    if (selectedProject) setProjectReleases(allReleases.filter(r => r.project === selectedProject));
+    else setProjectReleases([]);
   }, [selectedProject, allReleases]);
 
   const fetchRequirementsOnly = useCallback(async () => {
@@ -309,20 +309,20 @@ const [filterOptions, setFilterOptions] = useState({
 
       if (requirementsResult.data && Array.isArray(requirementsResult.data)) {
         const reqsWithDates = requirementsResult.data.map(group => ({
-            ...group,
-            project: group.project ? String(group.project).trim() : '',
-            requirementUserIdentifier: group.requirementUserIdentifier ? String(group.requirementUserIdentifier).trim() : 'Unnamed',
-            history: group.history.map((hist, index) => ({
-                ...hist, date: new Date(hist.date), createdAt: hist.createdAt ? new Date(hist.createdAt) : new Date(hist.date), id: `${group.id}_hist_${hist.activityId || `idx_${index}`}`, activityId: hist.activityId
-            })),
-            currentStatusDetails: group.currentStatusDetails ? {
-                ...group.currentStatusDetails, date: new Date(group.currentStatusDetails.date), createdAt: group.currentStatusDetails.createdAt ? new Date(group.currentStatusDetails.createdAt) : new Date(group.currentStatusDetails.date), activityId: group.currentStatusDetails.activityId
-            } : { status: 'N/A', sprint: 'N/A', comment: '', link: '', date: new Date(), createdAt: new Date(), activityId: null }
+          ...group,
+          project: group.project ? String(group.project).trim() : '',
+          requirementUserIdentifier: group.requirementUserIdentifier ? String(group.requirementUserIdentifier).trim() : 'Unnamed',
+          history: group.history.map((hist, index) => ({
+            ...hist, date: new Date(hist.date), createdAt: hist.createdAt ? new Date(hist.createdAt) : new Date(hist.date), id: `${group.id}_hist_${hist.activityId || `idx_${index}`}`, activityId: hist.activityId
+          })),
+          currentStatusDetails: group.currentStatusDetails ? {
+            ...group.currentStatusDetails, date: new Date(group.currentStatusDetails.date), createdAt: group.currentStatusDetails.createdAt ? new Date(group.currentStatusDetails.createdAt) : new Date(group.currentStatusDetails.date), activityId: group.currentStatusDetails.activityId
+          } : { status: 'N/A', sprint: 'N/A', comment: '', link: '', date: new Date(), createdAt: new Date(), activityId: null }
         }));
         setAllProcessedRequirements(reqsWithDates);
         return reqsWithDates;
       }
-    } catch(err) { showMainMessage(`Error refreshing requirements: ${err.message}`, "error"); }
+    } catch (err) { showMainMessage(`Error refreshing requirements: ${err.message}`, "error"); }
     return [];
   }, [showMainMessage]);
 
@@ -337,18 +337,18 @@ const [filterOptions, setFilterOptions] = useState({
       const combinedProjects = Array.from(new Set([...officialProjects, ...projectsFromData])).sort();
       setProjects(combinedProjects);
     } catch (err) {
-        setError(err.message || "Failed to fetch data.");
-        setAllProcessedRequirements([]); setProjects([]);
+      setError(err.message || "Failed to fetch data.");
+      setAllProcessedRequirements([]); setProjects([]);
     } finally { setIsLoading(false); }
   }, [fetchRequirementsOnly]);
 
   const handleDataRefresh = useCallback(async (newItemDetails) => {
-      await fetchRequirementsOnly(); 
-      showMainMessage(`Successfully created: "${newItemDetails.title}"`, 'success');
-      
-      if (newItemDetails.project && newItemDetails.sprint) {
-         handleManualProjectSelect(newItemDetails.project); 
-      }
+    await fetchRequirementsOnly();
+    showMainMessage(`Successfully created: "${newItemDetails.title}"`, 'success');
+
+    if (newItemDetails.project && newItemDetails.sprint) {
+      handleManualProjectSelect(newItemDetails.project);
+    }
   }, [fetchRequirementsOnly, showMainMessage, handleManualProjectSelect]);
 
   useEffect(() => {
@@ -372,13 +372,13 @@ const [filterOptions, setFilterOptions] = useState({
       let hasLinkedDefects = false;
       let hasNoLinkedDefects = false;
       let hasNoReleaseItems = false;
-  
+
       baseReqs.forEach(req => {
         if (req.currentStatusDetails?.type) types.add(req.currentStatusDetails.type);
         if (req.currentStatusDetails?.releaseId) {
-            releaseIds.add(req.currentStatusDetails.releaseId);
+          releaseIds.add(req.currentStatusDetails.releaseId);
         } else {
-            hasNoReleaseItems = true;
+          hasNoReleaseItems = true;
         }
         if (Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0) hasLinkedDefects = true
         else hasNoLinkedDefects = true;
@@ -389,12 +389,12 @@ const [filterOptions, setFilterOptions] = useState({
         enabledReleases: Array.from(releaseIds),
         isLinkedDefectsYesEnabled: hasLinkedDefects,
         isLinkedDefectsNoEnabled: hasNoLinkedDefects,
-        hasNoReleaseItems: hasNoReleaseItems 
-       });
-      } else {
-        setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
-      }
-    }, [selectedProject, selectedSprint, allProcessedRequirements]);
+        hasNoReleaseItems: hasNoReleaseItems
+      });
+    } else {
+      setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
+    }
+  }, [selectedProject, selectedSprint, allProcessedRequirements]);
 
   useEffect(() => {
     if (isSearching) return;
@@ -406,11 +406,11 @@ const [filterOptions, setFilterOptions] = useState({
         else filteredRequirements = filteredRequirements.filter(req => !Array.isArray(req.linkedDefects) || req.linkedDefects.length === 0);
       }
       if (selectedReleases.length > 0) {
-          filteredRequirements = filteredRequirements.filter(req => {
-              const rId = req.currentStatusDetails.releaseId;
-              if (!rId) return selectedReleases.includes('no-release');
-              return selectedReleases.includes(rId);
-          });
+        filteredRequirements = filteredRequirements.filter(req => {
+          const rId = req.currentStatusDetails.releaseId;
+          if (!rId) return selectedReleases.includes('no-release');
+          return selectedReleases.includes(rId);
+        });
       }
       if (dateFrom) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) >= new Date(dateFrom));
       if (dateTo) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) <= new Date(dateTo));
@@ -421,7 +421,7 @@ const [filterOptions, setFilterOptions] = useState({
   const handleTypeChange = (type) => { setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]); };
   const handleLinkedDefectsChange = (value) => { setLinkedDefectsFilter(prev => (prev === value ? null : value)); };
   const handleReleaseChange = (releaseId) => { setSelectedReleases(prev => prev.includes(releaseId) ? prev.filter(id => id !== releaseId) : [...prev, releaseId]); };
-  
+
   const handleRequirementSearch = (query) => {
     const finalQuery = query || requirementQuery;
     if (!finalQuery) { handleClearRequirementSearch(); return; }
@@ -435,58 +435,58 @@ const [filterOptions, setFilterOptions] = useState({
         const proj = uniqueProjects[0];
         setSelectedProject(proj);
         sessionStorage.setItem('sprintBoardProject', proj);
-        
+
         const uniqueSprints = [...new Set(results.map(r => r.currentStatusDetails.sprint))];
         if (uniqueSprints.length === 1) {
-            const sp = uniqueSprints[0];
-            setSelectedSprint(sp);
-            sessionStorage.setItem('sprintBoardSprint', sp);
-            navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
+          const sp = uniqueSprints[0];
+          setSelectedSprint(sp);
+          sessionStorage.setItem('sprintBoardSprint', sp);
+          navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
         }
         else {
-            setSelectedSprint('');
-            sessionStorage.removeItem('sprintBoardSprint');
-            navigate(`/sprint-board?project=${encodeURIComponent(proj)}`, { replace: true });
+          setSelectedSprint('');
+          sessionStorage.removeItem('sprintBoardSprint');
+          navigate(`/sprint-board?project=${encodeURIComponent(proj)}`, { replace: true });
         }
-      } else { 
-        setSelectedProject(''); 
-        setSelectedSprint(''); 
+      } else {
+        setSelectedProject('');
+        setSelectedSprint('');
         sessionStorage.removeItem('sprintBoardProject');
         sessionStorage.removeItem('sprintBoardSprint');
         navigate(`/sprint-board`, { replace: true });
       }
-    } else { 
-        setSelectedProject(''); 
-        setSelectedSprint(''); 
-        sessionStorage.removeItem('sprintBoardProject');
-        sessionStorage.removeItem('sprintBoardSprint');
-        navigate(`/sprint-board`, { replace: true });
+    } else {
+      setSelectedProject('');
+      setSelectedSprint('');
+      sessionStorage.removeItem('sprintBoardProject');
+      sessionStorage.removeItem('sprintBoardSprint');
+      navigate(`/sprint-board`, { replace: true });
     }
     setTimeout(() => { isSearchUpdate.current = false; }, 100);
   };
 
-  const handleClearRequirementSearch = () => { 
-      setIsSearching(false); 
-      setRequirementQuery(''); 
-      setSearchSuggestions([]); 
-      setSelectedProject(''); 
-      setSelectedSprint(''); 
-      setDisplayableRequirements([]); 
-      setSelectedTypes([]); 
-      setLinkedDefectsFilter(null); 
-      setSelectedReleases([]); 
-      setDateFrom(''); 
-      setDateTo(''); 
-      
-      sessionStorage.removeItem('sprintBoardProject');
-      sessionStorage.removeItem('sprintBoardSprint');
-      
-      navigate('/sprint-board', { replace: true }); 
+  const handleClearRequirementSearch = () => {
+    setIsSearching(false);
+    setRequirementQuery('');
+    setSearchSuggestions([]);
+    setSelectedProject('');
+    setSelectedSprint('');
+    setDisplayableRequirements([]);
+    setSelectedTypes([]);
+    setLinkedDefectsFilter(null);
+    setSelectedReleases([]);
+    setDateFrom('');
+    setDateTo('');
+
+    sessionStorage.removeItem('sprintBoardProject');
+    sessionStorage.removeItem('sprintBoardSprint');
+
+    navigate('/sprint-board', { replace: true });
   };
 
   const resetSearch = () => { setIsSearching(false); setRequirementQuery(''); setSearchSuggestions([]); };
   const handleClearFilters = () => { setSelectedTypes([]); setLinkedDefectsFilter(null); setSelectedReleases([]); setDateFrom(''); setDateTo(''); };
-  
+
   const handleRequirementQueryChange = (query) => {
     setRequirementQuery(query);
     if (query.length < 3) { setSearchSuggestions([]); return; }
@@ -501,20 +501,20 @@ const [filterOptions, setFilterOptions] = useState({
   const handleRequirementSuggestionSelect = (suggestion) => {
     setRequirementQuery(suggestion.name); setSearchSuggestions([]); isSearchUpdate.current = true;
     const selectedReq = allProcessedRequirements.find(req => req.id === suggestion.id);
-    if (selectedReq) { 
-        setDisplayableRequirements([selectedReq]); 
-        
-        const proj = selectedReq.project;
-        const sp = selectedReq.currentStatusDetails.sprint;
-        
-        setSelectedProject(proj); 
-        setSelectedSprint(sp); 
-        sessionStorage.setItem('sprintBoardProject', proj);
-        sessionStorage.setItem('sprintBoardSprint', sp);
-        
-        setIsSearching(true); 
-        navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
-    } 
+    if (selectedReq) {
+      setDisplayableRequirements([selectedReq]);
+
+      const proj = selectedReq.project;
+      const sp = selectedReq.currentStatusDetails.sprint;
+
+      setSelectedProject(proj);
+      setSelectedSprint(sp);
+      sessionStorage.setItem('sprintBoardProject', proj);
+      sessionStorage.setItem('sprintBoardSprint', sp);
+
+      setIsSearching(true);
+      navigate(`/sprint-board?project=${encodeURIComponent(proj)}&sprint=${encodeURIComponent(sp)}`, { replace: true });
+    }
     else { handleRequirementSearch(suggestion.name); }
     setTimeout(() => { isSearchUpdate.current = false; }, 100);
   };
@@ -523,18 +523,18 @@ const [filterOptions, setFilterOptions] = useState({
   const handleCloseHistoryModal = useCallback(() => { setIsHistoryModalOpen(false); setRequirementForHistory(null); }, []);
   const handleOpenEditModal = useCallback((req) => { setEditingRequirement(req); setIsEditModalOpen(true); }, []);
   const handleCloseEditModal = useCallback(() => { setIsEditModalOpen(false); setEditingRequirement(null); }, []);
-  
+
   // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleOpenAddModal για να δέχεται parentReq
   const handleOpenAddModal = useCallback((eventOrReq = null) => {
     const isEvent = eventOrReq && eventOrReq.nativeEvent;
     const parentReq = isEvent ? null : eventOrReq;
-    const isParent = parentReq && parentReq.id; 
+    const isParent = parentReq && parentReq.id;
 
     setNewReqFormState({
-      project: isParent ? parentReq.project : (selectedProject || ''), 
-      requirementName: '', status: 'To Do', 
-      sprint: isParent ? (parentReq.currentStatusDetails.sprint === 'Backlog' ? '1' : parentReq.currentStatusDetails.sprint.replace('Sprint ', '')) : '1', 
-      comment: '', link: '', isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false, 
+      project: isParent ? parentReq.project : (selectedProject || ''),
+      requirementName: '', status: 'To Do',
+      sprint: isParent ? (parentReq.currentStatusDetails.sprint === 'Backlog' ? '1' : parentReq.currentStatusDetails.sprint.replace('Sprint ', '')) : '1',
+      comment: '', link: '', isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false,
       type: isParent ? 'Sub-task' : '', tags: '', release_id: isParent ? parentReq.currentStatusDetails.releaseId : '', parent_id: isParent ? parentReq.id : null,
       expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h'
     });
@@ -546,31 +546,31 @@ const [filterOptions, setFilterOptions] = useState({
     setIsAddModalOpen(false);
     setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null, expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h' });
   }, []);
-  
-  const handleNewReqFormChange = useCallback((e) => { 
-    const { name, value, type, checked } = e.target; 
-    setNewReqFormState(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); 
+
+  const handleNewReqFormChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    setNewReqFormState(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   }, []);
-  
+
   const handleOpenAddProjectModal = useCallback(() => setIsAddProjectModalOpen(true), []);
   const handleCloseAddProjectModal = useCallback(() => setIsAddProjectModalOpen(false), []);
-  
+
   const handleOpenImportModal = useCallback(() => setIsImportModalOpen(true), []);
   const handleCloseImportModal = useCallback(() => { setIsImportModalOpen(false); setImportConfirmData(null); }, []);
-  
+
   const handleOpenJiraImportModal = useCallback(() => setIsJiraImportModalOpen(true), []);
   const handleCloseJiraImportModal = useCallback(() => setIsJiraImportModalOpen(false), []);
-  
+
   const handleDeleteRequest = useCallback((type, item) => { setDeleteType(type); setItemToDelete(item); setIsDeleteConfirmModalOpen(true); }, []);
   const handleCancelDelete = useCallback(() => { setIsDeleteConfirmModalOpen(false); setItemToDelete(null); setDeleteType(''); }, []);
-  
-  const handleStatusUpdateRequest = (requirement, newStatus, targetIndex) => { 
-      setStatusUpdateInfo({ requirement, newStatus, targetIndex }); 
-      setIsUpdateStatusModalOpen(true); 
+
+  const handleStatusUpdateRequest = (requirement, newStatus, targetIndex) => {
+    setStatusUpdateInfo({ requirement, newStatus, targetIndex });
+    setIsUpdateStatusModalOpen(true);
   };
-  const handleCloseUpdateStatusModal = () => { 
-      setIsUpdateStatusModalOpen(false); 
-      setStatusUpdateInfo({ requirement: null, newStatus: '', targetIndex: null }); 
+  const handleCloseUpdateStatusModal = () => {
+    setIsUpdateStatusModalOpen(false);
+    setStatusUpdateInfo({ requirement: null, newStatus: '', targetIndex: null });
   };
 
   const handleNavigateToRequirement = (req) => { navigate(`/sprint-board?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`); };
@@ -579,16 +579,16 @@ const [filterOptions, setFilterOptions] = useState({
   const handleConfirmStatusUpdate = async ({ comment, timeData }) => {
     const { requirement, newStatus, targetIndex } = statusUpdateInfo;
     if (!requirement) return;
-    
-    const payload = { 
-        project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus, 
-        sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link, 
-        type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags, 
-        release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId, 
-        statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex,
-        expected_time: requirement.currentStatusDetails.expected_time,
-        real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
-        real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing
+
+    const payload = {
+      project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus,
+      sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link,
+      type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags,
+      release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId,
+      statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex,
+      expected_time: requirement.currentStatusDetails.expected_time,
+      real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
+      real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing
     };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -596,26 +596,26 @@ const [filterOptions, setFilterOptions] = useState({
       showMainMessage('Status updated successfully!', 'success');
       if (isSearching) { setDisplayableRequirements(prev => prev.map(req => req.id === requirement.id ? { ...req, currentStatusDetails: { ...req.currentStatusDetails, status: newStatus } } : req)); }
       await fetchData();
-    } catch (error) { showMainMessage(`Error: ${error.message}`, 'error'); } 
+    } catch (error) { showMainMessage(`Error: ${error.message}`, 'error'); }
     finally { handleCloseUpdateStatusModal(); }
   };
-  
+
   // Πρόσθεσε αυτή τη συνάρτηση μέσα στο App (π.χ. κάτω από το handleConfirmStatusUpdate)
-const handleReorderRequirements = async (orderedIds) => {
+  const handleReorderRequirements = async (orderedIds) => {
     try {
       const response = await fetch(`${API_BASE_URL}/activities/reorder`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderedIds })
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to save new order');
       }
-      
+
       // ΑΥΤΟ ΕΛΕΙΠΕ: Κάνουμε refresh τα δεδομένα για να "κλειδώσει" η νέα σειρά στο UI
-      await fetchData(); 
-      
+      await fetchData();
+
     } catch (error) {
       console.error("❌ Reorder failed:", error);
       showMainMessage("Failed to save order", "error");
@@ -636,13 +636,13 @@ const handleReorderRequirements = async (orderedIds) => {
       const payload = {
         project: editingRequirement.project, requirementName: formData.name, status: formData.status,
         sprint: newSprint, comment: formData.comment, link: formData.link, type: formData.type,
-        tags: formData.tags, release_id: formData.release_id, 
+        tags: formData.tags, release_id: formData.release_id,
         parent_id: formData.type === 'Sub-task' ? formData.parent_id : null,
         statusDate: new Date().toISOString().split('T')[0],
         existingRequirementGroupId: editingRequirement.id,
-        expected_time: calcHours(formData.expected_time, formData.expected_time_unit),
-        real_time_tc_creation: calcHours(formData.real_time_tc_creation, formData.real_time_tc_creation_unit),
-        real_time_testing: calcHours(formData.real_time_testing, formData.real_time_testing_unit)
+        expected_time: formData.expected_time,
+        real_time_tc_creation: formData.real_time_tc_creation,
+        real_time_testing: formData.real_time_testing
       };
       // ... rest of function
       const response = await fetch(`${API_BASE_URL}/activities`, {
@@ -650,11 +650,11 @@ const handleReorderRequirements = async (orderedIds) => {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to update requirement');
-      
+
       showMainMessage('Requirement updated successfully!', 'success');
       fetchData();
     } catch (error) {
-       showMainMessage(`Error: ${error.message}`, 'error');
+      showMainMessage(`Error: ${error.message}`, 'error');
     } finally {
       handleCloseEditModal();
     }
@@ -662,42 +662,42 @@ const handleReorderRequirements = async (orderedIds) => {
 
   const handleLogChange = useCallback(async (requirementGroupId, reason) => {
     if (!requirementGroupId) {
-        showMainMessage("Cannot log change: Requirement ID is missing.", "error");
-        return false;
+      showMainMessage("Cannot log change: Requirement ID is missing.", "error");
+      return false;
     }
     try {
-        const response = await fetch(`${API_BASE_URL}/requirements/${requirementGroupId}/changes`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || "Failed to log scope change.");
-        }
-        showMainMessage("Scope change logged successfully!", "success");
-        await fetchData();
-        return true;
+      const response = await fetch(`${API_BASE_URL}/requirements/${requirementGroupId}/changes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to log scope change.");
+      }
+      showMainMessage("Scope change logged successfully!", "success");
+      await fetchData();
+      return true;
     } catch (error) {
-        showMainMessage(`Error: ${error.message}`, 'error');
-        return false;
+      showMainMessage(`Error: ${error.message}`, 'error');
+      return false;
     }
   }, [fetchData, showMainMessage]);
 
-const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
+  const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
     if (!dbId) { showMainMessage("Error: Cannot update history. Missing activity DB ID.", 'error'); return; }
     try {
       const formattedDate = new Date(date).toISOString().split('T')[0];
       const res = await fetch(`${API_BASE_URL}/activities/${dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment, statusDate: formattedDate }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to save history"); }
-      
-      const freshReqs = await fetchRequirementsOnly(); 
+
+      const freshReqs = await fetchRequirementsOnly();
       const updatedReq = freshReqs.find(r => r.id === id);
       if (updatedReq) {
-          setRequirementForHistory(updatedReq);
+        setRequirementForHistory(updatedReq);
       }
-      
+
       showMainMessage("History updated!", 'success');
     } catch (e) { showMainMessage(`Error: ${e.message}`, 'error'); }
-  }, [fetchRequirementsOnly, showMainMessage]); 
+  }, [fetchRequirementsOnly, showMainMessage]);
 
   // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleAddNewRequirement με το parent_id
   const handleAddNewRequirement = useCallback(async () => {
@@ -711,7 +711,7 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
         body: JSON.stringify({
           project: targetProject, requirementName: newReqFormState.requirementName, status: newReqFormState.status,
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
-          tags: newReqFormState.tags, release_id: newReqFormState.release_id, 
+          tags: newReqFormState.tags, release_id: newReqFormState.release_id,
           parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null,
           statusDate: new Date().toISOString().split('T')[0],
           expected_time: calcHours(newReqFormState.expected_time, newReqFormState.expected_time_unit),
@@ -719,14 +719,14 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
           real_time_testing: calcHours(newReqFormState.real_time_testing, newReqFormState.real_time_testing_unit)
         }),
       });
-      
+
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to add requirement');
-      
+
       showMainMessage(newReqFormState.parent_id ? 'Sub-task added successfully!' : 'Requirement added successfully!', 'success');
-      
+
       await fetchRequirementsOnly();
-      
+
       navigate(`/sprint-board?project=${encodeURIComponent(targetProject)}&sprint=${encodeURIComponent(targetSprint)}`, { replace: true });
 
     } catch (error) {
@@ -775,14 +775,14 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
     formData.append('sprint', sprint);
     if (release_id) formData.append('release_id', release_id);
     formData.append('importMode', importMode);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/import/requirements`, { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Import failed');
       showMainMessage(result.message, 'success');
       fetchData();
-      
+
       navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`, { replace: true });
     } catch (error) {
       showMainMessage(`Import Error: ${error.message}`, 'error');
@@ -801,15 +801,15 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
       const response = await fetch(`${API_BASE_URL}/import/validate`, { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Validation failed');
-      
+
       setImportConfirmData({ file, project, sprint, release_id, ...result.data });
-      
+
       if (result.data.newCount === 0 && result.data.duplicateCount === 0) {
         showMainMessage(`No valid requirements found to import. Skipped: ${result.data.skippedCount}`, "info");
         setIsImportModalOpen(false);
         return;
       }
-      
+
       if (result.data.duplicateCount > 0) {
         setIsImportConfirmModalOpen(true);
       } else {
@@ -835,7 +835,7 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
       if (!response.ok) throw new Error(result.error || `Failed to delete ${deleteType}`);
       showMainMessage(`${deleteType.charAt(0).toUpperCase() + deleteType.slice(1).replace('-', ' ')} deleted successfully!`, 'success');
       fetchData();
-      if(deleteType === 'release' || deleteType === 'archived-release') fetchAllProjectData();
+      if (deleteType === 'release' || deleteType === 'archived-release') fetchAllProjectData();
     } catch (error) {
       showMainMessage(`Error: ${error.message}`, 'error');
     } finally {
@@ -877,25 +877,25 @@ const handleSaveHistoryEntry = useCallback(async (id, dbId, date, comment) => {
     }
   };
 
-  const handleJiraImportSuccess = useCallback(async (project, sprint) => { 
-      await fetchData(); 
-      if(project && sprint) {
-        navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`, { replace: true });
-      }
+  const handleJiraImportSuccess = useCallback(async (project, sprint) => {
+    await fetchData();
+    if (project && sprint) {
+      navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`, { replace: true });
+    }
   }, [fetchData, navigate]);
 
   const getDeleteConfirmationMessage = () => {
     if (!itemToDelete) return '';
     switch (deleteType) {
-        case 'requirement': return `Are you sure you want to delete requirement "${itemToDelete.name}" (Project: ${itemToDelete.project}) and all its history? This action cannot be undone.`;
-        case 'project': return `Are you sure you want to delete the project "${itemToDelete.name}"? This will also delete ALL associated requirements, releases, notes, defects, and retrospective items permanently. This action cannot be undone.`;
-        case 'release': return `Are you sure you want to delete the release "${itemToDelete.name}"? This will not delete the requirements, but will unlink them from this release. This action cannot be undone.`;
-        case 'archived-release': return `Are you sure you want to permanently delete the archived release "${itemToDelete.name}"? This action cannot be undone.`;
-        default: return 'Are you sure?';
+      case 'requirement': return `Are you sure you want to delete requirement "${itemToDelete.name}" (Project: ${itemToDelete.project}) and all its history? This action cannot be undone.`;
+      case 'project': return `Are you sure you want to delete the project "${itemToDelete.name}"? This will also delete ALL associated requirements, releases, notes, defects, and retrospective items permanently. This action cannot be undone.`;
+      case 'release': return `Are you sure you want to delete the release "${itemToDelete.name}"? This will not delete the requirements, but will unlink them from this release. This action cannot be undone.`;
+      case 'archived-release': return `Are you sure you want to permanently delete the archived release "${itemToDelete.name}"? This action cannot be undone.`;
+      default: return 'Are you sure?';
     }
   };
 
-if (isLoading) { 
+  if (isLoading) {
     return (
       <GlobalProvider>
         <div id="app-container-loading-id" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
@@ -905,10 +905,10 @@ if (isLoading) {
           </div>
         </div>
       </GlobalProvider>
-    ); 
+    );
   }
 
-  if (error && !isLoading) { 
+  if (error && !isLoading) {
     return (
       <GlobalProvider>
         <div id="app-container-error-id" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
@@ -920,78 +920,78 @@ if (isLoading) {
           </div>
         </div>
       </GlobalProvider>
-    ); 
+    );
   }
-  
+
   return (
     <GlobalProvider>
       <div id="app-wrapper" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
-        
+
         <Sidebar />
 
         <div className="main-layout-content">
           <Toast key={toastInfo.key} message={toastInfo.message} type={toastInfo.type} onDismiss={handleDismissToast} />
-          
+
           <Routes>
             <Route path="/" element={
-              <DashboardPage 
-                projects={projects} 
-                allReleases={allReleases} 
-                allProcessedRequirements={allProcessedRequirements} 
+              <DashboardPage
+                projects={projects}
+                allReleases={allReleases}
+                allProcessedRequirements={allProcessedRequirements}
                 onNavigateToRequirement={handleNavigateToRequirement}
                 onNavigateToDefect={handleNavigateToDefect}
               />
             } />
-            
+
             <Route path="/sprint-board" element={
               <SprintActivitiesPage
-                projects={projects} 
-                selectedProject={selectedProject} 
-                onSelectProject={handleManualProjectSelect} 
-                availableSprints={availableSprints} 
-                selectedSprint={selectedSprint} 
-                onSelectSprint={handleManualSprintSelect} 
-                requirementQuery={requirementQuery} 
-                onQueryChange={handleRequirementQueryChange} 
+                projects={projects}
+                selectedProject={selectedProject}
+                onSelectProject={handleManualProjectSelect}
+                availableSprints={availableSprints}
+                selectedSprint={selectedSprint}
+                onSelectSprint={handleManualSprintSelect}
+                requirementQuery={requirementQuery}
+                onQueryChange={handleRequirementQueryChange}
                 onSearch={handleRequirementSearch}
-                onClear={handleClearRequirementSearch} 
-                onSuggestionSelect={handleRequirementSuggestionSelect} 
+                onClear={handleClearRequirementSearch}
+                onSuggestionSelect={handleRequirementSuggestionSelect}
                 searchSuggestions={searchSuggestions}
-                onOpenAddProjectModal={handleOpenAddProjectModal} 
-                onOpenAddModal={handleOpenAddModal} 
+                onOpenAddProjectModal={handleOpenAddProjectModal}
+                onOpenAddModal={handleOpenAddModal}
                 onAddSubtask={handleOpenAddModal} // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
                 onReorderRequirements={handleReorderRequirements}
                 onDataRefresh={fetchData}
                 onOpenImportModal={handleOpenImportModal}
-                onOpenJiraImportModal={handleOpenJiraImportModal} 
+                onOpenJiraImportModal={handleOpenJiraImportModal}
                 onOpenAddReleaseModal={() => setIsAddReleaseModalOpen(true)}
-                onOpenEditReleaseModal={() => setIsEditReleaseModalOpen(true)} 
+                onOpenEditReleaseModal={() => setIsEditReleaseModalOpen(true)}
                 onOpenEditProjectModal={() => setIsEditProjectModalOpen(true)}
-                onToggleFilterSidebar={() => setIsFilterSidebarOpen(prev => !prev)} 
+                onToggleFilterSidebar={() => setIsFilterSidebarOpen(prev => !prev)}
                 isSearching={isSearching}
-                displayableRequirements={displayableRequirements} 
-                onShowHistory={handleShowHistory} 
+                displayableRequirements={displayableRequirements}
+                onShowHistory={handleShowHistory}
                 onEditRequirement={handleOpenEditModal}
                 onDeleteRequirement={(id, project, name) => handleDeleteRequest('requirement', { id, project, name })}
-                onStatusUpdateRequest={handleStatusUpdateRequest} 
-                projectReleases={projectReleases} 
+                onStatusUpdateRequest={handleStatusUpdateRequest}
+                projectReleases={projectReleases}
                 allProcessedRequirements={allProcessedRequirements}
-                hasAnyReleases={allReleases.length > 0} 
-                showArchivedSprints={showArchivedSprints} 
+                hasAnyReleases={allReleases.length > 0}
+                showArchivedSprints={showArchivedSprints}
                 onSetShowArchived={setShowArchivedSprints}
               />
             } />
-            
+
             <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} />} />
             <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
             <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
-            <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMainMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />            
-            
+            <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMainMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />
+
             <Route path="/:projectName" element={
-              <DashboardPage 
-                projects={projects} 
-                allReleases={allReleases} 
-                allProcessedRequirements={allProcessedRequirements} 
+              <DashboardPage
+                projects={projects}
+                allReleases={allReleases}
+                allProcessedRequirements={allProcessedRequirements}
                 onNavigateToRequirement={handleNavigateToRequirement}
                 onNavigateToDefect={handleNavigateToDefect}
               />
@@ -1008,61 +1008,61 @@ if (isLoading) {
         <EditReleaseModal isOpen={isEditReleaseModalOpen} onClose={() => setIsEditReleaseModalOpen(false)} onSave={handleEditRelease} onDelete={(release) => handleDeleteRequest('release', release)} releases={allReleases} projects={projects} currentProject={selectedProject} />
         <EditProjectModal isOpen={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} onSave={handleEditProject} onDelete={(project) => handleDeleteRequest('project', project)} projects={projects} currentProject={selectedProject} />
         <EditRequirementModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSave={handleSaveRequirementEdit} requirement={editingRequirement} releases={projectReleases} onLogChange={handleLogChange} showMessage={showMainMessage} allRequirements={allProcessedRequirements} selectedSprint={selectedSprint} />
-        <UpdateStatusModal 
-            isOpen={isUpdateStatusModalOpen} 
-            onClose={handleCloseUpdateStatusModal} 
-            onSave={handleConfirmStatusUpdate} 
-            item={statusUpdateInfo.requirement} 
-            itemType="requirement" 
-            newStatus={statusUpdateInfo.newStatus} 
-            showMessage={showMainMessage} 
+        <UpdateStatusModal
+          isOpen={isUpdateStatusModalOpen}
+          onClose={handleCloseUpdateStatusModal}
+          onSave={handleConfirmStatusUpdate}
+          item={statusUpdateInfo.requirement}
+          itemType="requirement"
+          newStatus={statusUpdateInfo.newStatus}
+          showMessage={showMainMessage}
         />
-        <FilterSidebar 
-            isOpen={isFilterSidebarOpen} 
-            onClose={() => setIsFilterSidebarOpen(false)} 
-            types={availableTypes} 
-            selectedTypes={selectedTypes} 
-            onTypeChange={handleTypeChange} 
-            enabledTypes={filterOptions.enabledTypes} 
-            linkedDefectsFilter={linkedDefectsFilter} 
-            onLinkedDefectsChange={handleLinkedDefectsChange} 
-            isLinkedDefectsYesEnabled={filterOptions.isLinkedDefectsYesEnabled} 
-            isLinkedDefectsNoEnabled={filterOptions.isLinkedDefectsNoEnabled} 
-            releases={projectReleases} 
-            selectedReleases={selectedReleases} 
-            onReleaseChange={handleReleaseChange} 
-            enabledReleases={filterOptions.enabledReleases} 
-            hasNoReleaseItems={filterOptions.hasNoReleaseItems} 
-            dateFrom={dateFrom} 
-            dateTo={dateTo} 
-            onDateFromChange={setDateFrom} 
-            onDateToChange={setDateTo} 
-            onClearFilters={handleClearFilters} 
+        <FilterSidebar
+          isOpen={isFilterSidebarOpen}
+          onClose={() => setIsFilterSidebarOpen(false)}
+          types={availableTypes}
+          selectedTypes={selectedTypes}
+          onTypeChange={handleTypeChange}
+          enabledTypes={filterOptions.enabledTypes}
+          linkedDefectsFilter={linkedDefectsFilter}
+          onLinkedDefectsChange={handleLinkedDefectsChange}
+          isLinkedDefectsYesEnabled={filterOptions.isLinkedDefectsYesEnabled}
+          isLinkedDefectsNoEnabled={filterOptions.isLinkedDefectsNoEnabled}
+          releases={projectReleases}
+          selectedReleases={selectedReleases}
+          onReleaseChange={handleReleaseChange}
+          enabledReleases={filterOptions.enabledReleases}
+          hasNoReleaseItems={filterOptions.hasNoReleaseItems}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          onClearFilters={handleClearFilters}
         />
-        
+
         {isImportConfirmModalOpen && importConfirmData && (
           <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
-              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
-                  <h3>Confirm Requirement Import</h3>
-                  <p>
-                      The file contains {importConfirmData.newCount} new requirement(s) and {importConfirmData.duplicateCount} duplicate(s).
-                      {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
-                  </p>
-                  <p>How would you like to proceed?</p>
-                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
-                      <button onClick={() => { executeImport(importConfirmData.file, importConfirmData.project, importConfirmData.sprint, importConfirmData.release_id, 'all'); }} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
-                          Import All (Rename Duplicates)
-                      </button>
-                      {importConfirmData.newCount > 0 && (
-                          <button onClick={() => { executeImport(importConfirmData.file, importConfirmData.project, importConfirmData.sprint, importConfirmData.release_id, 'new_only'); }} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
-                              Import New Only
-                          </button>
-                      )}
-                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
-                          Cancel
-                      </button>
-                  </div>
+            <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+              <h3>Confirm Requirement Import</h3>
+              <p>
+                The file contains {importConfirmData.newCount} new requirement(s) and {importConfirmData.duplicateCount} duplicate(s).
+                {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
+              </p>
+              <p>How would you like to proceed?</p>
+              <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+                <button onClick={() => { executeImport(importConfirmData.file, importConfirmData.project, importConfirmData.sprint, importConfirmData.release_id, 'all'); }} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                  Import All (Rename Duplicates)
+                </button>
+                {importConfirmData.newCount > 0 && (
+                  <button onClick={() => { executeImport(importConfirmData.file, importConfirmData.project, importConfirmData.sprint, importConfirmData.release_id, 'new_only'); }} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                    Import New Only
+                  </button>
+                )}
+                <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                  Cancel
+                </button>
               </div>
+            </div>
           </div>
         )}
 
