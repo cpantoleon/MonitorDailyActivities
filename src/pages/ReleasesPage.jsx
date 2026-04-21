@@ -1232,7 +1232,9 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
     };
 
     const totalExpectedReqs = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.expected_time || 0), 0);
-    const totalRealReqs = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_tc_creation || 0) + (r.currentStatusDetails.real_time_testing || 0), 0);
+    const totalRealTcCreation = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_tc_creation || 0), 0);
+    const totalRealTesting = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_testing || 0), 0);
+    const totalRealReqs = totalRealTcCreation + totalRealTesting;
     const totalRealDefects = (defects || []).reduce((sum, d) => sum + (d.real_time || 0), 0);
 
     return (
@@ -1282,6 +1284,7 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
                 <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
                     <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Reqs)</div>
                     <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealReqs)}</strong>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85em', marginTop: '4px' }}>[TC: {formatTimeHelper(totalRealTcCreation)}, Test: {formatTimeHelper(totalRealTesting)}]</div>
                 </div>
                 <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
                     <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Defects)</div>
@@ -1559,10 +1562,17 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         return sum + (req?.currentStatusDetails.expected_time || 0);
     }, 0);
 
-    const totalRealReqs = items.reduce((sum, item) => {
+    const totalRealTcCreation = items.reduce((sum, item) => {
         const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
-        return sum + (req?.currentStatusDetails.real_time_tc_creation || 0) + (req?.currentStatusDetails.real_time_testing || 0);
+        return sum + (req?.currentStatusDetails.real_time_tc_creation || 0);
     }, 0);
+
+    const totalRealTesting = items.reduce((sum, item) => {
+        const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
+        return sum + (req?.currentStatusDetails.real_time_testing || 0);
+    }, 0);
+
+    const totalRealReqs = totalRealTcCreation + totalRealTesting;
 
     const totalRealDefects = defects.reduce((sum, d) => sum + (d.real_time || 0), 0);
 
@@ -1620,21 +1630,6 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                 <ChartLegend items={bugLabelsLegendItems} />
                             </div>
                         )}
-                        
-                        <div className="release-time-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '20px', fontSize: '0.85em', textAlign: 'center', width: '100%', maxWidth: '500px' }}>
-                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
-                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Expected (Reqs)</div>
-                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalExpectedReqs)}</strong>
-                            </div>
-                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
-                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Reqs)</div>
-                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealReqs)}</strong>
-                            </div>
-                            <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
-                                <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Defects)</div>
-                                <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealDefects)}</strong>
-                            </div>
-                        </div>
 
                     </div>
 
@@ -1709,6 +1704,22 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                         </div>
                     </div>
 
+                </div>
+
+                <div className="release-time-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', margin: '15px 20px 0', fontSize: '0.85em', textAlign: 'center' }}>
+                    <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Expected (Reqs)</div>
+                        <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalExpectedReqs)}</strong>
+                    </div>
+                    <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Reqs)</div>
+                        <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealReqs)}</strong>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85em', marginTop: '4px' }}>[TC: {formatTimeHelper(totalRealTcCreation)}, Test: {formatTimeHelper(totalRealTesting)}]</div>
+                    </div>
+                    <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Real (Defects)</div>
+                        <strong style={{ fontSize: '1.1em', color: 'var(--text-primary)' }}>{formatTimeHelper(totalRealDefects)}</strong>
+                    </div>
                 </div>
                 <div id={`archived-release-card-footer-${archive.id}`} className="release-card-footer">
                     <div id={`archived-release-card-actions-${archive.id}`} className="release-card-actions">

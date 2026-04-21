@@ -2,7 +2,7 @@
 .custom-dropdown {
   position: relative;
   width: 100%;
-  min-width: 220px;
+  min-width: 100%;
   font-family: inherit;
 }
 
