@@ -9,6 +9,7 @@ import Tooltip from '../components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 import FilterSidebar from '../components/FilterSidebar';
+import CustomDropdown from '../components/CustomDropdown';
 import '../components/FilterSidebar.css';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
@@ -52,7 +53,7 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
           <button onClick={createHandler(onOpenAddModal)} className="options-menu-item">
             + Add Requirement
           </button>
-           <button onClick={createHandler(onOpenAddReleaseModal)} className="options-menu-item" disabled={!hasProjects}>
+          <button onClick={createHandler(onOpenAddReleaseModal)} className="options-menu-item" disabled={!hasProjects}>
             + Add Release
           </button>
           <button onClick={createHandler(onOpenEditReleaseModal)} className="options-menu-item" disabled={!hasAnyReleases}>
@@ -73,15 +74,120 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
 
 const SprintActivitiesPage = ({
   projects, selectedProject, onSelectProject, availableSprints, selectedSprint, onSelectSprint,
-  requirementQuery, onQueryChange, onSearch, onClear, onSuggestionSelect, searchSuggestions,onAddSubtask,
+  requirementQuery, onQueryChange, onSearch, onClear, onSuggestionSelect, searchSuggestions, onAddSubtask,
   onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenJiraImportModal, onOpenAddReleaseModal,
   onOpenEditReleaseModal, onOpenEditProjectModal, onToggleFilterSidebar, isSearching, displayableRequirements,
   onShowHistory, onEditRequirement, onDeleteRequirement, onStatusUpdateRequest, projectReleases,
   allProcessedRequirements, hasAnyReleases, showArchivedSprints, onSetShowArchived, onReorderRequirements,
-  onDataRefresh // <--- ΠΡΟΣΘΗΚΗ ΕΔΩ
+  onDataRefresh
 }) => {
   const [showCharts, setShowCharts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Bulk Selection State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkTargetSprint, setBulkTargetSprint] = useState('');
+  const [bulkTargetRelease, setBulkTargetRelease] = useState('');
+
+  const sprintOptions = [
+    { value: 'Backlog', label: 'Backlog' },
+    ...Array.from({ length: 20 }, (_, i) => ({ value: `${i + 1}`, label: `${i + 1}` }))
+  ];
+
+  const releaseOptions = [
+    { value: 'remove', label: 'Remove Release' },
+    ...projectReleases.map(r => ({ value: r.id, label: r.name }))
+  ];
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === displayableRequirements.length && displayableRequirements.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(displayableRequirements.map(r => r.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} items?`)) return;
+
+    for (const id of selectedIds) {
+      // Requirement deletion calls /api/requirements/{requirementGroupId}
+      await fetch(`/api/requirements/${id}`, { method: 'DELETE' }).catch(console.error);
+    }
+    setSelectedIds([]);
+    setIsSelectionMode(false);
+    onDataRefresh();
+  };
+
+  const handleBulkMoveSprint = async () => {
+    if (selectedIds.length === 0 || !bulkTargetSprint) return;
+    for (const id of selectedIds) {
+      const req = displayableRequirements.find(r => r.id === id);
+      if (req) {
+        const finalSprint = bulkTargetSprint === 'Backlog' ? 'Backlog' : (bulkTargetSprint.startsWith('Sprint') ? bulkTargetSprint : `Sprint ${bulkTargetSprint}`);
+        const payload = {
+          project: req.project,
+          requirementName: req.requirementUserIdentifier,
+          status: req.currentStatusDetails.status,
+          sprint: finalSprint,
+          comment: req.currentStatusDetails.comment || '',
+          link: req.currentStatusDetails.link || '',
+          type: req.currentStatusDetails.type || '',
+          tags: req.currentStatusDetails.tags || '',
+          release_id: req.currentStatusDetails.releaseId || '',
+          parent_id: req.parentId || null,
+          statusDate: new Date().toISOString().split('T')[0],
+          existingRequirementGroupId: req.id,
+          expected_time: req.currentStatusDetails.expected_time,
+          real_time_tc_creation: req.currentStatusDetails.real_time_tc_creation,
+          real_time_testing: req.currentStatusDetails.real_time_testing
+        };
+        await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(console.error);
+      }
+    }
+    setSelectedIds([]);
+    setIsSelectionMode(false);
+    setBulkTargetSprint('');
+    onDataRefresh();
+  };
+
+  const handleBulkAddRelease = async () => {
+    if (selectedIds.length === 0 || !bulkTargetRelease) return;
+    for (const id of selectedIds) {
+      const req = displayableRequirements.find(r => r.id === id);
+      if (req) {
+        const releaseVal = bulkTargetRelease === 'remove' ? '' : bulkTargetRelease;
+        const payload = {
+          project: req.project,
+          requirementName: req.requirementUserIdentifier,
+          status: req.currentStatusDetails.status,
+          sprint: req.currentStatusDetails.sprint,
+          comment: req.currentStatusDetails.comment || '',
+          link: req.currentStatusDetails.link || '',
+          type: req.currentStatusDetails.type || '',
+          tags: req.currentStatusDetails.tags || '',
+          release_id: releaseVal,
+          parent_id: req.parentId || null,
+          statusDate: new Date().toISOString().split('T')[0],
+          existingRequirementGroupId: req.id,
+          expected_time: req.currentStatusDetails.expected_time,
+          real_time_tc_creation: req.currentStatusDetails.real_time_tc_creation,
+          real_time_testing: req.currentStatusDetails.real_time_testing
+        };
+        await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(console.error);
+      }
+    }
+    setSelectedIds([]);
+    setIsSelectionMode(false);
+    setBulkTargetRelease('');
+    onDataRefresh();
+  };
 
   // Detect theme changes for Chart.js colors
   useEffect(() => {
@@ -141,20 +247,20 @@ const SprintActivitiesPage = ({
     // Check direct properties (handles number or array of changes)
     const propsToCheck = ['changeCount', 'change_count', 'scopeChanges', 'scope_changes'];
     for (const prop of propsToCheck) {
-        const val = r[prop] || (r.currentStatusDetails ? r.currentStatusDetails[prop] : undefined);
-        if (val !== undefined && val !== null) {
-            if (Array.isArray(val)) return val.length;
-            if (!isNaN(val) && Number(val) > 0) return Number(val);
-        }
+      const val = r[prop] || (r.currentStatusDetails ? r.currentStatusDetails[prop] : undefined);
+      if (val !== undefined && val !== null) {
+        if (Array.isArray(val)) return val.length;
+        if (!isNaN(val) && Number(val) > 0) return Number(val);
+      }
     }
 
     // Fallback: Check history for "scope change" activities if no direct count exists
     if (r.history && Array.isArray(r.history)) {
-        return r.history.filter(h => 
-            (h.activity_type && h.activity_type.toLowerCase().includes('scope')) || 
-            (h.type && h.type.toLowerCase().includes('scope')) || 
-            (h.comment && String(h.comment).toLowerCase().includes('scope change'))
-        ).length;
+      return r.history.filter(h =>
+        (h.activity_type && h.activity_type.toLowerCase().includes('scope')) ||
+        (h.type && h.type.toLowerCase().includes('scope')) ||
+        (h.comment && String(h.comment).toLowerCase().includes('scope change'))
+      ).length;
     }
     return 0;
   };
@@ -167,33 +273,33 @@ const SprintActivitiesPage = ({
     changedReqs.sort((a, b) => getChangeCount(b) - getChangeCount(a));
 
     const splitLabelIntoLines = (label, maxCharsPerLine = 22) => {
-        const words = label.split(' ');
-        const lines = [];
-        let currentLine = '';
-        for (const word of words) {
-            if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
-                lines.push(currentLine); currentLine = word;
-            } else {
-                currentLine = currentLine ? currentLine + ' ' + word : word;
-            }
+      const words = label.split(' ');
+      const lines = [];
+      let currentLine = '';
+      for (const word of words) {
+        if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+          lines.push(currentLine); currentLine = word;
+        } else {
+          currentLine = currentLine ? currentLine + ' ' + word : word;
         }
-        if (currentLine) lines.push(currentLine);
-        return lines;
+      }
+      if (currentLine) lines.push(currentLine);
+      return lines;
     };
 
     const fullLabels = changedReqs.map(r => r.requirementUserIdentifier);
     const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
 
     return {
-        labels: multilineLabels,
-        datasets: [{
-            label: 'Number of Scope Changes',
-            data: changedReqs.map(r => getChangeCount(r)),
-            backgroundColor: chartColors.scopeBar,
-            borderColor: chartColors.scopeBorder,
-            borderWidth: 1,
-            fullLabels: fullLabels,
-        }],
+      labels: multilineLabels,
+      datasets: [{
+        label: 'Number of Scope Changes',
+        data: changedReqs.map(r => getChangeCount(r)),
+        backgroundColor: chartColors.scopeBar,
+        borderColor: chartColors.scopeBorder,
+        borderWidth: 1,
+        fullLabels: fullLabels,
+      }],
     };
   };
 
@@ -211,24 +317,24 @@ const SprintActivitiesPage = ({
   const sprintChartOptions = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { ...baseChartOptions.plugins.title, text: `Current Sprint: ${selectedSprint}` } } };
 
   // Aggressive check to find which release is active (checks true, 1, "true", "Active")
-  const activeRelease = projectReleases.find(r => 
-      String(r.is_current) === 'true' || r.is_current === 1 || 
-      String(r.isCurrent) === 'true' || r.isCurrent === 1 ||
-      String(r.status).toLowerCase() === 'active'
+  const activeRelease = projectReleases.find(r =>
+    String(r.is_current) === 'true' || r.is_current === 1 ||
+    String(r.isCurrent) === 'true' || r.isCurrent === 1 ||
+    String(r.status).toLowerCase() === 'active'
   );
-  
+
   // Aggressive match to link requirements to the active release ID or Name
   const releaseRequirements = activeRelease
     ? allProcessedRequirements.filter(r => {
-        const det = r.currentStatusDetails || {};
-        const rId = det.releaseId || det.release_id || r.releaseId || r.release_id;
-        const rName = det.releaseName || det.release_name || r.releaseName || r.release_name;
-        
-        return (rId && String(rId) === String(activeRelease.id)) || 
-               (rName && rName === activeRelease.name);
-      })
+      const det = r.currentStatusDetails || {};
+      const rId = det.releaseId || det.release_id || r.releaseId || r.release_id;
+      const rName = det.releaseName || det.release_name || r.releaseName || r.release_name;
+
+      return (rId && String(rId) === String(activeRelease.id)) ||
+        (rName && rName === activeRelease.name);
+    })
     : [];
-  
+
   const releaseChartData = getChartData(releaseRequirements);
   const releaseChartOptions = { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, title: { ...baseChartOptions.plugins.title, text: `Active Release: ${activeRelease?.name || 'N/A'}` } } };
 
@@ -236,28 +342,17 @@ const SprintActivitiesPage = ({
   const changeChartOptions = {
     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
     plugins: {
-        legend: { display: false, labels: { color: chartColors.text } },
-        title: { display: true, text: `Scope Changes in Sprint: ${selectedSprint}`, font: { size: 16 }, color: chartColors.text },
-        tooltip: { callbacks: {
-                title: function(context) { return context[0].dataset.fullLabels[context[0].dataIndex]; },
-                label: function(context) { return (context.dataset.label || '') + ': ' + context.parsed.x; }
-            }
+      legend: { display: false, labels: { color: chartColors.text } },
+      title: { display: true, text: `Scope Changes in Sprint: ${selectedSprint}`, font: { size: 16 }, color: chartColors.text },
+      tooltip: {
+        callbacks: {
+          title: function (context) { return context[0].dataset.fullLabels[context[0].dataIndex]; },
+          label: function (context) { return (context.dataset.label || '') + ': ' + context.parsed.x; }
         }
+      }
     },
     scales: { x: { beginAtZero: true, ticks: { stepSize: 1, color: chartColors.text }, grid: { color: chartColors.grid } }, y: { ticks: { color: chartColors.text }, grid: { display: false } } }
   };
-
-  // --- DEBUGGER ---
-  // Open your browser console (F12) to see why data might be missing!
-  useEffect(() => {
-      if (showCharts) {
-          console.log("📊 CHART DEBUGGER:");
-          console.log("1. Project Releases from DB:", projectReleases);
-          console.log("2. Did we find an Active Release?", activeRelease ? "YES: " + activeRelease.name : "NO (Check if 'is_current' is set in DB)");
-          console.log("3. Requirements inside Active Release:", releaseRequirements.length);
-          console.log("4. Scope Changes per requirement:", displayableRequirements.map(req => ({ name: req.requirementUserIdentifier, changeCount: getChangeCount(req) })));
-      }
-  }, [showCharts, projectReleases, activeRelease, releaseRequirements, displayableRequirements]);
 
   return (
     <div id="main-content-area-id" className="main-content-area">
@@ -322,38 +417,45 @@ const SprintActivitiesPage = ({
           </div>
         </div>
         <div className="page-actions-group">
-           {/* Expand / Collapse All */}
-           <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
-               <button 
-                   onClick={async () => {
-                       await fetch('/api/activities/expand-all', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: true }) });
-                       onDataRefresh();
-                   }} 
-                   className="btn-primary" 
-                   style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
-                   title="Show details for all cards" 
-                   disabled={!selectedProject || !selectedSprint}>
-                   Expand All
-               </button>
-               <button 
-                   onClick={async () => {
-                       await fetch('/api/activities/expand-all', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: false }) });
-                       onDataRefresh();
-                   }} 
-                   className="btn-primary" 
-                   style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
-                   title="Hide details for all cards" 
-                   disabled={!selectedProject || !selectedSprint}>
-                   Collapse All
-               </button>
-           </div>
+          {/* Expand / Collapse All */}
+          <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+            <button
+              onClick={async () => {
+                await fetch('/api/activities/expand-all', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: true }) });
+                onDataRefresh();
+              }}
+              className="btn-primary"
+              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              title="Show details for all cards"
+              disabled={!selectedProject || !selectedSprint}>
+              Expand All
+            </button>
+            <button
+              onClick={async () => {
+                await fetch('/api/activities/expand-all', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: false }) });
+                onDataRefresh();
+              }}
+              className="btn-primary"
+              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              title="Hide details for all cards"
+              disabled={!selectedProject || !selectedSprint}>
+              Collapse All
+            </button>
+          </div>
 
-           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <Tooltip content={sprintChartTooltipContent} position="bottom" />
-               <button onClick={() => setShowCharts(p => !p)} className="btn-primary" disabled={!selectedProject || !selectedSprint}>
-                   {showCharts ? 'Hide' : 'Show'} Charts
-               </button>
-           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Tooltip content={sprintChartTooltipContent} position="bottom" />
+            <button onClick={() => setShowCharts(p => !p)} className="btn-primary" disabled={!selectedProject || !selectedSprint}>
+              {showCharts ? 'Hide' : 'Show'} Charts
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px' }}>
+            <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject || !selectedSprint}>
+              {isSelectionMode ? 'Cancel Selection' : 'Select Mode'}
+            </button>
+          </div>
+
           <OptionsMenu
             onOpenAddProjectModal={onOpenAddProjectModal} onOpenAddModal={onOpenAddModal} onOpenImportModal={onOpenImportModal}
             onOpenJiraImportModal={onOpenJiraImportModal} onOpenAddReleaseModal={onOpenAddReleaseModal} onOpenEditReleaseModal={onOpenEditReleaseModal}
@@ -361,6 +463,49 @@ const SprintActivitiesPage = ({
           />
         </div>
       </div>
+
+      {isSelectionMode && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '15px', padding: '15px 20px',
+          backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+          borderRadius: '12px', marginBottom: '25px', boxShadow: 'var(--card-shadow)',
+          flexWrap: 'nowrap', overflowX: 'auto'
+        }}>
+          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{selectedIds.length} Selected</span>
+          <button onClick={handleSelectAll} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Select All</button>
+          <button onClick={() => setSelectedIds([])} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} disabled={selectedIds.length === 0}>Deselect</button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto', minWidth: '150px' }}>
+            <CustomDropdown
+              id="bulk-sprint-dropdown"
+              name="bulkSprint"
+              value={bulkTargetSprint}
+              onChange={e => setBulkTargetSprint(e.target.value)}
+              options={sprintOptions}
+              placeholder="- Target Sprint -"
+              disabled={selectedIds.length === 0}
+              placement="bottom"
+            />
+            <button onClick={handleBulkMoveSprint} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetSprint} style={{ padding: '6px 12px' }}>Move</button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: '150px' }}>
+            <CustomDropdown
+              id="bulk-release-dropdown"
+              name="bulkRelease"
+              value={bulkTargetRelease}
+              onChange={e => setBulkTargetRelease(e.target.value)}
+              options={releaseOptions}
+              placeholder="- Target Release -"
+              disabled={selectedIds.length === 0}
+              placement="bottom"
+            />
+            <button onClick={handleBulkAddRelease} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetRelease} style={{ padding: '6px 12px' }}>Assign</button>
+          </div>
+
+          <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none' }} disabled={selectedIds.length === 0}>Delete</button>
+        </div>
+      )}
 
       {showCharts && selectedProject && selectedSprint && (
         <div id="sprint-charts-wrapper-id" className="charts-wrapper">
@@ -396,17 +541,20 @@ const SprintActivitiesPage = ({
       {isSearching && displayableRequirements.length === 0 && (
         <div className="empty-column-message">No results found for your search.</div>
       )}
-      
-      <KanbanBoard 
-        requirements={displayableRequirements} 
+
+      <KanbanBoard
+        requirements={displayableRequirements}
         allRequirements={allProcessedRequirements} // <--- ΠΡΟΣΘΗΚΗ
-        onShowHistory={onShowHistory} 
-        onEditRequirement={onEditRequirement} 
-        onDeleteRequirement={onDeleteRequirement} 
-        isSearching={isSearching} 
-        onStatusUpdateRequest={onStatusUpdateRequest} 
+        onShowHistory={onShowHistory}
+        onEditRequirement={onEditRequirement}
+        onDeleteRequirement={onDeleteRequirement}
+        isSearching={isSearching}
+        onStatusUpdateRequest={onStatusUpdateRequest}
         onAddSubtask={onAddSubtask} // <--- ΠΡΟΣΘΗΚΗ
         onReorderRequirements={onReorderRequirements} // <--- ΠΡΟΣΘΗΚΗ
+        isSelectionMode={isSelectionMode}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
       />
     </div>
   );

@@ -363,6 +363,34 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     });
   }, [isSearching, searchResults, showClosedView, closedDefects, activeDefects, selectedReleases, allRequirements, archivedReleases, fatDefectFilter]);
 
+  // Bulk Selection State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === filteredDefects.length && filteredDefects.length > 0) {
+        setSelectedIds([]);
+    } else {
+        setSelectedIds(filteredDefects.map(d => d.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} defects?`)) return;
+    
+    for (const id of selectedIds) {
+        await fetch(`${API_BASE_URL}/defects/${id}`, { method: 'DELETE' }).catch(console.error);
+    }
+    setSelectedIds([]);
+    setIsSelectionMode(false);
+    refreshDefectsState();
+  };
+
   useEffect(() => {
     if (selectedProject) {
         const releases = allRequirements
@@ -1035,6 +1063,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             onDeleteRequest={handleDeleteRequest} 
             onNavigate={handleNavigateToRequirement}
             onUpdateFixedDate={handleSaveFixedDate}
+            isSelectionMode={isSelectionMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
           />
         </div>
       );
@@ -1055,6 +1086,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             onMoveToClosed={handleMoveToClosed}
             onUpdateFixedDate={handleSaveFixedDate}
             onReorder={handleReorderDefects}
+            isSelectionMode={isSelectionMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
           />
         ))}
       </div>
@@ -1121,6 +1155,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
                 </button>
             </div>
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px', paddingRight: '8px' }}>
+                <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject}>
+                    {isSelectionMode ? 'Cancel Selection' : 'Select Mode'}
+                </button>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <Tooltip content={defectChartTooltipContent} position="bottom" />
                 <button onClick={handleToggleCharts} className="btn-primary" disabled={!selectedProject || filteredDefects.length === 0}>
@@ -1137,6 +1177,23 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
             />
         </div>
       </div>
+
+      {isSelectionMode && (
+          <div style={{
+              display: 'flex', alignItems: 'center', gap: '15px', padding: '15px 20px', 
+              backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', 
+              borderRadius: '12px', marginBottom: '25px', boxShadow: 'var(--card-shadow)',
+              flexWrap: 'nowrap', overflowX: 'auto'
+          }}>
+              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{selectedIds.length} Selected</span>
+              <button onClick={handleSelectAll} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Select All</button>
+              <button onClick={() => setSelectedIds([])} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} disabled={selectedIds.length === 0}>Deselect</button>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto' }}>
+                  <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none' }} disabled={selectedIds.length === 0}>Delete</button>
+              </div>
+          </div>
+      )}
 
       {isLoading && <p className="loading-message">Loading defects...</p>}
       {!isLoading && !isSearching && !selectedProject && <p className="empty-column-message">Please select a project to view defects, or use the search bar for all projects.</p>}

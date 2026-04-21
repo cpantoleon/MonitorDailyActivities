@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import DefectCard from './DefectCard';
 
-const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onDrop, onMoveToClosed, onUpdateFixedDate, onReorder }) => {
+const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onDrop, onMoveToClosed, onUpdateFixedDate, onReorder, isSelectionMode, selectedIds, onToggleSelect }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
   const containerRef = useRef(null);
@@ -176,6 +176,9 @@ const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteReq
                     onDragStart={onDragStart}
                     onMoveToClosed={onMoveToClosed}
                     onUpdateFixedDate={onUpdateFixedDate}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedIds && selectedIds.includes(defect.id)}
+                    onToggleSelect={onToggleSelect}
                 />
             </div>
           );

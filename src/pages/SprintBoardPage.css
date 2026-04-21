@@ -7,7 +7,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end; /* Aligns inputs to the bottom so labels stay on top */
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 20px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -21,7 +22,7 @@
   display: flex;
   align-items: flex-end;
   gap: 15px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex-grow: 1;
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -58,6 +59,7 @@ function MyUploadAdapterPlugin(editor) {
 }
 
 const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
+  const navigate = useNavigate();
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [noteText, setNoteText] = useState('');
@@ -70,29 +72,33 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [isGeneralMode, setIsGeneralMode] = useState(false);
   const [dateSelectionMode, setDateSelectionMode] = useState('month');
 
+  // --- Unsaved Changes State ---
+  const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+
   useEffect(() => {
     const savedProject = sessionStorage.getItem('notesPageSelectedProject');
     if (savedProject) {
-        setSelectedProject(savedProject);
-        if (savedProject === 'General') {
-            setIsGeneralMode(true);
-        }
+      setSelectedProject(savedProject);
+      if (savedProject === 'General') {
+        setIsGeneralMode(true);
+      }
     }
   }, []);
 
   useEffect(() => {
-      if (selectedProject) {
-          sessionStorage.setItem('notesPageSelectedProject', selectedProject);
-      } else {
-          sessionStorage.removeItem('notesPageSelectedProject');
-      }
+    if (selectedProject) {
+      sessionStorage.setItem('notesPageSelectedProject', selectedProject);
+    } else {
+      sessionStorage.removeItem('notesPageSelectedProject');
+    }
   }, [selectedProject]);
 
   const isToday = (someDate) => {
     const today = new Date();
     return someDate.getDate() === today.getDate() &&
-           someDate.getMonth() === today.getMonth() &&
-           someDate.getFullYear() === today.getFullYear();
+      someDate.getMonth() === today.getMonth() &&
+      someDate.getFullYear() === today.getFullYear();
   };
 
   const formatDateKey = (date) => {
@@ -110,6 +116,58 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     return `${year}-${month}`;
   };
 
+  // --- Determine if there are unsaved changes ---
+  const currentDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
+  const originalNoteText = projectNotesMap[currentDateKey] || '';
+
+  // Clean up empty CKEditor paragraphs before comparing to prevent false unsaved warnings
+  const cleanNoteText = (noteText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+  const cleanOriginalText = (originalNoteText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+  const hasUnsavedChanges = cleanNoteText !== cleanOriginalText;
+
+  // Intercept Actions that navigate away or change context
+  const executeWithUnsavedCheck = (action) => {
+    if (hasUnsavedChanges) {
+      setPendingAction(() => action);
+      setIsUnsavedModalOpen(true);
+    } else {
+      action();
+    }
+  };
+
+  // Intercept clicks on routing links and browser refresh/close
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Trigger browser's native leave confirmation
+      }
+    };
+
+    const handleNavigationClick = (e) => {
+      if (!hasUnsavedChanges) return;
+      const target = e.target.closest('a');
+      if (target && target.tagName === 'A') {
+        const href = target.getAttribute('href');
+        // If navigating internally to a different view away from Notes
+        if (href && !href.startsWith('http') && !href.includes('/notes')) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPendingAction(() => () => navigate(href));
+          setIsUnsavedModalOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleNavigationClick, true);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleNavigationClick, true);
+    };
+  }, [hasUnsavedChanges, navigate]);
+
   const handleSaveNote = useCallback(async (textToSave) => {
     if (!selectedProject) {
       if (showMessage) showMessage('Please select a project.', 'error');
@@ -121,7 +179,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       return;
     }
     setIsLoadingNotes(true);
-    
+
     try {
       const response = await fetch(`${apiBaseUrl}/notes`, {
         method: 'POST',
@@ -166,7 +224,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       setIsLoadingNotes(false);
     }
   }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode, dateSelectionMode]);
-  
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -209,7 +267,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           }
 
           const noteType = isGeneralMode ? (text.trim() ? DEFAULT_NOTE_TYPE : null) : getNoteType(text);
-          
+
           if (noteType) {
             const [year, month, day] = dateKey.split('-').map(Number);
             return { date: new Date(year, month - 1, day), type: noteType };
@@ -238,9 +296,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   useEffect(() => {
     const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
     if (selectedProject) {
-        setNoteText(projectNotesMap[dateKey] || '');
+      setNoteText(projectNotesMap[dateKey] || '');
     } else {
-        setNoteText('');
+      setNoteText('');
     }
   }, [selectedDate, projectNotesMap, selectedProject, isGeneralMode, dateSelectionMode]);
 
@@ -292,15 +350,17 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const handleProjectChange = (e) => {
     const project = e.target.value;
-    setSelectedProject(project);
-    setIsGeneralMode(project === 'General');
+    executeWithUnsavedCheck(() => {
+      setSelectedProject(project);
+      setIsGeneralMode(project === 'General');
+    });
   };
 
   const projectOptions = [{ value: 'General', label: 'General' }, ...projects.map(p => ({ value: p, label: p }))];
 
   return (
     <div id="notes-page-main-content-id" className="main-content-area">
-        <style>{`
+      <style>{`
           .ck-editor__editable_inline {
               min-height: 400px;
               max-height: 600px;
@@ -457,9 +517,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           }
         `}</style>
 
-        <div className="selection-controls">
-          <div className="selection-group-container">
-            <div className="selection-group">
+      <div className="selection-controls">
+        <div className="selection-group-container">
+          <div className="selection-group">
             <label className="dropdown-label" htmlFor="note-project">Project</label>
             <CustomDropdown
               id="note-project"
@@ -470,45 +530,48 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
               placeholder="-- Select Project --"
               disabled={projectOptions.length === 0}
             />
-            </div>
+          </div>
 
-            <div className="selection-group" style={{ minWidth: '300px' }}>
-              <label className="dropdown-label" htmlFor="note-date">
-                {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
-              </label>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: '100%' }}>
+          <div className="selection-group" style={{ minWidth: '300px' }}>
+            <label className="dropdown-label" htmlFor="note-date">
+              {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
+            </label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: '100%' }}>
               <div style={{ flexGrow: 1 }}>
-              <DatePicker
-                id="note-date"
-                name="noteDate"
-                selected={selectedDate}
-                onChange={(date) => setSelectedDate(date)}
-                dateFormat={isGeneralMode ? (dateSelectionMode === 'month' ? "MM/yyyy" : "MM/dd/yyyy") : "MM/dd/yyyy"}
-                showMonthYearPicker={isGeneralMode && dateSelectionMode === 'month'}
-                className="notes-datepicker"
-                renderDayContents={renderDayContents}
-                wrapperClassName="date-picker-wrapper"
-                popperPlacement="bottom-start"
-                portalId="root"
-                popperProps={{
-                   strategy: "fixed" 
-                }}
-                autoComplete="off"
-              />
+                <DatePicker
+                  id="note-date"
+                  name="noteDate"
+                  selected={selectedDate}
+                  onChange={(date) => executeWithUnsavedCheck(() => setSelectedDate(date))}
+                  dateFormat={isGeneralMode ? (dateSelectionMode === 'month' ? "MM/yyyy" : "MM/dd/yyyy") : "MM/dd/yyyy"}
+                  showMonthYearPicker={isGeneralMode && dateSelectionMode === 'month'}
+                  className="notes-datepicker"
+                  renderDayContents={renderDayContents}
+                  wrapperClassName="date-picker-wrapper"
+                  popperPlacement="bottom-start"
+                  portalId="root"
+                  popperProps={{
+                    strategy: "fixed"
+                  }}
+                  autoComplete="off"
+                />
               </div>
               {isGeneralMode ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ToggleSwitch
                     id="date-selection-mode"
                     checked={dateSelectionMode === 'month'}
-                    onChange={(e) => setDateSelectionMode(e.target.checked ? 'month' : 'date')}
+                    onChange={(e) => {
+                      const isMonth = e.target.checked;
+                      executeWithUnsavedCheck(() => setDateSelectionMode(isMonth ? 'month' : 'date'));
+                    }}
                     option1="Month"
                     option2="Date"
                     title="Toggle between month and date selection"
                   />
                   {dateSelectionMode === 'date' && (
-                    <button 
-                      onClick={() => setSelectedDate(new Date())} 
+                    <button
+                      onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))}
                       disabled={isToday(selectedDate)}
                       className="today-button"
                     >
@@ -517,117 +580,117 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   )}
                 </div>
               ) : (
-                <button 
-                  onClick={() => setSelectedDate(new Date())} 
+                <button
+                  onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))}
                   disabled={isToday(selectedDate)}
                   className="today-button"
                 >
                   Today
                 </button>
               )}
-              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div id="notes-legend-id" className="notes-legend" style={{ 
-            marginBottom: '20px', 
-            backgroundColor: 'var(--bg-secondary)', 
-            border: '1px solid var(--border-color)', 
-            borderRadius: '8px', 
-            padding: '10px 15px' 
-        }}>
-          <div id="legend-title-id" className="legend-title clickable" onClick={toggleLegend}>
-            Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
-          </div>
-          {isLegendOpen && (
-            <div id="legend-content-id" className="legend-content">
-              <div id="legend-item-default-id" className="legend-item">
-                <span className="note-dot"></span>
-                <span>{DEFAULT_NOTE_LABEL}</span>
-              </div>
-              {KEYWORD_CONFIG.map(config => (
-                <div key={config.type} id={`legend-item-${config.type}-id`} className="legend-item">
-                  <span className={`note-dot note-dot-${config.type}`}></span>
-                  <span>{config.label} (note contains "{config.keyword}")</span>
-                </div>
-              ))}
-            </div>
-          )}
+      <div id="notes-legend-id" className="notes-legend" style={{
+        marginBottom: '20px',
+        backgroundColor: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '8px',
+        padding: '10px 15px'
+      }}>
+        <div id="legend-title-id" className="legend-title clickable" onClick={toggleLegend}>
+          Calendar Dot Legend {isLegendOpen ? '▼' : '►'}
         </div>
-
-        {selectedProject ? (
-          <div id="notes-editor-area-id" className="notes-editor-area" style={{
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: 'var(--card-shadow)'
-          }}>
-            <h3 id="notes-editor-label">
-              Notes for {selectedProject} on {isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}
-            </h3>
-            <div id="editor-wrapper-id" className="editor-wrapper">
-              <CKEditor
-                  editor={ ClassicEditor }
-                  data={noteText}
-                  config={editorConfiguration}
-                  onReady={editor => {
-                    setEditorInstance(editor);
-                    
-                    const editableElement = editor.ui.getEditableElement();
-                    if (editableElement && editableElement.parentElement) {
-                        editableElement.parentElement.setAttribute('aria-labelledby', 'notes-editor-label');
-                    }
-
-                    const fileUploadButton = editor.ui.view.toolbar.element.querySelector('.ck-file-dialog-button');
-                    if (fileUploadButton) {
-                      fileUploadButton.setAttribute('aria-label', 'Upload file');
-                    }
-                    
-                    setTimeout(() => {
-                        const fileInput = document.querySelector('input.ck-hidden[type="file"]');
-                        if (fileInput && !fileInput.hasAttribute('title')) {
-                            fileInput.setAttribute('title', 'Upload image file');
-                        }
-                    }, 500);
-                  }}
-                  onChange={ ( event, editor ) => {
-                      const data = editor.getData();
-                      setNoteText(data);
-                  } }
-                  disabled={!selectedProject}
-              />
+        {isLegendOpen && (
+          <div id="legend-content-id" className="legend-content">
+            <div id="legend-item-default-id" className="legend-item">
+              <span className="note-dot"></span>
+              <span>{DEFAULT_NOTE_LABEL}</span>
             </div>
-            <div id="notes-actions-container-id" className="notes-actions-container" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                id="save-note-button-id"
-                onClick={() => handleSaveNote(noteText)}
-                className="btn-primary"
-                disabled={isLoadingNotes || !selectedProject}
-              >
-                {isLoadingNotes ? (
-                  <>
-                    <span className="spinner"></span> Saving...
-                  </>
-                ) : (
-                  'Save Note'
-                )}
-              </button>
-              <button
-                id="clear-note-button-id"
-                onClick={handleClearRequest}
-                className="delete-card-button"
-                style={{ height: '42px', display: 'flex', alignItems: 'center' }}
-                disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
-              >
-                Clear Note
-              </button>
-            </div>
+            {KEYWORD_CONFIG.map(config => (
+              <div key={config.type} id={`legend-item-${config.type}-id`} className="legend-item">
+                <span className={`note-dot note-dot-${config.type}`}></span>
+                <span>{config.label} (note contains "{config.keyword}")</span>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div id="select-project-prompt-id" className="empty-column-message">Please select a project to view or add notes.</div>
         )}
+      </div>
+
+      {selectedProject ? (
+        <div id="notes-editor-area-id" className="notes-editor-area" style={{
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '20px',
+          boxShadow: 'var(--card-shadow)'
+        }}>
+          <h3 id="notes-editor-label">
+            Notes for {selectedProject} on {isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}
+          </h3>
+          <div id="editor-wrapper-id" className="editor-wrapper">
+            <CKEditor
+              editor={ClassicEditor}
+              data={noteText}
+              config={editorConfiguration}
+              onReady={editor => {
+                setEditorInstance(editor);
+
+                const editableElement = editor.ui.getEditableElement();
+                if (editableElement && editableElement.parentElement) {
+                  editableElement.parentElement.setAttribute('aria-labelledby', 'notes-editor-label');
+                }
+
+                const fileUploadButton = editor.ui.view.toolbar.element.querySelector('.ck-file-dialog-button');
+                if (fileUploadButton) {
+                  fileUploadButton.setAttribute('aria-label', 'Upload file');
+                }
+
+                setTimeout(() => {
+                  const fileInput = document.querySelector('input.ck-hidden[type="file"]');
+                  if (fileInput && !fileInput.hasAttribute('title')) {
+                    fileInput.setAttribute('title', 'Upload image file');
+                  }
+                }, 500);
+              }}
+              onChange={(event, editor) => {
+                const data = editor.getData();
+                setNoteText(data);
+              }}
+              disabled={!selectedProject}
+            />
+          </div>
+          <div id="notes-actions-container-id" className="notes-actions-container" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              id="save-note-button-id"
+              onClick={() => handleSaveNote(noteText)}
+              className="btn-primary"
+              disabled={isLoadingNotes || !selectedProject}
+            >
+              {isLoadingNotes ? (
+                <>
+                  <span className="spinner"></span> Saving...
+                </>
+              ) : (
+                'Save Note'
+              )}
+            </button>
+            <button
+              id="clear-note-button-id"
+              onClick={handleClearRequest}
+              className="delete-card-button"
+              style={{ height: '42px', display: 'flex', alignItems: 'center' }}
+              disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
+            >
+              Clear Note
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div id="select-project-prompt-id" className="empty-column-message">Please select a project to view or add notes.</div>
+      )}
 
       <ConfirmationModal
         isOpen={isConfirmClearOpen}
@@ -635,6 +698,23 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         onConfirm={handleConfirmClear}
         title="Confirm Clear Note"
         message={`Are you sure you want to permanently delete the note for ${isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
+      />
+
+      <ConfirmationModal
+        isOpen={isUnsavedModalOpen}
+        onClose={() => {
+          setIsUnsavedModalOpen(false);
+          setPendingAction(null);
+        }}
+        onConfirm={() => {
+          setIsUnsavedModalOpen(false);
+          if (pendingAction) pendingAction();
+          setPendingAction(null);
+        }}
+        title="Unsaved Changes"
+        message="You have unsaved changes in your note. Are you sure you want to leave without saving?"
+        confirmText="Yes, leave"
+        cancelText="Cancel"
       />
     </div>
   );

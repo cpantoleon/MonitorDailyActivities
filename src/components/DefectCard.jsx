@@ -6,7 +6,7 @@ const ToggleIcon = ({ isExpanded }) => (
   </svg>
 );
 
-const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed, onUpdateFixedDate }) => {
+const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed, onUpdateFixedDate, isSelectionMode, isSelected, onToggleSelect }) => {
   
   const getLocalDateTime = (isoString) => {
     if (!isoString) return '';
@@ -86,15 +86,28 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
   return (
     <div 
       id={`defect-card-${defect.id}`}
-      className="defect-card kanban-card"
-      draggable={isDraggable}
-      onDragStart={(e) => handleDragStartLocal(e, defect)}
+      className={`defect-card kanban-card ${isSelected ? 'selected' : ''}`}
+      draggable={!isSelectionMode && isDraggable}
+      onDragStart={(e) => !isSelectionMode && handleDragStartLocal(e, defect)}
       onDragEnd={handleDragEnd}
-      style={{ cursor: isDraggable ? 'grab' : 'default', position: 'relative' }}
+      onClick={() => isSelectionMode && onToggleSelect && onToggleSelect(defect.id)}
+      style={{ cursor: isSelectionMode ? 'pointer' : (isDraggable ? 'grab' : 'default'), position: 'relative', border: isSelected ? '2px solid var(--accent-color)' : '' }}
     >
+      {isSelectionMode && (
+          <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 10 }}>
+              <input 
+                type="checkbox" 
+                checked={!!isSelected} 
+                onChange={() => onToggleSelect && onToggleSelect(defect.id)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+              />
+          </div>
+      )}
+
       {!!defect.is_fat_defect && <div className="fat-bubble">FAT</div>}
       
-      {isDraggable && (
+      {!isSelectionMode && isDraggable && (
         <div style={{
             position: 'absolute',
             top: '8px',

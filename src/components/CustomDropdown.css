@@ -6,7 +6,8 @@
   font-family: inherit;
 }
 
-.custom-dropdown-button, .custom-dropdown-input {
+.custom-dropdown-button,
+.custom-dropdown-input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
@@ -26,13 +27,15 @@
   align-items: center;
 }
 
-.custom-dropdown-button:focus, .custom-dropdown-input:focus {
+.custom-dropdown-button:focus,
+.custom-dropdown-input:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.1); 
+  box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.1);
 }
 
-.custom-dropdown-button:disabled, .custom-dropdown-input:disabled {
+.custom-dropdown-button:disabled,
+.custom-dropdown-input:disabled {
   background-color: var(--bg-primary);
   color: var(--text-secondary);
   cursor: not-allowed;
@@ -56,7 +59,7 @@
 
 /* The Options Menu */
 .custom-dropdown-options {
-  position: fixed; 
+  position: fixed;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -65,7 +68,8 @@
   list-style: none;
   padding: 6px;
   margin: 0;
-  max-height: 250px;
+  /* Reduced from 250px to 210px to show exactly 5 items before scrolling */
+  max-height: 210px;
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -77,7 +81,7 @@
   color: var(--text-primary);
   border-radius: 6px;
   /* Transparent border prevents layout jumping on hover */
-  border: 1px solid transparent; 
+  border: 1px solid transparent;
   transition: all 0.15s ease;
 }
 
@@ -88,7 +92,7 @@
 /* THE HOVER EFFECT YOU REQUESTED */
 .custom-dropdown-option:hover {
   background-color: var(--bg-tertiary);
-  border-color: var(--accent-color); 
+  border-color: var(--accent-color);
 }
 
 .custom-dropdown-option.selected {

@@ -10,7 +10,10 @@ const KanbanBoard = ({
   isSearching,
   onStatusUpdateRequest,
   onAddSubtask,
-  onReorderRequirements
+  onReorderRequirements,
+  isSelectionMode,
+  selectedIds,
+  onToggleSelect
 }) => {
   const columnTitles = ['To Do', 'Scenarios created', 'Under testing', 'Done'];
   
@@ -53,6 +56,9 @@ const KanbanBoard = ({
           setFocusedFamilyId={setFocusedFamilyId}
           onAddSubtask={onAddSubtask}
           onReorder={onReorderRequirements}
+          isSelectionMode={isSelectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </div>

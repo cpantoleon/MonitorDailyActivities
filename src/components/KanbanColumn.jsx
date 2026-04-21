@@ -13,7 +13,10 @@ const KanbanColumn = ({
   focusedFamilyId,
   setFocusedFamilyId,
   onAddSubtask,
-  onReorder // <--- ΠΡΟΣΘΗΚΗ
+  onReorder,
+  isSelectionMode,
+  selectedIds,
+  onToggleSelect
 }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
@@ -200,6 +203,9 @@ const KanbanColumn = ({
                 focusedFamilyId={focusedFamilyId}
                 setFocusedFamilyId={setFocusedFamilyId}
                 onAddSubtask={onAddSubtask}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedIds && selectedIds.includes(req.id)}
+                onToggleSelect={onToggleSelect}
               />
             </div>
           );

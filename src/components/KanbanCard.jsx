@@ -48,7 +48,10 @@ const KanbanCard = React.memo(({
   onDragStart,
   focusedFamilyId,
   setFocusedFamilyId,
-  onAddSubtask
+  onAddSubtask,
+  isSelectionMode,
+  isSelected,
+  onToggleSelect
 }) => {
   const { comment, link, type, tags, releaseName, releaseDate, activityId, is_expanded } = requirement.currentStatusDetails;
   const navigate = useNavigate();
@@ -139,19 +142,34 @@ const KanbanCard = React.memo(({
     <div 
       id={`req-card-${requirement.id}`}
       data-id={requirement.id}
-      className={`kanban-card ${focusClass} ${isSubtask ? 'is-subtask-card' : ''}`}
-      draggable="true"
-      onDragStart={(e) => handleDragStartLocal(e, requirement)}
+      className={`kanban-card ${focusClass} ${isSubtask ? 'is-subtask-card' : ''} ${isSelected ? 'selected' : ''}`}
+      draggable={!isSelectionMode}
+      onDragStart={(e) => !isSelectionMode && handleDragStartLocal(e, requirement)}
       onDragEnd={handleDragEnd}
-      style={{ position: 'relative' }}
+      onClick={() => isSelectionMode && onToggleSelect && onToggleSelect(requirement.id)}
+      style={{ position: 'relative', cursor: isSelectionMode ? 'pointer' : 'default', border: isSelected ? '2px solid var(--accent-color)' : '' }}
     >
-      <div style={{
-          position: 'absolute', top: '8px', right: '8px', cursor: 'grab',
-          color: 'var(--text-secondary)', opacity: 0.4, fontSize: '14px',
-          lineHeight: 1, userSelect: 'none'
-      }} title="Drag to move">
-        ⋮⋮
-      </div>
+      {isSelectionMode && (
+          <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 10 }}>
+              <input 
+                type="checkbox" 
+                checked={!!isSelected} 
+                onChange={() => onToggleSelect && onToggleSelect(requirement.id)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+              />
+          </div>
+      )}
+
+      {!isSelectionMode && (
+          <div style={{
+              position: 'absolute', top: '8px', right: '8px', cursor: 'grab',
+              color: 'var(--text-secondary)', opacity: 0.4, fontSize: '14px',
+              lineHeight: 1, userSelect: 'none'
+          }} title="Drag to move">
+            ⋮⋮
+          </div>
+      )}
 
       {!isExpanded && type && (
         <div className={`type-bubble type-badge ${getTypeClass(type)}`}>
