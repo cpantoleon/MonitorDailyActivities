@@ -6,14 +6,16 @@
 .selection-controls {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end; /* Aligns inputs to the bottom so labels stay on top */
+  align-items: flex-end;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: 20px;
+  /* Changed back to nowrap to keep it on one row */
+  /* No overflow-x property so the dropdown can break out of the box freely */
+  gap: 12px;
+  /* Reduced gap slightly to fit everything */
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 20px;
+  padding: 15px 20px;
   margin-bottom: 25px;
   box-shadow: var(--card-shadow);
 }
@@ -21,9 +23,12 @@
 .selection-group-container {
   display: flex;
   align-items: flex-end;
-  gap: 15px;
+  gap: 12px;
+  /* Reduced gap */
   flex-wrap: nowrap;
   flex-grow: 1;
+  min-width: 0;
+  /* Allows flex children to shrink if needed */
 }
 
 /* Constrain dropdown widths so they sit side by side */
@@ -31,8 +36,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 200px;
-  max-width: 300px;
+  min-width: 150px;
+  /* Reduced min-width */
+  max-width: 250px;
   flex: 1;
 }
 
@@ -46,23 +52,26 @@
 
 /* Make Search take up remaining middle space */
 .search-container {
-  flex: 2;
-  min-width: 250px;
-  max-width: 400px;
+  flex: 1.5;
+  min-width: 200px;
+  /* Reduced min-width */
+  max-width: 350px;
 }
 
 /* Align buttons and checkboxes to match input heights */
 .filter-toggle-button {
-  height: 42px; /* Matches standard input height */
+  height: 42px;
   margin-bottom: 0;
 }
 
 .show-archived-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 42px;
   padding: 0 5px;
+  white-space: nowrap;
+  /* Prevents text from breaking */
 }
 
 .show-archived-container input[type="checkbox"] {
@@ -82,24 +91,23 @@
 .page-actions-group {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  /* Reduced gap */
   height: 42px;
+  flex-shrink: 0;
+  /* Prevents the buttons from shrinking too much */
 }
 
 .page-actions-group .btn-primary {
   height: 42px;
   display: flex;
   align-items: center;
+  white-space: nowrap;
 }
 
-/* -----------------------------------------
-   DISABLED STATE
------------------------------------------ */
-.btn-primary:disabled {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: not-allowed;
-  border-color: var(--border-color);
-  transform: none;
-  opacity: 0.7;
+/* Allow wrapping ONLY on very small/narrow screens */
+@media screen and (max-width: 1300px) {
+  .selection-controls {
+    flex-wrap: wrap;
+  }
 }
