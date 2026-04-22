@@ -706,6 +706,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           setIsUnsavedModalOpen(false);
           setPendingAction(null);
         }}
+        onSecondaryConfirm={async () => {
+          setIsUnsavedModalOpen(false);
+          const currentData = editorInstance ? editorInstance.getData() : noteText;
+          await handleSaveNote(currentData);
+          if (pendingAction) pendingAction();
+          setPendingAction(null);
+        }}
         onConfirm={() => {
           setIsUnsavedModalOpen(false);
           if (pendingAction) pendingAction();
@@ -713,7 +720,8 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         }}
         title="Unsaved Changes"
         message="You have unsaved changes in your note. Are you sure you want to leave without saving?"
-        confirmText="Yes, leave"
+        secondaryConfirmText="Save and Leave"
+        confirmText="Don't Save and Leave"
         cancelText="Cancel"
       />
     </div>

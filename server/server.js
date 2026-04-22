@@ -19,7 +19,7 @@ const ensureGeneralProjectExists = () => {
             return;
         }
         if (!row) {
-            db.run(`INSERT INTO projects (name) VALUES (?)`, [projectName], function(err) {
+            db.run(`INSERT INTO projects (name) VALUES (?)`, [projectName], function (err) {
                 if (err) {
                     console.error("Error creating General project:", err.message);
                 } else {
@@ -57,18 +57,18 @@ let syncWithQdrant, handleChatbotQuery;
 let isChatbotEnabled = false;
 
 try {
-  const chatbotModule = require('./chatbot.js');
-  syncWithQdrant = chatbotModule.syncWithQdrant;
-  handleChatbotQuery = chatbotModule.handleChatbotQuery;
-  isChatbotEnabled = true;
-  console.log("Chatbot module loaded successfully.");
+    const chatbotModule = require('./chatbot.js');
+    syncWithQdrant = chatbotModule.syncWithQdrant;
+    handleChatbotQuery = chatbotModule.handleChatbotQuery;
+    isChatbotEnabled = true;
+    console.log("Chatbot module loaded successfully.");
 } catch (error) {
-  console.warn("**************************************************");
-  console.warn("WARNING: Chatbot module failed to load.");
-  console.warn("The server will run without chatbot functionality.");
-  console.warn("Reason:", error.message);
-  console.warn("**************************************************");
-  isChatbotEnabled = false;
+    console.warn("**************************************************");
+    console.warn("WARNING: Chatbot module failed to load.");
+    console.warn("The server will run without chatbot functionality.");
+    console.warn("Reason:", error.message);
+    console.warn("**************************************************");
+    isChatbotEnabled = false;
 }
 
 // --- BACKGROUND JOB ΓΙΑ ΤΑ MEETINGS ---
@@ -77,7 +77,7 @@ const fetchAndParseMeetings = () => {
         console.warn("⚠️ WARNING: OUTLOOK_ICS_URL is missing in .env file! Calendar sync is disabled.");
         return;
     }
-    
+
     console.log("Fetching latest calendar events from Outlook...");
     ical.fromURL(OUTLOOK_ICS_URL, {}, function (err, data) {
         if (err) {
@@ -95,22 +95,22 @@ const fetchAndParseMeetings = () => {
         for (let k in data) {
             if (!data.hasOwnProperty(k)) continue;
             const ev = data[k];
-            
+
             if (ev.type === 'VEVENT') {
-                
+
                 // 1. ΑΠΛΑ (NON-RECURRING) EVENTS
                 if (!ev.rrule) {
                     if (ev.start >= today && ev.start < tomorrow) {
                         meetings.push(ev);
                     }
-                } 
+                }
                 // 2. RECURRING EVENTS
                 else {
                     // Α. Έλεγχος των κανονικών εμφανίσεων που θα έπρεπε να γίνουν ΣΗΜΕΡΑ
                     const dates = ev.rrule.between(today, tomorrow);
                     for (let date of dates) {
                         const originalDateStr = new Date(date).toDateString();
-                        
+
                         // Εξαιρείται εντελώς; (ακυρώθηκε)
                         let isExcluded = false;
                         if (ev.exdates) {
@@ -133,14 +133,14 @@ const fetchAndParseMeetings = () => {
                                 }
                             }
                         }
-                        
+
                         // Αν ΔΕΝ έχει μετακινηθεί και ΔΕΝ έχει ακυρωθεί, το βάζουμε κανονικά για σήμερα
                         if (!hasOverride) {
                             const newStart = new Date(date);
                             newStart.setHours(ev.start.getHours(), ev.start.getMinutes(), 0, 0);
                             const duration = ev.end.getTime() - ev.start.getTime();
                             const newEnd = new Date(newStart.getTime() + duration);
-                            
+
                             meetings.push({ ...ev, start: newStart, end: newEnd });
                         }
                     }
@@ -167,10 +167,10 @@ const fetchAndParseMeetings = () => {
             const loc = m.location || '';
             const urlRegex = /(https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>\s]+)/i;
             const match = desc.match(urlRegex) || loc.match(urlRegex);
-            
+
             // Το μοναδικό ID αποτελείται από το UID και το ID της συγκεκριμένης επανάληψης (αν υπάρχει)
             const uniqueId = m.uid + (m.recurrenceid ? new Date(m.recurrenceid).getTime() : '');
-            
+
             // Το βάζουμε σε Map. Αν υπάρχει ήδη από άλλο σημείο του parse, απλά θα το κάνει overwrite 
             // και δεν θα έχουμε διπλότυπα!
             meetingsMap.set(uniqueId, {
@@ -186,10 +186,10 @@ const fetchAndParseMeetings = () => {
         cachedTodayMeetings = Array.from(meetingsMap.values())
             .filter(m => {
                 const titleUpper = m.title.toUpperCase();
-                const isCanceled = titleUpper.includes('CANCELED:') || 
-                                   titleUpper.includes('CANCELLED:') || 
-                                   m.status === 'CANCELLED';
-                
+                const isCanceled = titleUpper.includes('CANCELED:') ||
+                    titleUpper.includes('CANCELLED:') ||
+                    m.status === 'CANCELLED';
+
                 if (isCanceled) {
                     canceledCount++;
                     return false;
@@ -197,12 +197,12 @@ const fetchAndParseMeetings = () => {
                 return true;
             })
             .sort((a, b) => new Date(a.start) - new Date(b.start));
-            
+
         let logMsg = `Calendar updated. Found ${cachedTodayMeetings.length} meetings for today.`;
         if (canceledCount > 0) {
             logMsg += ` (${canceledCount} canceled)`;
         }
-        
+
         console.log(logMsg);
     });
 };
@@ -216,8 +216,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -298,7 +298,7 @@ const calculateBusinessHours = (start, end) => {
 
         // Είναι Σαββατοκύριακο; (0 = Κυριακή, 6 = Σάββατο)
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-        
+
         // Υπολογίζουμε τη μέρα ΑΝ: 
         // 1. ΔΕΝ είναι ΣΚ (καθημερινή)
         // 2. Ή ΕΙΝΑΙ ΣΚ, αλλά είναι ακριβώς η μέρα που άνοιξε το ticket
@@ -320,7 +320,7 @@ const calculateBusinessHours = (start, end) => {
                 totalHours += (effectiveEnd - effectiveStart) / (1000 * 60 * 60);
             }
         }
-        
+
         // Πάμε στην επόμενη μέρα
         current.setUTCDate(current.getUTCDate() + 1);
     }
@@ -364,10 +364,10 @@ const processExcelData = (fileBuffer) => {
         const title = summary;
         const key = row['Key'] ? String(row['Key']).trim() : '';
         const tags = row['Sprint'] ? String(row['Sprint']).trim() : null;
-        
+
         let link = null;
         if (keyColumn) {
-            const excelRowNumber = index + 2; 
+            const excelRowNumber = index + 2;
             const keyCellAddress = `${keyColumn}${excelRowNumber}`;
             const keyCell = worksheet[keyCellAddress];
 
@@ -417,7 +417,7 @@ const processDefectExcelData = (fileBuffer) => {
         }
         let link = null;
         if (keyColumn) {
-            const excelRowNumber = index + 2; 
+            const excelRowNumber = index + 2;
             const keyCellAddress = `${keyColumn}${excelRowNumber}`;
             const keyCell = worksheet[keyCellAddress];
 
@@ -428,7 +428,7 @@ const processDefectExcelData = (fileBuffer) => {
 
         const links = row['Links'] ? String(row['Links']).trim() : null;
         const status = row['Status'] ? String(row['Status']).trim() : null;
-        
+
         let createdDate = null;
         const createdRaw = row['Created'];
         if (createdRaw) {
@@ -461,7 +461,7 @@ app.post("/api/projects", (req, res) => {
     if (!name || name.trim() === '') return res.status(400).json({ error: "Project name is required." });
     const trimmedName = name.trim();
     const sql = `INSERT INTO projects (name) VALUES (?)`;
-    db.run(sql, [trimmedName], function(err) {
+    db.run(sql, [trimmedName], function (err) {
         if (err) {
             if (err.message.includes("UNIQUE constraint failed")) return res.status(409).json({ "error": `Project '${trimmedName}' already exists.` });
             return res.status(400).json({ "error": err.message });
@@ -471,7 +471,7 @@ app.post("/api/projects", (req, res) => {
     });
 });
 
-app.delete("/api/projects/:name", async (req, res) => { 
+app.delete("/api/projects/:name", async (req, res) => {
     const projectName = decodeURIComponent(req.params.name);
     if (!projectName) {
         return res.status(400).json({ error: "Project name is required." });
@@ -500,7 +500,7 @@ app.delete("/api/projects/:name", async (req, res) => {
         await dbRun("DELETE FROM projects WHERE id = ?", [projectId]);
 
         await dbRun("COMMIT");
-        
+
         scheduleQdrantSync();
         res.json({ message: `Project '${projectName}' and all its associated data have been deleted.` });
 
@@ -522,7 +522,7 @@ app.put("/api/projects/:name", (req, res) => {
     const trimmedNewName = newName.trim();
     const sql = 'UPDATE projects SET name = ? WHERE name = ?';
 
-    db.run(sql, [trimmedNewName, currentName], function(err) {
+    db.run(sql, [trimmedNewName, currentName], function (err) {
         if (err) {
             if (err.message.includes("UNIQUE constraint failed")) {
                 return res.status(409).json({ "error": `A project named '${trimmedNewName}' already exists.` });
@@ -533,7 +533,7 @@ app.put("/api/projects/:name", (req, res) => {
             return res.status(404).json({ error: `Project '${currentName}' not found.` });
         }
         scheduleQdrantSync();
-        res.json({ 
+        res.json({
             message: `Project '${currentName}' was successfully renamed to '${trimmedNewName}'.`,
             data: { oldName: currentName, newName: trimmedNewName }
         });
@@ -552,7 +552,7 @@ app.get("/api/requirements", (req, res) => {
                  JOIN projects p ON act.project_id = p.id
                  LEFT JOIN releases rel ON act.release_id = rel.id
                  ORDER BY act.requirementGroupId, act.created_at DESC`;
-    
+
     const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect, d.real_time
                     FROM defect_requirement_links l
                     JOIN defects d ON l.defect_id = d.id
@@ -570,12 +570,12 @@ app.get("/api/requirements", (req, res) => {
             if (!linksMap.has(link.requirement_group_id)) {
                 linksMap.set(link.requirement_group_id, []);
             }
-            linksMap.get(link.requirement_group_id).push({ 
-                id: link.defect_id, 
-                title: link.defect_title, 
-                status: link.defect_status, 
-                link: link.defect_link, 
-                project: link.project_name, 
+            linksMap.get(link.requirement_group_id).push({
+                id: link.defect_id,
+                title: link.defect_title,
+                status: link.defect_status,
+                link: link.defect_link,
+                project: link.project_name,
                 is_fat_defect: link.is_fat_defect,
                 real_time: link.real_time // <-- ΠΡΟΣΘΕΣΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ
             });
@@ -630,11 +630,11 @@ app.get("/api/requirements", (req, res) => {
                 reqGroup.currentStatusDetails = reqGroup.history.find(h => h.isCurrent) || reqGroup.history[0];
                 reqGroup.displayOrder = reqGroup.history.find(h => h.isCurrent)?.display_order || 0;
 
-                const isArchivedAndCompleted = 
+                const isArchivedAndCompleted =
                     reqGroup.currentStatusDetails.status === 'Done' &&
                     reqGroup.currentStatusDetails.sprint &&
                     reqGroup.currentStatusDetails.sprint.startsWith('Archived_from_');
-                
+
                 reqGroup.isActive = !isArchivedAndCompleted;
 
                 if (
@@ -649,14 +649,14 @@ app.get("/api/requirements", (req, res) => {
                     }
                 }
             } else {
-                reqGroup.isActive = true; 
+                reqGroup.isActive = true;
             }
             processedRequirements.push(reqGroup);
         });
         res.json({ message: "success", data: processedRequirements });
 
     }).catch(err => {
-        res.status(400).json({"error": err.message});
+        res.status(400).json({ "error": err.message });
     });
 });
 
@@ -665,7 +665,7 @@ app.post("/api/activities", async (req, res) => {
     if (!project || !requirementName || !status || !statusDate || !sprint) {
         return res.status(400).json({ error: "Missing required fields (project, requirementName, status, statusDate, sprint)" });
     }
-    
+
     try {
         const projectId = await getProjectId(project.trim());
         const requirementUserIdentifier = requirementName.trim();
@@ -681,10 +681,10 @@ app.post("/api/activities", async (req, res) => {
         const now = new Date().toISOString();
         const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
         const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
-        
+
         let finalDisplayOrder = display_order;
-        let finalIsExpanded = defaultExpanded; 
-    
+        let finalIsExpanded = defaultExpanded;
+
         if (finalDisplayOrder === undefined || finalDisplayOrder === null || existingRequirementGroupId) {
             try {
                 if (existingRequirementGroupId) {
@@ -698,7 +698,7 @@ app.post("/api/activities", async (req, res) => {
                         }
                     }
                 }
-                
+
                 if (finalDisplayOrder === undefined || finalDisplayOrder === null) {
                     const maxRow = await dbGet(`SELECT MAX(display_order) as maxOrder FROM activities WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1`, [projectId, sprint, status]);
                     finalDisplayOrder = (maxRow && maxRow.maxOrder !== null) ? maxRow.maxOrder + 1 : 0;
@@ -716,7 +716,7 @@ app.post("/api/activities", async (req, res) => {
 
             const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded, expected_time || null, real_time_tc_creation || null, real_time_testing || null], function(err) {
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded, expected_time || null, real_time_tc_creation || null, real_time_testing || null], function (err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -725,11 +725,11 @@ app.post("/api/activities", async (req, res) => {
 
                 db.run(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [finalRequirementGroupId, newActivityDbId], (updateGroupIdErr) => {
                     if (updateGroupIdErr) console.error("Error setting requirementGroupId:", updateGroupIdErr.message);
-                    
+
                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ? AND id != ?`;
                     db.run(updateOldSql, [finalRequirementGroupId, newActivityDbId], (updateOldErr) => {
                         if (updateOldErr) console.error("Error updating old current status:", updateOldErr.message);
-                        
+
                         if (!finalParentId) {
                             const findSubtasksSql = `SELECT * FROM activities WHERE parent_id = ? AND isCurrent = 1 AND sprint != ?`;
                             db.all(findSubtasksSql, [finalRequirementGroupId, sprint], (err, subtasks) => {
@@ -743,9 +743,9 @@ app.post("/api/activities", async (req, res) => {
                                     const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
                                                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`;
                                     db.run(insertSubSql, [
-                                        sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate, 
+                                        sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate,
                                         "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded, sub.expected_time || null, sub.real_time_tc_creation || null, sub.real_time_testing || null
-                                    ], function(errInsert) {
+                                    ], function (errInsert) {
                                         if (!errInsert) {
                                             const newSubId = this.lastID;
                                             db.run(`UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ? AND id != ?`, [sub.requirementGroupId, newSubId]);
@@ -780,19 +780,19 @@ app.post("/api/activities", async (req, res) => {
 
 // ΠΡΟΣΘΗΚΗ: Endpoint για μαζικό update της σειράς (Reorder)
 app.put("/api/activities/reorder", async (req, res) => {
-    const { orderedIds } = req.body; 
+    const { orderedIds } = req.body;
     if (!orderedIds || !Array.isArray(orderedIds)) {
         return res.status(400).json({ error: "Invalid data format." });
     }
 
     try {
         await dbRun("BEGIN TRANSACTION");
-        
+
         // Κάνουμε update το display_order χρησιμοποιώντας το primary key (id)
         for (let i = 0; i < orderedIds.length; i++) {
             await dbRun("UPDATE activities SET display_order = ? WHERE id = ?", [i, orderedIds[i]]);
         }
-        
+
         await dbRun("COMMIT");
         res.json({ message: "Order updated successfully." });
     } catch (error) {
@@ -816,7 +816,7 @@ app.put("/api/activities/expand-all", async (req, res) => {
 app.put("/api/activities/:activityId", (req, res) => {
     let { comment, statusDate, link, type, tags, release_id, parent_id, is_expanded, expected_time, real_time_tc_creation, real_time_testing } = req.body;
     const activityDbId = req.params.activityId;
-    
+
     let fieldsToUpdate = [];
     let params = [];
     if (comment !== undefined) { fieldsToUpdate.push("comment = ?"); params.push(comment); }
@@ -839,11 +839,11 @@ app.put("/api/activities/:activityId", (req, res) => {
     params.push(new Date().toISOString());
     params.push(activityDbId);
     const sql = `UPDATE activities SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
         if (err) return res.status(400).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: `Activity with id ${activityDbId} not found.` });
         scheduleQdrantSync();
-        res.json({ message: "success", data: { id: activityDbId, changes: this.changes }});
+        res.json({ message: "success", data: { id: activityDbId, changes: this.changes } });
     });
 });
 
@@ -870,7 +870,7 @@ app.post("/api/requirements/:requirementGroupId/changes", (req, res) => {
     }
 
     const sql = `INSERT INTO requirement_changes (requirement_group_id, reason) VALUES (?, ?)`;
-    db.run(sql, [groupId, reason ? reason.trim() : null], function(err) {
+    db.run(sql, [groupId, reason ? reason.trim() : null], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error while logging change." });
         }
@@ -893,7 +893,7 @@ app.put("/api/requirements/:requirementGroupId/rename", (req, res) => {
     }
     const trimmedNewName = newRequirementName.trim();
     const sql = `UPDATE activities SET requirementUserIdentifier = ? WHERE requirementGroupId = ?`;
-    db.run(sql, [trimmedNewName, groupId], function(err) {
+    db.run(sql, [trimmedNewName, groupId], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error while updating requirement name." });
         }
@@ -913,7 +913,7 @@ app.put("/api/requirements/:requirementGroupId/set-release", (req, res) => {
     const { release_id } = req.body;
 
     const sql = `UPDATE activities SET release_id = ? WHERE requirementGroupId = ?`;
-    db.run(sql, [release_id, groupId], function(err) {
+    db.run(sql, [release_id, groupId], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error while updating release." });
         }
@@ -937,21 +937,21 @@ app.delete("/api/requirements/:requirementGroupId", (req, res) => {
         db.run("BEGIN TRANSACTION");
 
         const deleteChangesSql = "DELETE FROM requirement_changes WHERE requirement_group_id = ?";
-        db.run(deleteChangesSql, [groupId], function(deleteChangesErr) {
+        db.run(deleteChangesSql, [groupId], function (deleteChangesErr) {
             if (deleteChangesErr) {
                 db.run("ROLLBACK");
                 return res.status(400).json({ error: deleteChangesErr.message });
             }
 
             const deleteLinksSql = "DELETE FROM defect_requirement_links WHERE requirement_group_id = ?";
-            db.run(deleteLinksSql, [groupId], function(deleteLinksErr) {
+            db.run(deleteLinksSql, [groupId], function (deleteLinksErr) {
                 if (deleteLinksErr) {
                     db.run("ROLLBACK");
                     return res.status(400).json({ error: deleteLinksErr.message });
                 }
 
                 const deleteActivitiesSql = "DELETE FROM activities WHERE requirementGroupId = ?";
-                db.run(deleteActivitiesSql, [groupId], function(deleteActivitiesErr) {
+                db.run(deleteActivitiesSql, [groupId], function (deleteActivitiesErr) {
                     if (deleteActivitiesErr) {
                         db.run("ROLLBACK");
                         return res.status(400).json({ error: deleteActivitiesErr.message });
@@ -989,7 +989,7 @@ app.post('/api/import/validate', upload.single('file'), async (req, res) => {
 
             const existingKeys = new Set(existingRows.map(r => r.key).filter(Boolean));
             const existingNames = new Set(existingRows.map(r => r.requirementUserIdentifier));
-            
+
             const duplicates = validRows.filter(row => (row.key && existingKeys.has(row.key)) || existingNames.has(row.title));
             const newItems = validRows.filter(row => (!row.key || !existingKeys.has(row.key)) && !existingNames.has(row.title));
 
@@ -1011,7 +1011,7 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
     const { project, sprint, release_id, importMode } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
     if (!project || !sprint) return res.status(400).json({ error: 'Project and Sprint are required.' });
-    
+
     try {
         const projectId = await getProjectId(project);
         const finalReleaseId = release_id || null;
@@ -1022,7 +1022,7 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
         const getExistingDataSql = `SELECT key, requirementUserIdentifier FROM activities WHERE project_id = ?`;
         db.all(getExistingDataSql, [projectId], (err, existingRows) => {
             if (err) return res.status(500).json({ error: "Failed to check for existing requirements." });
-            
+
             const existingKeys = new Set(existingRows.map(r => r.key).filter(Boolean));
             const existingNames = new Set(existingRows.map(r => r.requirementUserIdentifier));
 
@@ -1063,12 +1063,12 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
                 db.run("BEGIN TRANSACTION");
                 const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
                                    VALUES (?, ?, 'To Do', ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`;
-                
+
                 let completedInserts = 0;
                 let successfulInserts = 0;
 
                 itemsToImport.forEach(item => {
-                    db.run(insertSql, [projectId, item.title, statusDate, sprint, item.link, item.type, item.tags, item.key, finalReleaseId, now, now], function(err) {
+                    db.run(insertSql, [projectId, item.title, statusDate, sprint, item.link, item.type, item.tags, item.key, finalReleaseId, now, now], function (err) {
                         if (err) {
                             console.error("Error inserting imported activity:", err.message);
                         } else {
@@ -1078,13 +1078,13 @@ app.post('/api/import/requirements', upload.single('file'), async (req, res) => 
                         }
                         completedInserts++;
                         if (completedInserts === itemsToImport.length) {
-                             db.run("COMMIT", (commitErr) => {
+                            db.run("COMMIT", (commitErr) => {
                                 if (commitErr) return res.status(500).json({ error: "Failed to commit imported data: " + commitErr.message });
-                                
+
                                 let messageParts = [`Import complete. Imported: ${successfulInserts}`];
                                 if (renamedCount > 0) messageParts.push(`Renamed ${renamedCount} duplicate(s)`);
                                 if (skippedCount > 0) messageParts.push(`Skipped: ${skippedCount}`);
-                                
+
                                 scheduleQdrantSync();
                                 res.status(201).json({
                                     message: messageParts.join('. ') + '.',
@@ -1115,7 +1115,7 @@ app.post('/api/import/defects/validate', upload.single('file'), async (req, res)
             if (err) return res.status(500).json({ error: "Failed to check for existing defects." });
 
             const existingLinks = new Set(existingRows.map(r => r.link));
-            
+
             const duplicates = validRows.filter(row => row.link && existingLinks.has(row.link));
             const newItems = validRows.filter(row => !row.link || !existingLinks.has(row.link));
 
@@ -1150,7 +1150,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
             const existingLinks = new Set(existingRows.map(r => r.link).filter(Boolean));
             const existingTitles = new Set(existingRows.map(r => r.title));
             let renamedCount = 0;
-            
+
             let itemsToImport;
 
             if (importMode === 'new_only') {
@@ -1183,7 +1183,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                 db.run("BEGIN TRANSACTION");
                 const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date, is_fat_defect, created_at, updated_at, fixed_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
-                
+
                 let completedInserts = 0;
                 let successfulInserts = 0;
 
@@ -1202,7 +1202,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
 
                     const createdDateToUse = item.createdDate || now;
 
-                    db.run(insertDefectSql, [projectId, item.title, null, defaultArea, defaultStatus, item.link, createdDateToUse, 0, createdDateToUse, now, fixedDate], function(err) {
+                    db.run(insertDefectSql, [projectId, item.title, null, defaultArea, defaultStatus, item.link, createdDateToUse, 0, createdDateToUse, now, fixedDate], function (err) {
                         if (err) {
                             console.error("Error inserting imported defect:", err.message);
                         } else {
@@ -1243,9 +1243,9 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                         }
                         completedInserts++;
                         if (completedInserts === itemsToImport.length) {
-                             db.run("COMMIT", (commitErr) => {
+                            db.run("COMMIT", (commitErr) => {
                                 if (commitErr) return res.status(500).json({ error: "Failed to commit imported defects: " + commitErr.message });
-                                
+
                                 let message = `Import complete. Imported: ${successfulInserts}`;
                                 if (renamedCount > 0) message += `. Renamed ${renamedCount} duplicate(s)`;
                                 if (skippedCount > 0) message += `. Skipped: ${skippedCount}`;
@@ -1291,7 +1291,7 @@ app.post("/api/notes", async (req, res) => {
         const trimmedNoteText = noteText.trim();
         if (trimmedNoteText === "") {
             const deleteSql = "DELETE FROM notes WHERE project_id = ? AND noteDate = ?";
-            db.run(deleteSql, [projectId, noteDate], function(err) {
+            db.run(deleteSql, [projectId, noteDate], function (err) {
                 if (err) return res.status(400).json({ error: err.message });
                 if (this.changes > 0) {
                     scheduleQdrantSync();
@@ -1303,7 +1303,7 @@ app.post("/api/notes", async (req, res) => {
         } else {
             const upsertSql = `INSERT INTO notes (project_id, noteDate, noteText) VALUES (?, ?, ?)
                                ON CONFLICT(project_id, noteDate) DO UPDATE SET noteText = excluded.noteText;`;
-            db.run(upsertSql, [projectId, noteDate, trimmedNoteText], function(err) {
+            db.run(upsertSql, [projectId, noteDate, trimmedNoteText], function (err) {
                 if (err) return res.status(400).json({ error: err.message });
                 scheduleQdrantSync();
                 res.json({ message: "Note saved successfully.", action: "saved", data: { project, noteDate, noteText: trimmedNoteText } });
@@ -1358,9 +1358,9 @@ app.post("/api/retrospective", async (req, res) => {
     }
     try {
         const projectId = await getProjectId(project.trim());
-        column_type = column_type.trim(); 
-        description = description.trim(); 
-        details = details.trim(); 
+        column_type = column_type.trim();
+        description = description.trim();
+        details = details.trim();
         item_date = item_date.trim();
         const sql = `INSERT INTO retrospective_items (project_id, column_type, description, details, item_date) VALUES (?,?,?,?,?)`;
         db.run(sql, [projectId, column_type, description, details, item_date], function (err) {
@@ -1389,7 +1389,7 @@ app.put("/api/retrospective/:id", (req, res) => {
     const sql = `UPDATE retrospective_items SET ${setClauses.join(", ")} WHERE id = ?`;
     db.run(sql, params, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
-        if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.`});
+        if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.` });
         scheduleQdrantSync();
         res.json({ message: "success", data: { id: itemId, changes: this.changes } });
     });
@@ -1400,7 +1400,7 @@ app.delete("/api/retrospective/:id", (req, res) => {
     const sql = 'DELETE FROM retrospective_items WHERE id = ?';
     db.run(sql, itemId, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
-        if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.`});
+        if (this.changes === 0) return res.status(404).json({ error: `Item ${itemId} not found.` });
         scheduleQdrantSync();
         res.json({ message: "deleted", changes: this.changes });
     });
@@ -1431,7 +1431,7 @@ app.get("/api/releases/:project", async (req, res) => {
 
         db.all(sql, [projectId], (err, rows) => {
             if (err) return res.status(400).json({ "error": err.message });
-            
+
             const data = rows.map(row => {
                 let fat_execution_report = null;
                 if (row.passed !== null) {
@@ -1474,7 +1474,7 @@ app.post("/api/releases", async (req, res) => {
             }
 
             const releaseSql = `INSERT INTO releases (project_id, name, release_date, is_current) VALUES (?, ?, ?, ?)`;
-            db.run(releaseSql, [projectId, name, release_date, is_current ? 1 : 0], function(err) {
+            db.run(releaseSql, [projectId, name, release_date, is_current ? 1 : 0], function (err) {
                 if (err) {
                     db.run("ROLLBACK");
                     if (err.message.includes("UNIQUE constraint failed")) {
@@ -1527,7 +1527,7 @@ app.put("/api/releases/:id", (req, res) => {
             }
 
             const updateReleaseSql = `UPDATE releases SET name = ?, release_date = ?, is_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-            db.run(updateReleaseSql, [name, release_date, is_current ? 1 : 0, releaseId], function(updateErr) {
+            db.run(updateReleaseSql, [name, release_date, is_current ? 1 : 0, releaseId], function (updateErr) {
                 if (updateErr) {
                     db.run("ROLLBACK");
                     if (updateErr.message.includes("UNIQUE constraint failed")) {
@@ -1603,9 +1603,9 @@ app.delete("/api/releases/:id", (req, res) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            
-            db.run('DELETE FROM releases WHERE id = ?', releaseId, function(deleteErr) { 
-                if (deleteErr) { db.run("ROLLBACK"); return res.status(400).json({ "error": deleteErr.message }); } 
+
+            db.run('DELETE FROM releases WHERE id = ?', releaseId, function (deleteErr) {
+                if (deleteErr) { db.run("ROLLBACK"); return res.status(400).json({ "error": deleteErr.message }); }
                 if (this.changes === 0) { db.run("ROLLBACK"); return res.status(404).json({ error: `Release with id ${releaseId} not found.` }); }
 
                 const noteTextToRemove = `release date: ${releaseToDelete.name}`;
@@ -1633,7 +1633,7 @@ app.delete("/api/releases/:id", (req, res) => {
 
 app.post("/api/releases/:id/close", async (req, res) => {
     const releaseId = req.params.id;
-    const { closeAction } = req.body; 
+    const { closeAction } = req.body;
 
     if (!['archive_only', 'archive_and_complete'].includes(closeAction)) {
         return res.status(400).json({ error: "Invalid closeAction specified." });
@@ -1675,18 +1675,18 @@ app.post("/api/releases/:id/close", async (req, res) => {
                         INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
                         VALUES (?, ?, ?, ?, ?, ?)
                     `;
-                    db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function(err) {
+                    db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function (err) {
                         if (err) {
                             db.run("ROLLBACK");
                             return res.status(500).json({ error: "Failed to create archive record." });
                         }
-                        
+
                         const archiveId = this.lastID;
                         const archiveItemsSql = `
                             INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status)
                             VALUES (?, ?, ?, ?)
                         `;
-                        
+
                         let itemsProcessed = 0;
                         if (allItems.length === 0) {
                             finalizeProcess(archiveId);
@@ -1738,7 +1738,7 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                         const now = new Date().toISOString();
                                         const statusDate = now.split('T')[0];
                                         const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
-                                        
+
                                         const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id, parent_id)
                                                                    VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, ?)`;
                                         const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
@@ -1748,14 +1748,14 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                             commitTransaction();
                                         } else {
                                             allItems.forEach(req => {
-                                                db.run(updateOldSql, [req.requirementGroupId], function(err) {
+                                                db.run(updateOldSql, [req.requirementGroupId], function (err) {
                                                     if (err) {
                                                         db.run("ROLLBACK");
                                                         if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                                         return;
                                                     }
                                                     const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                    db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function(err) {
+                                                    db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function (err) {
                                                         if (err) {
                                                             db.run("ROLLBACK");
                                                             if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
@@ -1830,7 +1830,7 @@ app.get("/api/archives/:project", async (req, res) => {
                         not_run: row.fat_not_run
                     };
                 }
-                
+
                 try {
                     return {
                         id: row.id,
@@ -1880,7 +1880,7 @@ app.post("/api/archives/:id/complete", async (req, res) => {
 
         db.get("SELECT * FROM releases WHERE id = ?", [archive.original_release_id], (err, release) => {
             if (err) return res.status(500).json({ error: "DB error fetching original release info." });
-            
+
             const projectName = release ? release.name : archive.name;
             const projectId = release ? release.project_id : archive.project_id;
 
@@ -1894,7 +1894,7 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                     const now = new Date().toISOString();
                     const statusDate = now.split('T')[0];
                     const newSprintName = `Archived_from_${projectName.replace(/\s/g, '_')}`;
-                    
+
                     const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id)
                                                VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)`;
                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
@@ -1909,14 +1909,14 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                                 const lastType = currentActivity ? currentActivity.type : null;
                                 const lastTags = currentActivity ? currentActivity.tags : null;
 
-                                db.run(updateOldSql, [item.requirement_group_id], function(err) {
+                                db.run(updateOldSql, [item.requirement_group_id], function (err) {
                                     if (err) {
                                         db.run("ROLLBACK");
                                         if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                         return;
                                     }
                                     const comment = `Item completed as part of completing archived release '${projectName}'`;
-                                    db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, lastLink, lastType, lastTags, now, now], function(err) {
+                                    db.run(insertActivitySql, [item.requirement_group_id, projectId, item.requirement_title, statusDate, comment, newSprintName, lastLink, lastType, lastTags, now, now], function (err) {
                                         if (err) {
                                             db.run("ROLLBACK");
                                             if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
@@ -1940,7 +1940,7 @@ app.post("/api/archives/:id/complete", async (req, res) => {
                                 if (!res.headersSent) res.status(500).json({ error: "Failed to update archive record." });
                                 return;
                             }
-                            
+
                             db.run("COMMIT", (err) => {
                                 if (err) {
                                     if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
@@ -1972,7 +1972,7 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
 
     if (total === 0) {
         const deleteSql = `DELETE FROM sat_reports WHERE archive_id = ?`;
-        db.run(deleteSql, [archiveId], function(err) {
+        db.run(deleteSql, [archiveId], function (err) {
             if (err) {
                 return res.status(500).json({ error: "Database error clearing SAT report: " + err.message });
             }
@@ -1998,7 +1998,7 @@ app.post("/api/archives/:archiveId/sat-report", (req, res) => {
             created_at = CURRENT_TIMESTAMP;
     `;
 
-    db.run(sql, [archiveId, ...numericValues], function(err) {
+    db.run(sql, [archiveId, ...numericValues], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error saving SAT report: " + err.message });
         }
@@ -2041,11 +2041,11 @@ app.post("/api/archives/:archiveId/sat-bugs", (req, res) => {
             }
         }
     }
-    
+
     const finalLabel = label && label.trim() !== '' ? label.trim() : null;
 
     const sql = `INSERT INTO sat_bugs (archive_id, title, link, estimation, label) VALUES (?, ?, ?, ?, ?)`;
-    db.run(sql, [archiveId, title.trim(), link.trim(), estimationInHours, finalLabel], function(err) {
+    db.run(sql, [archiveId, title.trim(), link.trim(), estimationInHours, finalLabel], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error saving SAT bug: " + err.message });
         }
@@ -2075,11 +2075,11 @@ app.put("/api/archives/sat-bugs/:bugId", (req, res) => {
             }
         }
     }
-    
+
     const finalLabel = label && label.trim() !== '' ? label.trim() : null;
 
     const sql = `UPDATE sat_bugs SET title = ?, link = ?, estimation = ?, label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-    db.run(sql, [title.trim(), link.trim(), estimationInHours, finalLabel, bugId], function(err) {
+    db.run(sql, [title.trim(), link.trim(), estimationInHours, finalLabel, bugId], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error updating SAT bug: " + err.message });
         }
@@ -2093,7 +2093,7 @@ app.put("/api/archives/sat-bugs/:bugId", (req, res) => {
 app.delete("/api/archives/sat-bugs/:bugId", (req, res) => {
     const bugId = req.params.bugId;
     const sql = 'DELETE FROM sat_bugs WHERE id = ?';
-    db.run(sql, [bugId], function(err) {
+    db.run(sql, [bugId], function (err) {
         if (err) {
             return res.status(500).json({ error: "Database error deleting SAT bug: " + err.message });
         }
@@ -2110,14 +2110,14 @@ app.delete("/api/archives/:id", (req, res) => {
         db.run("BEGIN TRANSACTION");
 
         const deleteItemsSql = "DELETE FROM archived_release_items WHERE archive_id = ?";
-        db.run(deleteItemsSql, [archiveId], function(err) {
+        db.run(deleteItemsSql, [archiveId], function (err) {
             if (err) {
                 db.run("ROLLBACK");
                 return res.status(400).json({ error: err.message });
             }
 
             const deleteArchiveSql = "DELETE FROM archived_releases WHERE id = ?";
-            db.run(deleteArchiveSql, [archiveId], function(err) {
+            db.run(deleteArchiveSql, [archiveId], function (err) {
                 if (err) {
                     db.run("ROLLBACK");
                     return res.status(400).json({ error: err.message });
@@ -2178,7 +2178,7 @@ app.get("/api/releases/:project/selectable", async (req, res) => {
 
         db.all(activeSql, [projectId], (err, activeRows) => {
             if (err) return res.status(500).json({ error: "DB error fetching selectable releases." });
-            
+
             const selectableReleases = activeRows.map(r => ({ ...r, type: 'active' }));
             res.json({ message: "success", data: selectableReleases });
         });
@@ -2192,7 +2192,7 @@ app.delete("/api/fat/:fat_period_id", (req, res) => {
     const sql = 'DELETE FROM fat_periods WHERE id = ?';
     db.run(sql, [fatPeriodId], function (err) {
         if (err) return res.status(500).json({ error: "DB error deleting FAT period: " + err.message });
-        if (this.changes === 0) return res.status(404).json({ error: `FAT period with id ${fatPeriodId} not found.`});
+        if (this.changes === 0) return res.status(404).json({ error: `FAT period with id ${fatPeriodId} not found.` });
         res.json({ message: "FAT period successfully deleted.", changes: this.changes });
     });
 });
@@ -2253,7 +2253,7 @@ app.get("/api/fat/:project", async (req, res) => {
 });
 
 app.post("/api/fat/:project", async (req, res) => {
-    const { start_date, release_id } = req.body; 
+    const { start_date, release_id } = req.body;
     if (!start_date || !release_id) {
         return res.status(400).json({ error: "Start date and a selected release are required." });
     }
@@ -2269,8 +2269,8 @@ app.post("/api/fat/:project", async (req, res) => {
             const dt = new Date(`${start_date}T12:00:00Z`);
             const athensOffsetString = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Athens', timeZoneName: 'longOffset' }).format(dt);
             const offsetMatch = athensOffsetString.match(/GMT([+-]\d{2}:\d{2})/);
-            const offset = offsetMatch ? offsetMatch[1] : "+02:00"; 
-            
+            const offset = offsetMatch ? offsetMatch[1] : "+02:00";
+
             const startDateUTC = new Date(`${start_date}T09:00:00${offset}`).toISOString();
 
             db.get("SELECT name FROM releases WHERE id = ?", [release_id], (nameErr, release) => {
@@ -2281,22 +2281,22 @@ app.post("/api/fat/:project", async (req, res) => {
                 db.serialize(() => {
                     db.run("BEGIN TRANSACTION");
                     const insertPeriodSql = `INSERT INTO fat_periods (project_id, start_date) VALUES (?, ?)`;
-                    db.run(insertPeriodSql, [projectId, startDateUTC], function(err) {
+                    db.run(insertPeriodSql, [projectId, startDateUTC], function (err) {
                         if (err) {
                             db.run("ROLLBACK");
                             return res.status(500).json({ error: "Failed to create FAT period." });
                         }
                         const fatPeriodId = this.lastID;
                         const insertReleaseSql = `INSERT INTO fat_selected_releases (fat_period_id, release_id, archived_release_id, release_name, release_type) VALUES (?, ?, ?, ?, ?)`;
-                        
+
                         db.run(insertReleaseSql, [fatPeriodId, release_id, null, release.name, 'active'], (insertErr) => {
                             if (insertErr) {
                                 db.run("ROLLBACK");
                                 return res.status(500).json({ error: "Failed to link release to FAT period." });
                             }
-                            
+
                             db.run("COMMIT", (commitErr) => {
-                                if(commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
+                                if (commitErr) return res.status(500).json({ error: "Failed to commit transaction." });
                                 res.status(201).json({ message: "FAT period started successfully.", data: { id: fatPeriodId } });
                             });
                         });
@@ -2311,7 +2311,7 @@ app.post("/api/fat/:project", async (req, res) => {
 
 app.get("/api/fat/details/:fat_period_id", (req, res) => {
     const fatPeriodId = req.params.fat_period_id;
-    
+
     const getSelectedReleasesSql = `SELECT release_id, archived_release_id, release_type FROM fat_selected_releases WHERE fat_period_id = ?`;
 
     db.all(getSelectedReleasesSql, [fatPeriodId], async (err, selectedReleases) => {
@@ -2393,7 +2393,7 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                 }
 
                 const sql = `UPDATE fat_periods SET status = 'completed', completion_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'active'`;
-                db.run(sql, [completionDate, fatPeriodId], function(err) {
+                db.run(sql, [completionDate, fatPeriodId], function (err) {
                     if (err) {
                         db.run("ROLLBACK");
                         return res.status(500).json({ error: "DB error completing FAT period." });
@@ -2402,7 +2402,7 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                         db.run("ROLLBACK");
                         return res.status(404).json({ error: "Active FAT period not found or already completed." });
                     }
-                    
+
                     db.get("SELECT project_id, start_date FROM fat_periods WHERE id = ?", [fatPeriodId], (err, fatPeriod) => {
                         if (err || !fatPeriod) {
                             db.run("ROLLBACK");
@@ -2422,7 +2422,7 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                             WHERE project_id = ? AND is_fat_defect = 1 AND created_at >= ? AND created_at <= ?
                         `;
                         const fatDefectsParams = [fatPeriod.project_id, fatPeriod.start_date, completionDate];
-                        
+
                         db.all(fatDefectsSql, fatDefectsParams, (err, fatDefects) => {
                             if (err) {
                                 db.run("ROLLBACK");
@@ -2480,11 +2480,11 @@ app.put("/api/fat/:fat_period_id/complete", (req, res) => {
                                                         fixedDate = normalizeToUTCDate(historyItem.changed_at);
                                                         break;
                                                     }
-                                                } catch (e) {}
+                                                } catch (e) { }
                                             }
                                         }
                                     }
-                                    
+
                                     if (fixedDate && defectCreatedAt) {
                                         if (fixedDate > defectCreatedAt) {
                                             totalRepairHours += calculateBusinessHours(defectCreatedAt, fixedDate);
@@ -2568,7 +2568,7 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
                 message: "No FAT defects found to calculate KPIs."
             });
         }
-        
+
         const defectIds = fatDefects.map(d => d.id);
         const historyRecords = await new Promise((resolve, reject) => {
             const sql = `SELECT * FROM defect_history WHERE defect_id IN (${defectIds.join(',')}) ORDER BY changed_at ASC`;
@@ -2614,13 +2614,13 @@ app.get("/api/fat/:fat_period_id/kpis", async (req, res) => {
                             const changes = JSON.parse(historyItem.changes_summary);
                             if (changes.status && (changes.status.new === 'Done' || changes.status.new === 'Closed')) {
                                 fixedDate = normalizeToUTCDate(historyItem.changed_at);
-                                break; 
+                                break;
                             }
                         } catch (e) { }
                     }
                 }
             }
-            
+
             if (fixedDate && defectCreatedAt) {
                 if (fixedDate > defectCreatedAt) {
                     totalRepairHours += calculateBusinessHours(defectCreatedAt, fixedDate);
@@ -2659,7 +2659,7 @@ app.post("/api/fat/:fat_period_id/report", async (req, res) => {
 
     if (totalFromUser === 0) {
         const deleteSql = `DELETE FROM fat_reports WHERE fat_period_id = ?`;
-        db.run(deleteSql, [fatPeriodId], function(err) {
+        db.run(deleteSql, [fatPeriodId], function (err) {
             if (err) return res.status(500).json({ error: "Database error clearing FAT report: " + err.message });
             return res.status(200).json({ message: "FAT report cleared successfully." });
         });
@@ -2668,7 +2668,7 @@ app.post("/api/fat/:fat_period_id/report", async (req, res) => {
 
     try {
         const totalRequirements = await getFatTotalRequirements(fatPeriodId);
-        
+
         if (totalFromUser !== totalRequirements) {
             return res.status(400).json({ error: `The sum of all fields must be exactly ${totalRequirements}. Current sum is ${totalFromUser}.` });
         }
@@ -2685,7 +2685,7 @@ app.post("/api/fat/:fat_period_id/report", async (req, res) => {
                 created_at = CURRENT_TIMESTAMP;
         `;
 
-        db.run(sql, [fatPeriodId, ...numericValues], function(err) {
+        db.run(sql, [fatPeriodId, ...numericValues], function (err) {
             if (err) return res.status(500).json({ error: "Database error saving FAT report: " + err.message });
             res.status(201).json({ message: "FAT report saved successfully." });
         });
@@ -2747,7 +2747,7 @@ app.get("/api/defects/all", (req, res) => {
 
 // --- ΠΡΟΣΘΗΚΗ: Reorder Defects ---
 app.put("/api/defects/reorder", async (req, res) => {
-    const { orderedIds } = req.body; 
+    const { orderedIds } = req.body;
     if (!orderedIds || !Array.isArray(orderedIds)) return res.status(400).json({ error: "Invalid data format." });
 
     try {
@@ -2782,14 +2782,14 @@ app.get("/api/defects/:project", async (req, res) => {
     const statusType = req.query.statusType || 'active';
 
     try {
-            const projectId = await getProjectId(project);
-            let statusCondition = "d.status != 'Closed'";
-            let orderBy = "d.display_order ASC, d.created_at DESC"; 
-            
-            if (statusType === 'closed') {
-                statusCondition = "d.status = 'Closed'";
-                orderBy = "d.updated_at DESC";
-            }
+        const projectId = await getProjectId(project);
+        let statusCondition = "d.status != 'Closed'";
+        let orderBy = "d.display_order ASC, d.created_at DESC";
+
+        if (statusType === 'closed') {
+            statusCondition = "d.status = 'Closed'";
+            orderBy = "d.updated_at DESC";
+        }
 
         const defectsSql = `
             WITH LastComment AS (
@@ -2807,7 +2807,7 @@ app.get("/api/defects/:project", async (req, res) => {
             WHERE d.project_id = ? AND ${statusCondition}
             ORDER BY ${orderBy}
         `;
-        
+
         const linksSql = `SELECT l.defect_id, l.requirement_group_id, a.requirementUserIdentifier, a.sprint
                           FROM defect_requirement_links l
                           JOIN activities a ON l.requirement_group_id = a.requirementGroupId
@@ -2905,10 +2905,10 @@ app.put("/api/defects/history/:historyId", (req, res) => {
     }
 
     const sql = "UPDATE defect_history SET comment = ? WHERE id = ?";
-    db.run(sql, [comment, historyId], function(err) {
+    db.run(sql, [comment, historyId], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "History entry not found." });
-        
+
         scheduleQdrantSync();
         res.json({ message: "success", changes: this.changes });
     });
@@ -2919,14 +2919,14 @@ app.post("/api/defects", async (req, res) => {
     if (!project || !title || !area || !status || !created_date) {
         return res.status(400).json({ error: "Missing required fields" });
     }
-    
+
     try {
         const projectId = await getProjectId(project.trim());
         title = title.trim(); area = area.trim(); status = status.trim();
-        
+
         const createdAtTimestamp = new Date(created_date).toISOString();
 
-        link = link ? link.trim() : null; 
+        link = link ? link.trim() : null;
         description = description ? description.trim() : null;
         comment = comment ? comment.trim() : null;
         const isFatDefect = is_fat_defect ? 1 : 0;
@@ -2939,18 +2939,18 @@ app.post("/api/defects", async (req, res) => {
 
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
-            
+
             const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded, real_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
-            
+
             const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded, real_time || null];
-            
-            db.run(insertDefectSql, defectParams, function(err) {
+
+            db.run(insertDefectSql, defectParams, function (err) {
                 if (err) {
                     db.run("ROLLBACK");
                     return res.status(400).json({ "error": err.message });
                 }
                 const defectId = this.lastID;
-                
+
                 if (linkedRequirementGroupIds && linkedRequirementGroupIds.length > 0) {
                     const linkInsertSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
                     linkedRequirementGroupIds.forEach(reqId => {
@@ -3016,9 +3016,9 @@ app.put("/api/defects/:id", async (req, res) => {
         let updates = [];
         let updateParamsList = [];
         let changedFieldsForSummary = {};
-        
+
         const addChange = (field, newValue, oldValue) => {
-            if (newValue === undefined) return; 
+            if (newValue === undefined) return;
             const normalizedNewValue = (newValue === null) ? null : String(newValue).trim();
             const normalizedOldValue = (oldValue === undefined || oldValue === null) ? null : String(oldValue).trim();
             if (normalizedNewValue !== normalizedOldValue) {
@@ -3032,7 +3032,7 @@ app.put("/api/defects/:id", async (req, res) => {
         addChange("description", description, currentDefect.description);
         addChange("area", area, currentDefect.area);
         addChange("real_time", real_time, currentDefect.real_time);
-        
+
         let targetFixedDate = currentDefect.fixed_date;
         let fixedDateProvided = false;
 
@@ -3042,7 +3042,7 @@ app.put("/api/defects/:id", async (req, res) => {
         }
 
         if (status !== undefined && status !== currentDefect.status) {
-            addChange("status", status, currentDefect.status); 
+            addChange("status", status, currentDefect.status);
             if (status === 'Done' || status === 'Closed') {
                 if (!fixedDateProvided || targetFixedDate === null) {
                     targetFixedDate = new Date().toISOString();
@@ -3054,7 +3054,7 @@ app.put("/api/defects/:id", async (req, res) => {
 
         const normalizedTarget = (targetFixedDate === null) ? null : String(targetFixedDate).trim();
         const normalizedCurrent = (currentDefect.fixed_date === null) ? null : String(currentDefect.fixed_date).trim();
-        
+
         if (normalizedTarget !== normalizedCurrent) {
             updates.push(`fixed_date = ?`);
             updateParamsList.push(normalizedTarget);
@@ -3063,20 +3063,20 @@ app.put("/api/defects/:id", async (req, res) => {
 
         addChange("link", link, currentDefect.link);
 
-        const isDragEvent = (status !== undefined && status !== currentDefect.status) || 
-                            (display_order !== undefined && display_order !== currentDefect.display_order);
+        const isDragEvent = (status !== undefined && status !== currentDefect.status) ||
+            (display_order !== undefined && display_order !== currentDefect.display_order);
 
         if (is_expanded !== undefined) {
             let expandedInt = (is_expanded === true || is_expanded === 'true' || is_expanded === 1 || is_expanded === '1') ? 1 : 0;
             if (isDragEvent) expandedInt = currentDefect.is_expanded !== null ? currentDefect.is_expanded : 1;
-            
+
             if (expandedInt !== currentDefect.is_expanded) {
                 updates.push(`is_expanded = ?`);
                 updateParamsList.push(expandedInt);
                 changedFieldsForSummary['is_expanded'] = { old: currentDefect.is_expanded, new: expandedInt };
             }
         }
-        
+
         if (display_order !== undefined && display_order !== currentDefect.display_order) {
             updates.push(`display_order = ?`);
             updateParamsList.push(display_order);
@@ -3100,7 +3100,7 @@ app.put("/api/defects/:id", async (req, res) => {
 
         const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
         const hasComment = comment && comment.trim() !== "";
-        
+
         if (!hasFieldChanges && !hasComment && !linksChanged) {
             return res.json({ message: "No changes detected.", defectId: defectId });
         }
@@ -3123,8 +3123,8 @@ app.put("/api/defects/:id", async (req, res) => {
 
         if (hasRealHistoryChanges || historyComment) {
             const changesSummaryString = hasRealHistoryChanges ? JSON.stringify(historyFields) : null;
-            await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`, 
-                        [defectId, changesSummaryString, historyComment, new Date().toISOString()]);
+            await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`,
+                [defectId, changesSummaryString, historyComment, new Date().toISOString()]);
         }
 
         if (hasFieldChanges) {
@@ -3149,7 +3149,7 @@ app.delete("/api/defects/:id", (req, res) => {
     const sql = 'DELETE FROM defects WHERE id = ?';
     db.run(sql, defectId, function (err) {
         if (err) return res.status(400).json({ "error": err.message });
-        if (this.changes === 0) return res.status(404).json({ error: `Defect with id ${defectId} not found.`});
+        if (this.changes === 0) return res.status(404).json({ error: `Defect with id ${defectId} not found.` });
         scheduleQdrantSync();
         res.json({ message: "Defect deleted successfully", changes: this.changes });
     });
@@ -3170,7 +3170,7 @@ app.post("/api/settings/weather-location", (req, res) => {
     }
     const sql = `INSERT INTO app_settings (key, value) VALUES ('weather_location', ?)
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value;`;
-    db.run(sql, [location.trim()], function(err) {
+    db.run(sql, [location.trim()], function (err) {
         if (err) {
             return res.status(500).json({ "error": err.message });
         }
@@ -3208,7 +3208,7 @@ app.get('/api/jira/config/:project', async (req, res) => {
             res.json({ jql: row ? row.jql_query : '' });
         });
     } catch (error) {
-        res.json({ jql: '' }); 
+        res.json({ jql: '' });
     }
 });
 
@@ -3237,7 +3237,7 @@ app.post('/api/jira/fetch', async (req, res) => {
                 db.run(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('jira_token', ?)`, [token], () => resolve());
             });
         }
-        
+
         const projectRow = await new Promise((resolve) => {
             db.get("SELECT id FROM projects WHERE name = ?", [project], (err, row) => resolve(row));
         });
@@ -3245,7 +3245,7 @@ app.post('/api/jira/fetch', async (req, res) => {
             db.run(`INSERT OR REPLACE INTO jira_project_configs (project_id, jql_query) VALUES (?, ?)`, [projectRow.id, jql]);
         }
 
-        const jiraDomain = JIRA_BASE_URL; 
+        const jiraDomain = JIRA_BASE_URL;
         const searchUrl = `${jiraDomain}/rest/api/2/search`;
 
         // Ζητάμε και το 'parent' και το 'subtasks' για να χτίσουμε το δέντρο
@@ -3257,7 +3257,7 @@ app.post('/api/jira/fetch', async (req, res) => {
             },
             body: JSON.stringify({
                 jql: jql,
-                maxResults: 1000, 
+                maxResults: 1000,
                 fields: ["summary", "status", "issuetype", "created", "parent", "subtasks", "issuelinks"],
                 expand: ["changelog"]
             })
@@ -3280,12 +3280,12 @@ app.post('/api/jira/fetch', async (req, res) => {
         issues.forEach(issue => {
             const type = issue.fields.issuetype.name ? issue.fields.issuetype.name.trim() : "Unknown";
             const isSubtask = issue.fields.issuetype.subtask || !!issue.fields.parent;
-            
+
             // Αν ΔΕΝ είναι στα επιτρεπόμενα ΚΑΙ ΔΕΝ είναι subtask, το αγνοούμε
             if (!VALID_REQUIREMENT_TYPES.includes(type) && !isSubtask) {
                 return;
             }
-            
+
             const itemData = {
                 key: issue.key,
                 summary: issue.fields.summary ? issue.fields.summary.trim() : "No Summary",
@@ -3293,7 +3293,7 @@ app.post('/api/jira/fetch', async (req, res) => {
                 status: issue.fields.status ? issue.fields.status.name.trim() : "To Do",
                 created: issue.fields.created,
                 link: `${jiraDomain}/browse/${issue.key}`,
-                rawIssue: issue 
+                rawIssue: issue
             };
 
             if (isSubtask) {
@@ -3328,13 +3328,13 @@ app.post('/api/jira/fetch', async (req, res) => {
                     // 2. Αν υπάρχει ήδη από κάποιο ανεξάρτητο subtask, κάνουμε merge για να μην χάσουμε τίποτα
                     const existing = parentsMap.get(issue.key);
                     const mergedSubtasks = [...existing.subtasks];
-                    
+
                     embeddedSubtasks.forEach(es => {
                         if (!mergedSubtasks.some(s => s.key === es.key)) {
                             mergedSubtasks.push(es);
                         }
                     });
-                    
+
                     parentsMap.set(issue.key, { ...itemData, subtasks: mergedSubtasks });
                 } else {
                     // 3. Αν δεν υπάρχει, απλά βάζουμε τα embeddedSubtasks αντί για []
@@ -3346,7 +3346,7 @@ app.post('/api/jira/fetch', async (req, res) => {
         // Φιλτράρουμε τα placeholders (parents που δεν ήρθαν στο JQL αλλά ήρθαν τα subtasks τους)
         const finalHierarchy = Array.from(parentsMap.values()).filter(p => !p.isPlaceholder);
 
-        res.json({ 
+        res.json({
             message: "Fetched successfully",
             data: {
                 hierarchy: finalHierarchy,
@@ -3388,7 +3388,7 @@ app.post('/api/jira/import', async (req, res) => {
 
         const runQuery = (sql, params) => {
             return new Promise((resolve, reject) => {
-                db.run(sql, params, function(err) {
+                db.run(sql, params, function (err) {
                     if (err) reject(err);
                     else resolve(this.lastID);
                 });
@@ -3402,7 +3402,7 @@ app.post('/api/jira/import', async (req, res) => {
 
         const linkDefects = async (rawIssue, reqGroupId) => {
             if (!rawIssue || !rawIssue.fields || !rawIssue.fields.issuelinks) return;
-            
+
             const linkedKeys = [];
             rawIssue.fields.issuelinks.forEach(linkObj => {
                 if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
@@ -3414,10 +3414,10 @@ app.post('/api/jira/import', async (req, res) => {
                 if (validKeys.length > 0) {
                     const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
                     const likeParams = validKeys.map(k => `%${k}`);
-                    
+
                     const findDefectsSql = `SELECT id FROM defects WHERE project_id = ? AND (${likeConditions})`;
                     const matchedDefects = await dbAll(findDefectsSql, [projectId, ...likeParams]);
-                    
+
                     if (matchedDefects && matchedDefects.length > 0) {
                         for (const defect of matchedDefects) {
                             await runQuery(
@@ -3441,12 +3441,14 @@ app.post('/api/jira/import', async (req, res) => {
                 if (existingLinksMap.has(parentItem.link)) {
                     skipped++;
                     parentDbId = existingLinksMap.get(parentItem.link);
+                    // FIX: Ensure the type and key are correct in case it was created manually without them
+                    await runQuery(`UPDATE activities SET type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentItem.type, parentItem.key, parentDbId]);
                 } else {
                     let appStatus = 'To Do';
                     if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
 
                     parentDbId = await runQuery(insertSql, [
-                        projectId, parentItem.summary, parentItem.key, appStatus, statusDate, 
+                        projectId, parentItem.summary, parentItem.key, appStatus, statusDate,
                         sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
                     ]);
                     await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
@@ -3464,12 +3466,14 @@ app.post('/api/jira/import', async (req, res) => {
                         if (existingLinksMap.has(subtask.link)) {
                             skipped++;
                             subDbId = existingLinksMap.get(subtask.link);
+                            // FIX: Link the existing subtask to the parent and fix its type
+                            await runQuery(`UPDATE activities SET parent_id = ?, type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentDbId, subtask.type, subtask.key, subDbId]);
                         } else {
                             let subStatus = 'To Do';
                             if (DONE_STATUSES.includes(subtask.status.toUpperCase())) subStatus = 'Done';
 
                             subDbId = await runQuery(insertSql, [
-                                projectId, subtask.summary, subtask.key, subStatus, statusDate, 
+                                projectId, subtask.summary, subtask.key, subStatus, statusDate,
                                 sprint, subtask.type, subtask.link, now, now, release_id || null, parentDbId
                             ]);
                             await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [subDbId, subDbId]);
@@ -3484,8 +3488,8 @@ app.post('/api/jira/import', async (req, res) => {
 
             await runQuery("COMMIT", []);
             scheduleQdrantSync();
-            
-            res.json({ 
+
+            res.json({
                 message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Skipped/Updated links for ${skipped} existing.`,
                 data: { importedParents, importedSubtasks, skipped }
             });
@@ -3536,8 +3540,8 @@ app.post("/api/jira/config", async (req, res) => {
 async function fetchJiraIssues(jql, token) {
     let issues = [];
     let startAt = 0;
-    const maxResults = 50; 
-    let total = 1; 
+    const maxResults = 50;
+    let total = 1;
 
     while (startAt < total) {
         const response = await fetch(`${JIRA_BASE_URL}/rest/api/latest/search`, {
@@ -3563,7 +3567,7 @@ async function fetchJiraIssues(jql, token) {
         const data = await response.json();
         total = data.total;
         if (!data.issues || data.issues.length === 0) break;
-        
+
         issues = issues.concat(data.issues);
         startAt += data.issues.length;
     }
@@ -3571,11 +3575,11 @@ async function fetchJiraIssues(jql, token) {
 }
 
 app.post("/api/jira/import/requirements", async (req, res) => {
-    const { project, jql, release_id, sprint } = req.body; 
+    const { project, jql, release_id, sprint } = req.body;
 
     try {
         const projectId = await getProjectId(project);
-        
+
         const tokenRow = await dbGet("SELECT value FROM app_settings WHERE key = 'jira_token'");
         if (!tokenRow || !tokenRow.value) return res.status(400).json({ error: "Jira Token not found" });
         const token = tokenRow.value;
@@ -3583,7 +3587,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
         await dbRun("INSERT INTO jira_project_configs (project_id, jql_query) VALUES (?, ?) ON CONFLICT(project_id) DO UPDATE SET jql_query = excluded.jql_query", [projectId, jql]);
 
         const issues = await fetchJiraIssues(jql, token);
-        
+
         let imported = 0;
         let skipped = 0;
 
@@ -3598,7 +3602,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
         for (const issue of issues) {
             const key = issue.key;
             const link = `${JIRA_BASE_URL}/browse/${key}`;
-            
+
             const type = issue.fields.issuetype.name;
             const validTypes = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'];
             if (!validTypes.includes(type)) {
@@ -3614,7 +3618,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
             } else {
                 const title = issue.fields.summary;
                 const jiraStatus = issue.fields.status.name;
-                
+
                 let appStatus = 'To Do';
                 const lowerStatus = jiraStatus.toLowerCase();
                 if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
@@ -3622,9 +3626,9 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                 }
 
                 await dbRun(`INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`, 
-                             [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, release_id || null, now, now]);
-                
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`,
+                    [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, release_id || null, now, now]);
+
                 const row = await dbGet("SELECT last_insert_rowid() as id");
                 reqGroupId = row.id;
                 await dbRun("UPDATE activities SET requirementGroupId = ? WHERE id = ?", [reqGroupId, reqGroupId]);
@@ -3645,10 +3649,10 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                 if (validKeys.length > 0) {
                     const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
                     const likeParams = validKeys.map(k => `%${k}`);
-                    
+
                     const findDefectsSql = `SELECT id FROM defects WHERE project_id = ? AND (${likeConditions})`;
                     const matchedDefects = await dbAll(findDefectsSql, [projectId, ...likeParams]);
-                    
+
                     if (matchedDefects && matchedDefects.length > 0) {
                         for (const defect of matchedDefects) {
                             await dbRun(
@@ -3661,7 +3665,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                 }
             }
         }
-        
+
         scheduleQdrantSync();
         res.json({ message: `Imported ${imported} requirements. Skipped/Updated links for ${skipped}.` });
 
@@ -3674,7 +3678,7 @@ app.post("/api/jira/import/defects", async (req, res) => {
     const { project, jql } = req.body;
     try {
         const projectId = await getProjectId(project);
-        
+
         const tokenRow = await dbGet("SELECT value FROM app_settings WHERE key = 'jira_token'");
         if (!tokenRow || !tokenRow.value) return res.status(400).json({ error: "Jira Token not found" });
         const token = tokenRow.value;
@@ -3706,14 +3710,14 @@ app.post("/api/jira/import/defects", async (req, res) => {
             const title = issue.fields.summary;
             const jiraStatus = issue.fields.status.name;
             const issueCreatedDate = issue.fields.created ? new Date(issue.fields.created).toISOString() : now;
-            
+
             let appStatus = 'Assigned to Developer';
             let fixedDate = null;
 
             const lowerStatus = jiraStatus.toLowerCase();
             if (lowerStatus === 'done' || lowerStatus === 'closed' || lowerStatus === 'resolved') {
                 appStatus = 'Done';
-                
+
                 // Ψάχνουμε στο changelog/history του Jira πότε ακριβώς πήγε σε Done
                 if (issue.changelog && issue.changelog.histories) {
                     const sortedHistories = [...issue.changelog.histories].sort((a, b) => new Date(b.created) - new Date(a.created));
@@ -3728,7 +3732,7 @@ app.post("/api/jira/import/defects", async (req, res) => {
                         }
                     }
                 }
-                
+
                 // Αν για κάποιο λόγο δεν βρεθεί στο history, παίρνουμε το updated date του ticket
                 if (!fixedDate) {
                     fixedDate = issue.fields.updated ? new Date(issue.fields.updated).toISOString() : now;
@@ -3739,7 +3743,7 @@ app.post("/api/jira/import/defects", async (req, res) => {
             if (existingLinksMap.has(link)) {
                 skipped++;
                 defectId = existingLinksMap.get(link);
-                
+
                 if (appStatus === 'Done') {
                     // Αν στο Jira έκλεισε (Done/Resolved), ενημερώνουμε ΤΑ ΠΑΝΤΑ (Status και Fixed Date)
                     await dbRun(
@@ -3760,20 +3764,20 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 // Κάνουμε INSERT βάζοντας σωστό created_date από το Jira και fixed_date
                 await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at, fixed_date) 
                              VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?, ?)`,
-                             [projectId, title, description, appStatus, link, issueCreatedDate, now, now, fixedDate]);
-                
+                    [projectId, title, description, appStatus, link, issueCreatedDate, now, now, fixedDate]);
+
                 const row = await dbGet("SELECT last_insert_rowid() as id");
                 defectId = row.id;
 
                 const historySummary = JSON.stringify({ status: { old: null, new: appStatus }, title: { old: null, new: title } });
                 await dbRun(`INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, 'Imported from Jira', ?)`, [defectId, historySummary, now]);
-                
+
                 imported++;
             }
 
             // --- ΑΡΧΗ ΛΟΓΙΚΗΣ ΓΙΑ JIRA LINKS (Τρέχει και για νέα και για ήδη υπάρχοντα) ---
             const linkedKeys = [];
-            
+
             if (issue.fields.issuelinks && issue.fields.issuelinks.length > 0) {
                 issue.fields.issuelinks.forEach(linkObj => {
                     if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
@@ -3786,13 +3790,13 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 if (validKeys.length > 0) {
                     const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
                     const likeParams = validKeys.map(k => `%${k}`);
-                    
+
                     const findReqsSql = `SELECT requirementGroupId FROM activities WHERE isCurrent = 1 AND project_id = ? AND (${likeConditions})`;
                     const matchedReqs = await dbAll(findReqsSql, [projectId, ...likeParams]);
-                    
+
                     if (matchedReqs && matchedReqs.length > 0) {
                         const uniqueReqIds = [...new Set(matchedReqs.map(r => r.requirementGroupId))];
-                        
+
                         for (const reqId of uniqueReqIds) {
                             await dbRun(
                                 `INSERT OR IGNORE INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`,
@@ -3851,17 +3855,17 @@ app.get("/api/git/check-updates", async (req, res) => {
     const { exec } = require('child_process');
     const util = require('util');
     const promisifiedExec = util.promisify(exec);
-    
+
     try {
         const projectRoot = path.resolve(__dirname, '..'); // Προσαρμόζεις το path αν χρειάζεται
         // Κάνουμε fetch για να φέρουμε τις πληροφορίες από το remote
         await promisifiedExec('git fetch', { cwd: projectRoot });
         // Ελέγχουμε το status
         const { stdout } = await promisifiedExec('git status', { cwd: projectRoot });
-        
+
         // Ψάχνουμε αν το output λέει ότι είμαστε πίσω
         const match = stdout.match(/Your branch is behind .* by (\d+) commit/i);
-        
+
         if (match) {
             return res.json({ isBehind: true, commitsBehind: parseInt(match[1], 10) });
         }
@@ -3874,25 +3878,25 @@ app.get("/api/git/check-updates", async (req, res) => {
 });
 
 if (isChatbotEnabled) {
-  app.post("/api/chatbot/sync", syncWithQdrant(db));
-  app.post("/api/chatbot", handleChatbotQuery(db, getProjectId, PORT));
+    app.post("/api/chatbot/sync", syncWithQdrant(db));
+    app.post("/api/chatbot", handleChatbotQuery(db, getProjectId, PORT));
 } else {
-  const chatbotDisabledHandler = (req, res) => {
-    res.status(503).json({ 
-      error: "Chatbot functionality is currently disabled.",
-      reply: "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
-    });
-  };
-  app.post("/api/chatbot/sync", chatbotDisabledHandler);
-  app.post("/api/chatbot", chatbotDisabledHandler);
+    const chatbotDisabledHandler = (req, res) => {
+        res.status(503).json({
+            error: "Chatbot functionality is currently disabled.",
+            reply: "I'm sorry, my AI features are currently unavailable. Please check the server configuration."
+        });
+    };
+    app.post("/api/chatbot/sync", chatbotDisabledHandler);
+    app.post("/api/chatbot", chatbotDisabledHandler);
 }
 
 app.get("/api/meetings/today", (req, res) => {
     res.json({ message: "success", data: cachedTodayMeetings });
 });
 
-app.use(function(req, res){
-    res.status(404).json({"error": "Endpoint not found"});
+app.use(function (req, res) {
+    res.status(404).json({ "error": "Endpoint not found" });
 });
 
 app.listen(PORT, () => {
