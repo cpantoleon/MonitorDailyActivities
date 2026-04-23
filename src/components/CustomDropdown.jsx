@@ -136,7 +136,9 @@ const CustomDropdown = ({
           aria-expanded={isOpen}
           aria-labelledby={labelId}
         >
-          {options.find(opt => String(opt.value) === String(value))?.label || placeholder}
+          <span className="custom-dropdown-button-label">
+            {options.find(opt => String(opt.value) === String(value))?.label || placeholder}
+          </span>
         </button>
       )}
       {isOpen && ReactDOM.createPortal(
