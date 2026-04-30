@@ -8,6 +8,9 @@ export const GlobalProvider = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [globalProject, setGlobalProject] = useState(() => sessionStorage.getItem('globalProject') || '');
 
+  // Το state για το Multi-Release Mode
+  const [isMultiReleaseMode, setIsMultiReleaseMode] = useState(false);
+
   const defaultLayout = ['overview', 'weather', 'timeline', 'calendar', 'meetings', 'celebrations'];
   const [dashboardLayout, setDashboardLayout] = useState(() => {
     const saved = localStorage.getItem('dashboardLayout');
@@ -17,6 +20,18 @@ export const GlobalProvider = ({ children }) => {
   const [dashboardGridStyle, setDashboardGridStyle] = useState(() => {
     return localStorage.getItem('dashboardGridStyle') || 'layout-dense';
   });
+
+  // ΠΡΟΣΘΗΚΗ: Fetch τη ρύθμιση αυτόματα όταν ξεκινάει το app
+  useEffect(() => {
+    fetch('/api/settings/multi-release-mode')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.isEnabled !== undefined) {
+          setIsMultiReleaseMode(data.isEnabled);
+        }
+      })
+      .catch(err => console.error("Failed to fetch multi-release mode setting", err));
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -54,17 +69,19 @@ export const GlobalProvider = ({ children }) => {
   };
 
   return (
-    <GlobalContext.Provider value={{ 
-      theme, 
-      toggleTheme, 
-      globalProject, 
-      setGlobalProject, 
-      sidebarCollapsed, 
+    <GlobalContext.Provider value={{
+      theme,
+      toggleTheme,
+      globalProject,
+      setGlobalProject,
+      sidebarCollapsed,
       toggleSidebar,
-      dashboardLayout, 
+      dashboardLayout,
       setDashboardLayout,
       dashboardGridStyle,
-      setDashboardGridStyle
+      setDashboardGridStyle,
+      isMultiReleaseMode,         // Εξαγωγή της μεταβλητής
+      setIsMultiReleaseMode       // Εξαγωγή της συνάρτησης
     }}>
       {children}
     </GlobalContext.Provider>

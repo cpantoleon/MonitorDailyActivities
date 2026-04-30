@@ -541,19 +541,19 @@ app.put("/api/projects/:name", (req, res) => {
 });
 
 app.get("/api/requirements", (req, res) => {
+    // ΠΡΟΣΘΗΚΗ: Βάλαμε ξανά το act.release_id στο SELECT για να διαβάζει τα παλιά δεδομένα
     const activitiesSql = `SELECT
                             act.id as activityDbId, act.requirementGroupId, p.name as project,
                             act.requirementUserIdentifier, act.status, act.statusDate,
                             act.comment, act.sprint, act.link, act.type, act.tags, act.isCurrent,
-                            act.created_at, act.release_id, act.parent_id, act.display_order, act.is_expanded,
+                            act.created_at, act.release_ids, act.release_id, act.parent_id, act.display_order, act.is_expanded,
                             act.expected_time, act.real_time_tc_creation, act.real_time_testing,
-                            rel.name as release_name, rel.release_date
+                            act.release_time_tracking
                  FROM activities act
                  JOIN projects p ON act.project_id = p.id
-                 LEFT JOIN releases rel ON act.release_id = rel.id
                  ORDER BY act.requirementGroupId, act.created_at DESC`;
 
-    const linksSql = `SELECT l.requirement_group_id, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect, d.real_time
+    const linksSql = `SELECT l.requirement_group_id, l.release_ids as link_release_ids, d.id as defect_id, d.title as defect_title, d.status as defect_status, d.link as defect_link, p.name as project_name, d.is_fat_defect, d.real_time
                     FROM defect_requirement_links l
                     JOIN defects d ON l.defect_id = d.id
                     JOIN projects p ON d.project_id = p.id`;
@@ -577,7 +577,8 @@ app.get("/api/requirements", (req, res) => {
                 link: link.defect_link,
                 project: link.project_name,
                 is_fat_defect: link.is_fat_defect,
-                real_time: link.real_time // <-- ΠΡΟΣΘΕΣΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ
+                real_time: link.real_time,
+                release_ids: link.link_release_ids ? JSON.parse(link.link_release_ids) : []
             });
         });
 
@@ -606,20 +607,27 @@ app.get("/api/requirements", (req, res) => {
             }
             const reqGroupEntry = requirementsGroupMap.get(groupId);
             if (reqGroupEntry) {
+                // ΠΡΟΣΘΗΚΗ: Λογική Fallback. Αν το νέο release_ids είναι άδειο, πάρε το παλιό release_id
+                let parsedReleaseIds = [];
+                if (row.release_ids && row.release_ids !== '[]') {
+                    try { parsedReleaseIds = JSON.parse(row.release_ids); } catch(e){}
+                } else if (row.release_id) {
+                    parsedReleaseIds = [row.release_id];
+                }
+
                 reqGroupEntry.history.push({
                     activityId: row.activityDbId, status: row.status, date: row.statusDate,
                     comment: row.comment, sprint: row.sprint ? row.sprint.trim() : row.sprint,
                     link: row.link, type: row.type, tags: row.tags, isCurrent: row.isCurrent === 1,
                     createdAt: row.created_at,
-                    releaseId: row.release_id,
-                    releaseName: row.release_name,
-                    releaseDate: row.release_date,
+                    releaseIds: parsedReleaseIds, // Χρησιμοποιούμε το parsed array
                     parentId: row.parent_id,
                     display_order: row.display_order,
                     is_expanded: row.is_expanded,
                     expected_time: row.expected_time,
                     real_time_tc_creation: row.real_time_tc_creation,
-                    real_time_testing: row.real_time_testing
+                    real_time_testing: row.real_time_testing,
+                    release_time_tracking: row.release_time_tracking ? JSON.parse(row.release_time_tracking) : {}
                 });
             }
         });
@@ -661,7 +669,9 @@ app.get("/api/requirements", (req, res) => {
 });
 
 app.post("/api/activities", async (req, res) => {
-    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_id, parent_id, display_order, expected_time, real_time_tc_creation, real_time_testing } = req.body;
+    // ΠΡΟΣΘΗΚΗ: release_time_tracking στο destructuring
+    let { project, requirementName, status, statusDate, comment, sprint, link, existingRequirementGroupId, type, tags, key, release_ids, parent_id, display_order, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking } = req.body;
+    
     if (!project || !requirementName || !status || !statusDate || !sprint) {
         return res.status(400).json({ error: "Missing required fields (project, requirementName, status, statusDate, sprint)" });
     }
@@ -676,11 +686,14 @@ app.post("/api/activities", async (req, res) => {
         type = type ? type.trim() : null;
         tags = tags ? tags.trim() : null;
         const itemKey = key ? key.trim() : null;
-        const finalReleaseId = release_id || null;
+        const finalReleaseIds = release_ids ? JSON.stringify(release_ids) : '[]';
         const finalParentId = parent_id || null;
         const now = new Date().toISOString();
         const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
         const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
+        
+        // ΠΡΟΣΘΗΚΗ: Stringify το release_time_tracking
+        const finalReleaseTimeTracking = release_time_tracking ? JSON.stringify(release_time_tracking) : '{}';
 
         let finalDisplayOrder = display_order;
         let finalIsExpanded = defaultExpanded;
@@ -714,9 +727,10 @@ app.post("/api/activities", async (req, res) => {
                 db.run(`UPDATE activities SET display_order = display_order + 1 WHERE project_id = ? AND sprint = ? AND status = ? AND isCurrent = 1 AND display_order >= ?`, [projectId, sprint, status, display_order]);
             }
 
-            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, ?)`;
-            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseId, finalParentId, now, now, finalDisplayOrder, finalIsExpanded, expected_time || null, real_time_tc_creation || null, real_time_testing || null], function (err) {
+            // ΠΡΟΣΘΗΚΗ: release_time_tracking στο INSERT
+            const insertSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_ids, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            db.run(insertSql, [projectId, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, itemKey, finalReleaseIds, finalParentId, now, now, finalDisplayOrder, finalIsExpanded, expected_time || null, real_time_tc_creation || null, real_time_testing || null, finalReleaseTimeTracking], function (err) {
                 if (err) {
                     return res.status(400).json({ error: "Failed to insert activity: " + err.message });
                 }
@@ -740,11 +754,12 @@ app.post("/api/activities", async (req, res) => {
                                 subtasks.forEach(sub => {
                                     const subExpanded = (sub.is_expanded !== undefined && sub.is_expanded !== null) ? sub.is_expanded : defaultExpanded;
 
-                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_id, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing)
-                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                                    // ΠΡΟΣΘΗΚΗ: release_time_tracking στο Subtask INSERT
+                                    const insertSubSql = `INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, key, release_ids, parent_id, isCurrent, requirementGroupId, created_at, updated_at, display_order, is_expanded, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking)
+                                                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                                     db.run(insertSubSql, [
                                         sub.project_id, sub.requirementUserIdentifier, sub.status, statusDate,
-                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_id, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded, sub.expected_time || null, sub.real_time_tc_creation || null, sub.real_time_testing || null
+                                        "Sprint updated automatically to match Parent", sprint, sub.link, sub.type, sub.tags, sub.key, sub.release_ids, sub.parent_id, sub.requirementGroupId, now, now, sub.display_order || 999999, subExpanded, sub.expected_time || null, sub.real_time_tc_creation || null, sub.real_time_testing || null, sub.release_time_tracking || '{}'
                                     ], function (errInsert) {
                                         if (!errInsert) {
                                             const newSubId = this.lastID;
@@ -765,7 +780,7 @@ app.post("/api/activities", async (req, res) => {
                                 message: "success",
                                 data: {
                                     activityDbId: newActivityDbId, requirementGroupId: finalRequirementGroupId,
-                                    project, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent: 1, type, tags, release_id: finalReleaseId, parent_id: finalParentId
+                                    project, requirementUserIdentifier, status, statusDate, comment, sprint, link, isCurrent: 1, type, tags, release_ids: JSON.parse(finalReleaseIds), parent_id: finalParentId
                                 }
                             });
                         }
@@ -814,7 +829,8 @@ app.put("/api/activities/expand-all", async (req, res) => {
 });
 
 app.put("/api/activities/:activityId", (req, res) => {
-    let { comment, statusDate, link, type, tags, release_id, parent_id, is_expanded, expected_time, real_time_tc_creation, real_time_testing } = req.body;
+    // ΠΡΟΣΘΗΚΗ: release_time_tracking στο destructuring
+    let { comment, statusDate, link, type, tags, release_ids, parent_id, is_expanded, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking } = req.body;
     const activityDbId = req.params.activityId;
 
     let fieldsToUpdate = [];
@@ -824,12 +840,18 @@ app.put("/api/activities/:activityId", (req, res) => {
     if (link !== undefined) { fieldsToUpdate.push("link = ?"); params.push(link); }
     if (type !== undefined) { fieldsToUpdate.push("type = ?"); params.push(type); }
     if (tags !== undefined) { fieldsToUpdate.push("tags = ?"); params.push(tags); }
-    if (release_id !== undefined) { fieldsToUpdate.push("release_id = ?"); params.push(release_id); }
+    if (release_ids !== undefined) { fieldsToUpdate.push("release_ids = ?"); params.push(JSON.stringify(release_ids)); }
     if (parent_id !== undefined) { fieldsToUpdate.push("parent_id = ?"); params.push(parent_id); }
     if (is_expanded !== undefined) { fieldsToUpdate.push("is_expanded = ?"); params.push(is_expanded); }
     if (expected_time !== undefined) { fieldsToUpdate.push("expected_time = ?"); params.push(expected_time); }
     if (real_time_tc_creation !== undefined) { fieldsToUpdate.push("real_time_tc_creation = ?"); params.push(real_time_tc_creation); }
     if (real_time_testing !== undefined) { fieldsToUpdate.push("real_time_testing = ?"); params.push(real_time_testing); }
+    
+    // ΠΡΟΣΘΗΚΗ: Έλεγχος για το release_time_tracking (ΕΔΩ ΕΙΝΑΙ Η ΣΩΣΤΗ ΤΟΥ ΘΕΣΗ)
+    if (release_time_tracking !== undefined) { 
+        fieldsToUpdate.push("release_time_tracking = ?"); 
+        params.push(JSON.stringify(release_time_tracking)); 
+    }
 
     if (fieldsToUpdate.length === 0) {
         return res.status(400).json({ error: "No fields to update provided" });
@@ -1643,14 +1665,26 @@ app.post("/api/releases/:id/close", async (req, res) => {
         if (err) return res.status(500).json({ error: "DB error fetching release info." });
         if (!release) return res.status(404).json({ error: "Release not found." });
 
-        const requirementsSql = `
-            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags
+        const allCurrentActivitiesSql = `
+            SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags, a.parent_id, a.release_id, a.release_ids, a.release_time_tracking
             FROM activities a
-            WHERE a.release_id = ? AND a.isCurrent = 1 AND a.parent_id IS NULL
+            WHERE a.isCurrent = 1 AND a.project_id = ?
         `;
 
-        db.all(requirementsSql, [releaseId], (err, requirements) => {
+        db.all(allCurrentActivitiesSql, [release.project_id], (err, allCurrentActivities) => {
             if (err) return res.status(500).json({ error: "DB error fetching requirements for release." });
+
+            const matchesRelease = (reqItem) => {
+                let parsedIds = [];
+                if (reqItem.release_ids && reqItem.release_ids !== '[]') {
+                    try { parsedIds = JSON.parse(reqItem.release_ids); } catch(e){}
+                } else if (reqItem.release_id) {
+                    parsedIds = [reqItem.release_id];
+                }
+                return parsedIds.some(id => String(id) === String(releaseId));
+            };
+
+            const requirements = allCurrentActivities.filter(reqItem => matchesRelease(reqItem) && reqItem.parent_id === null);
 
             const doneCount = requirements.filter(r => r.status === 'Done').length;
             const notDoneCount = requirements.length - doneCount;
@@ -1658,133 +1692,141 @@ app.post("/api/releases/:id/close", async (req, res) => {
             const metricsJson = JSON.stringify(metrics);
             const closedAt = new Date().toISOString();
 
-            // Τώρα φέρνουμε ΚΑΙ τα sub-tasks για να τα κάνουμε archive μαζί με τους γονείς τους
-            const allItemsToArchiveSql = `
-                SELECT a.requirementGroupId, a.requirementUserIdentifier, a.status, a.link, a.type, a.tags, a.parent_id
-                FROM activities a
-                WHERE a.isCurrent = 1 AND (a.release_id = ? OR a.parent_id IN (SELECT requirementGroupId FROM activities WHERE release_id = ? AND isCurrent = 1))
-            `;
+            // Fetch sub-tasks to archive along with their parents
+            const allItems = allCurrentActivities.filter(reqItem => {
+                if (matchesRelease(reqItem)) return true;
+                if (reqItem.parent_id) {
+                    const parentReq = allCurrentActivities.find(p => p.requirementGroupId === reqItem.parent_id);
+                    if (parentReq && matchesRelease(parentReq)) return true;
+                }
+                return false;
+            });
 
-            db.all(allItemsToArchiveSql, [releaseId, releaseId], (err, allItems) => {
-                if (err) return res.status(500).json({ error: "DB error fetching all items to archive." });
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
 
-                db.serialize(() => {
-                    db.run("BEGIN TRANSACTION");
+                const archiveSql = `
+                    INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `;
+                db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function (err) {
+                    if (err) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: "Failed to create archive record." });
+                    }
 
-                    const archiveSql = `
-                        INSERT INTO archived_releases (original_release_id, project_id, name, closed_at, metrics_json, close_action)
+                    const archiveId = this.lastID;
+                    const archiveItemsSql = `
+                        INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status, tc_time, test_time)
                         VALUES (?, ?, ?, ?, ?, ?)
                     `;
-                    db.run(archiveSql, [releaseId, release.project_id, release.name, closedAt, metricsJson, closeAction], function (err) {
-                        if (err) {
-                            db.run("ROLLBACK");
-                            return res.status(500).json({ error: "Failed to create archive record." });
-                        }
 
-                        const archiveId = this.lastID;
-                        const archiveItemsSql = `
-                            INSERT INTO archived_release_items (archive_id, requirement_group_id, requirement_title, final_status)
-                            VALUES (?, ?, ?, ?)
-                        `;
-
-                        let itemsProcessed = 0;
-                        if (allItems.length === 0) {
-                            finalizeProcess(archiveId);
-                        } else {
-                            allItems.forEach(req => {
-                                // Σώζουμε στο archive table (μπορούμε να σώσουμε και τα sub-tasks εδώ για ιστορικότητα)
-                                db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status], (err) => {
-                                    if (err) {
-                                        db.run("ROLLBACK");
-                                        if (!res.headersSent) {
-                                            res.status(500).json({ error: "Failed to archive requirement item." });
-                                        }
-                                        return;
-                                    }
-                                    itemsProcessed++;
-                                    if (itemsProcessed === allItems.length) {
-                                        finalizeProcess(archiveId);
-                                    }
-                                });
-                            });
-                        }
-
-                        function finalizeProcess(archiveId) {
-                            const checkFatSql = `
-                                SELECT fr.id 
-                                FROM fat_reports fr
-                                JOIN fat_periods fp ON fr.fat_period_id = fp.id
-                                JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
-                                WHERE fsr.release_id = ? AND fp.status = 'completed'
-                                ORDER BY fp.completion_date DESC
-                                LIMIT 1
-                            `;
-                            db.get(checkFatSql, [releaseId], (fatErr, fatReport) => {
-                                if (fatReport) {
-                                    db.run("UPDATE archived_releases SET fat_report_id = ? WHERE id = ?", [fatReport.id, archiveId]);
+                    let itemsProcessed = 0;
+                    if (allItems.length === 0) {
+                        finalizeProcess(archiveId);
+                    } else {
+                        allItems.forEach(req => {
+                            let tcTime = 0;
+                            let testTime = 0;
+                            try {
+                                const timeTracking = req.release_time_tracking ? JSON.parse(req.release_time_tracking) : {};
+                                if (timeTracking[releaseId]) {
+                                    tcTime = timeTracking[releaseId].tc || 0;
+                                    testTime = timeTracking[releaseId].test || 0;
                                 }
+                            } catch (e) { }
 
-                                const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
-                                db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
-                                    if (err) {
-                                        db.run("ROLLBACK");
-                                        if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
-                                        return;
-                                    }
-
-                                    if (closeAction === 'archive_only') {
-                                        commitTransaction();
-                                    } else if (closeAction === 'archive_and_complete') {
-                                        const now = new Date().toISOString();
-                                        const statusDate = now.split('T')[0];
-                                        const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
-
-                                        const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id, parent_id)
-                                                                   VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, ?)`;
-                                        const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
-
-                                        let activitiesProcessed = 0;
-                                        if (allItems.length === 0) {
-                                            commitTransaction();
-                                        } else {
-                                            allItems.forEach(req => {
-                                                db.run(updateOldSql, [req.requirementGroupId], function (err) {
-                                                    if (err) {
-                                                        db.run("ROLLBACK");
-                                                        if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
-                                                        return;
-                                                    }
-                                                    const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                    db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function (err) {
-                                                        if (err) {
-                                                            db.run("ROLLBACK");
-                                                            if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
-                                                            return;
-                                                        }
-                                                        activitiesProcessed++;
-                                                        if (activitiesProcessed === allItems.length) {
-                                                            commitTransaction();
-                                                        }
-                                                    });
-                                                });
-                                            });
-                                        }
-                                    }
-                                });
-                            });
-                        }
-
-                        function commitTransaction() {
-                            db.run("COMMIT", (err) => {
+                            db.run(archiveItemsSql, [archiveId, req.requirementGroupId, req.requirementUserIdentifier, req.status, tcTime, testTime], (err) => {
                                 if (err) {
-                                    if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
+                                    db.run("ROLLBACK");
+                                    if (!res.headersSent) {
+                                        res.status(500).json({ error: "Failed to archive requirement item." });
+                                    }
                                     return;
                                 }
-                                scheduleQdrantSync();
-                                if (!res.headersSent) res.json({ message: `Release '${release.name}' has been successfully finalized and archived.` });
+                                itemsProcessed++;
+                                if (itemsProcessed === allItems.length) {
+                                    finalizeProcess(archiveId);
+                                }
                             });
-                        }
-                    });
+                        });
+                    }
+
+                    function finalizeProcess(archiveId) {
+                        const checkFatSql = `
+                            SELECT fr.id 
+                            FROM fat_reports fr
+                            JOIN fat_periods fp ON fr.fat_period_id = fp.id
+                            JOIN fat_selected_releases fsr ON fp.id = fsr.fat_period_id
+                            WHERE fsr.release_id = ? AND fp.status = 'completed'
+                            ORDER BY fp.completion_date DESC
+                            LIMIT 1
+                        `;
+                        db.get(checkFatSql, [releaseId], (fatErr, fatReport) => {
+                            if (fatReport) {
+                                db.run("UPDATE archived_releases SET fat_report_id = ? WHERE id = ?", [fatReport.id, archiveId]);
+                            }
+
+                            const updateReleaseSql = "UPDATE releases SET status = 'closed', closed_at = ? WHERE id = ?";
+                            db.run(updateReleaseSql, [closedAt, releaseId], (err) => {
+                                if (err) {
+                                    db.run("ROLLBACK");
+                                    if (!res.headersSent) res.status(500).json({ error: "Failed to close original release." });
+                                    return;
+                                }
+
+                                if (closeAction === 'archive_only') {
+                                    commitTransaction();
+                                } else if (closeAction === 'archive_and_complete') {
+                                    const now = new Date().toISOString();
+                                    const statusDate = now.split('T')[0];
+                                    const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
+
+                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id, parent_id)
+                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, ?)`;
+                                    const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
+
+                                    let activitiesProcessed = 0;
+                                    if (allItems.length === 0) {
+                                        commitTransaction();
+                                    } else {
+                                        allItems.forEach(req => {
+                                            db.run(updateOldSql, [req.requirementGroupId], function (err) {
+                                                if (err) {
+                                                    db.run("ROLLBACK");
+                                                    if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
+                                                    return;
+                                                }
+                                                const comment = `Item completed as part of finalizing release '${release.name}'`;
+                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function (err) {
+                                                    if (err) {
+                                                        db.run("ROLLBACK");
+                                                        if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
+                                                        return;
+                                                    }
+                                                    activitiesProcessed++;
+                                                    if (activitiesProcessed === allItems.length) {
+                                                        commitTransaction();
+                                                    }
+                                                });
+                                            });
+                                        });
+                                    }
+                                }
+                            });
+                        });
+                    }
+
+                    function commitTransaction() {
+                        db.run("COMMIT", (err) => {
+                            if (err) {
+                                if (!res.headersSent) res.status(500).json({ error: "Failed to commit transaction." });
+                                return;
+                            }
+                            scheduleQdrantSync();
+                            if (!res.headersSent) res.json({ message: `Release '${release.name}' has been successfully finalized and archived.` });
+                        });
+                    }
                 });
             });
         });
@@ -2147,13 +2189,30 @@ const getFatTotalRequirements = (fatPeriodId) => {
         db.all(getSelectedReleasesSql, [fatPeriodId], async (err, selectedReleases) => {
             if (err) return reject(new Error("DB error getting selected releases."));
 
-            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => r.release_id);
-            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => r.archived_release_id);
+            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => String(r.release_id));
+            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => String(r.archived_release_id));
 
             const reqsPromises = [];
             if (activeReleaseIds.length > 0) {
-                const activeReqsSql = `SELECT COUNT(*) as count FROM activities WHERE release_id IN (${activeReleaseIds.join(',')}) AND isCurrent = 1`;
-                reqsPromises.push(new Promise((resolve, reject) => db.get(activeReqsSql, [], (err, row) => err ? reject(err) : resolve(row.count))));
+                const activeReqsSql = `SELECT release_id, release_ids FROM activities WHERE isCurrent = 1`;
+                reqsPromises.push(new Promise((resolve, reject) => {
+                    db.all(activeReqsSql, [], (err, rows) => {
+                        if (err) return reject(err);
+                        let count = 0;
+                        rows.forEach(row => {
+                            let parsedIds = [];
+                            if (row.release_ids && row.release_ids !== '[]') {
+                                try { parsedIds = JSON.parse(row.release_ids); } catch(e){}
+                            } else if (row.release_id) {
+                                parsedIds = [row.release_id];
+                            }
+                            if (parsedIds.some(id => activeReleaseIds.includes(String(id)))) {
+                                count++;
+                            }
+                        });
+                        resolve(count);
+                    });
+                }));
             }
             if (archivedReleaseIds.length > 0) {
                 const archivedReqsSql = `SELECT COUNT(*) as count FROM archived_release_items WHERE archive_id IN (${archivedReleaseIds.join(',')})`;
@@ -2252,6 +2311,21 @@ app.get("/api/fat/:project", async (req, res) => {
     }
 });
 
+app.get("/api/settings/multi-release-mode", async (req, res) => {
+    try {
+        const row = await dbGet("SELECT value FROM app_settings WHERE key = 'multi_release_mode'");
+        res.json({ isEnabled: row ? row.value === '1' : false });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/settings/multi-release-mode", async (req, res) => {
+    try {
+        const val = req.body.isEnabled ? '1' : '0';
+        await dbRun("INSERT INTO app_settings (key, value) VALUES ('multi_release_mode', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [val]);
+        res.json({ message: "Multi-Release Mode setting saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post("/api/fat/:project", async (req, res) => {
     const { start_date, release_id } = req.body;
     if (!start_date || !release_id) {
@@ -2321,13 +2395,27 @@ app.get("/api/fat/details/:fat_period_id", (req, res) => {
             const fatPeriod = await new Promise((resolve, reject) => db.get("SELECT project_id FROM fat_periods WHERE id = ?", [fatPeriodId], (err, row) => err ? reject(err) : resolve(row)));
             if (!fatPeriod) return res.status(404).json({ error: "FAT Period not found." });
 
-            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => r.release_id);
-            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => r.archived_release_id);
+            const activeReleaseIds = selectedReleases.filter(r => r.release_type === 'active').map(r => String(r.release_id));
+            const archivedReleaseIds = selectedReleases.filter(r => r.release_type === 'archived').map(r => String(r.archived_release_id));
 
             const reqsPromises = [];
             if (activeReleaseIds.length > 0) {
-                const activeReqsSql = `SELECT requirementGroupId as id, requirementUserIdentifier as title, 'active' as source FROM activities WHERE release_id IN (${activeReleaseIds.join(',')}) AND isCurrent = 1`;
-                reqsPromises.push(new Promise((resolve, reject) => db.all(activeReqsSql, [], (err, rows) => err ? reject(err) : resolve(rows))));
+                const activeReqsSql = `SELECT requirementGroupId as id, requirementUserIdentifier as title, release_id, release_ids, 'active' as source FROM activities WHERE project_id = ? AND isCurrent = 1`;
+                reqsPromises.push(new Promise((resolve, reject) => {
+                    db.all(activeReqsSql, [fatPeriod.project_id], (err, rows) => {
+                        if (err) return reject(err);
+                        const matchedReqs = rows.filter(req => {
+                            let parsedIds = [];
+                            if (req.release_ids && req.release_ids !== '[]') {
+                                try { parsedIds = JSON.parse(req.release_ids); } catch(e){}
+                            } else if (req.release_id) {
+                                parsedIds = [req.release_id];
+                            }
+                            return parsedIds.some(id => activeReleaseIds.includes(String(id)));
+                        }).map(req => ({ id: req.id, title: req.title, source: req.source }));
+                        resolve(matchedReqs);
+                    });
+                }));
             }
             if (archivedReleaseIds.length > 0) {
                 const archivedReqsSql = `SELECT requirement_group_id as id, requirement_title as title, 'archived' as source FROM archived_release_items WHERE archive_id IN (${archivedReleaseIds.join(',')})`;
@@ -2712,7 +2800,7 @@ app.get("/api/defects/all", (req, res) => {
         LEFT JOIN LastComment lc ON d.id = lc.defect_id AND lc.rn = 1
         ORDER BY d.created_at DESC
     `;
-    const linksSql = `SELECT l.defect_id, l.requirement_group_id, a.requirementUserIdentifier, a.sprint
+    const linksSql = `SELECT l.defect_id, l.requirement_group_id, l.release_ids, a.requirementUserIdentifier, a.sprint
                       FROM defect_requirement_links l
                       JOIN activities a ON l.requirement_group_id = a.requirementGroupId
                       WHERE a.isCurrent = 1`;
@@ -2729,7 +2817,8 @@ app.get("/api/defects/all", (req, res) => {
             linksMap.get(link.defect_id).push({
                 groupId: link.requirement_group_id,
                 name: link.requirementUserIdentifier,
-                sprint: link.sprint
+                sprint: link.sprint,
+                release_ids: link.release_ids ? JSON.parse(link.release_ids) : []
             });
         });
 
@@ -2808,7 +2897,7 @@ app.get("/api/defects/:project", async (req, res) => {
             ORDER BY ${orderBy}
         `;
 
-        const linksSql = `SELECT l.defect_id, l.requirement_group_id, a.requirementUserIdentifier, a.sprint
+        const linksSql = `SELECT l.defect_id, l.requirement_group_id, l.release_ids, a.requirementUserIdentifier, a.sprint
                           FROM defect_requirement_links l
                           JOIN activities a ON l.requirement_group_id = a.requirementGroupId
                           WHERE a.isCurrent = 1 AND a.project_id = ?`;
@@ -2825,7 +2914,8 @@ app.get("/api/defects/:project", async (req, res) => {
                 linksMap.get(link.defect_id).push({
                     groupId: link.requirement_group_id,
                     name: link.requirementUserIdentifier,
-                    sprint: link.sprint
+                    sprint: link.sprint,
+                    release_ids: link.release_ids ? JSON.parse(link.release_ids) : []
                 });
             });
 
@@ -2952,9 +3042,13 @@ app.post("/api/defects", async (req, res) => {
                 const defectId = this.lastID;
 
                 if (linkedRequirementGroupIds && linkedRequirementGroupIds.length > 0) {
-                    const linkInsertSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`;
-                    linkedRequirementGroupIds.forEach(reqId => {
-                        db.run(linkInsertSql, [defectId, reqId], (linkErr) => {
+                    const linkInsertSql = `INSERT INTO defect_requirement_links (defect_id, requirement_group_id, release_ids) VALUES (?, ?, ?)`;
+                    linkedRequirementGroupIds.forEach(reqObj => {
+                        // Support both legacy array of IDs and new array of objects
+                        const reqId = typeof reqObj === 'object' ? reqObj.reqId : reqObj;
+                        const relIds = typeof reqObj === 'object' ? JSON.stringify(reqObj.releaseIds || []) : '[]';
+
+                        db.run(linkInsertSql, [defectId, reqId, relIds], (linkErr) => {
                             if (linkErr) console.error("Error creating defect-requirement link:", linkErr.message);
                         });
                     });
@@ -2998,7 +3092,6 @@ app.put("/api/defects/:id", async (req, res) => {
         // 3. Determine if links have changed
         let linksChanged = false;
         if (linkedRequirementGroupIds !== undefined) {
-            if (currentLinks.length !== newLinks.length) {
                 linksChanged = true;
             } else {
                 const currentSet = new Set(currentLinks.map(String));
@@ -3010,7 +3103,6 @@ app.put("/api/defects/:id", async (req, res) => {
                     }
                 }
             }
-        }
 
         // 4. Calculate Field Changes
         let updates = [];
@@ -3109,8 +3201,10 @@ app.put("/api/defects/:id", async (req, res) => {
         if (linksChanged) {
             await dbRun(`DELETE FROM defect_requirement_links WHERE defect_id = ?`, [defectId]);
             if (newLinks.length > 0) {
-                for (const reqId of newLinks) {
-                    await dbRun(`INSERT INTO defect_requirement_links (defect_id, requirement_group_id) VALUES (?, ?)`, [defectId, reqId]);
+                for (const reqObj of newLinks) {
+                    const reqId = typeof reqObj === 'object' ? reqObj.reqId : reqObj;
+                    const relIds = typeof reqObj === 'object' ? JSON.stringify(reqObj.releaseIds || []) : '[]';
+                    await dbRun(`INSERT INTO defect_requirement_links (defect_id, requirement_group_id, release_ids) VALUES (?, ?, ?)`, [defectId, reqId, relIds]);
                 }
             }
         }

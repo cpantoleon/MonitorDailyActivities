@@ -5,10 +5,12 @@ import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 import ToggleSwitch from './ToggleSwitch';
+import { useGlobal } from '../context/GlobalContext'; // <-- ADDED
 
 const DEFECT_STATUSES = ['Assigned to Developer', 'Assigned to Tester', 'Done'];
 
-const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [], allDefects = [] }) => {
+const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [], allDefects = [], allReleases = [], archivedReleases = [] }) => {
+  const { isMultiReleaseMode } = useGlobal(); // <-- ADDED
 
   const getInitialFormState = (project) => ({
     project: project || '',
@@ -20,6 +22,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     created_date: new Date(),
     comment: '',
     linkedRequirementGroupIds: [],
+    linkedReqReleaseMap: {}, // <-- ADDED: Maps reqId -> array of releaseIds
     is_fat_defect: false,
     real_time: '',
     real_time_unit: 'h'
@@ -53,6 +56,15 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
         const initRTime = { val: rTime || '', unit: (rTime > 0 && rTime % 8 === 0) ? 'd' : 'h' };
         if (initRTime.unit === 'd') initRTime.val = initRTime.val / 8;
 
+        // <-- ADDED: Initialize linkedReqReleaseMap
+        const initialLinks = defect.linkedRequirements ? defect.linkedRequirements.map(r => r.groupId) : [];
+        const initialMap = {};
+        if (defect.linkedRequirements) {
+          defect.linkedRequirements.forEach(r => {
+            initialMap[r.groupId] = r.release_ids || [];
+          });
+        }
+
         initialData = {
           project: defect.project,
           title: defect.title || '',
@@ -62,7 +74,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           link: defect.link || '',
           created_date: defect.created_date ? new Date(defect.created_date) : new Date(),
           comment: '',
-          linkedRequirementGroupIds: defect.linkedRequirements ? defect.linkedRequirements.map(r => r.groupId) : [],
+          linkedRequirementGroupIds: initialLinks,
+          linkedReqReleaseMap: initialMap, // <-- ADDED
           is_fat_defect: defect.is_fat_defect || false,
           real_time: initRTime.val,
           real_time_unit: initRTime.unit
@@ -87,18 +100,19 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     const sortedCurrentLinks = [...formData.linkedRequirementGroupIds].sort();
     const sortedInitialLinks = [...initialFormData.linkedRequirementGroupIds].sort();
     const linksChanged = JSON.stringify(sortedCurrentLinks) !== JSON.stringify(sortedInitialLinks);
+    const mapsChanged = JSON.stringify(formData.linkedReqReleaseMap) !== JSON.stringify(initialFormData.linkedReqReleaseMap); // <-- ADDED
 
     return formData.title !== initialFormData.title ||
-           formData.description !== initialFormData.description ||
-           formData.area !== initialFormData.area ||
-           formData.status !== initialFormData.status ||
-           formData.link !== initialFormData.link ||
-           formData.created_date.toISOString().split('T')[0] !== initialFormData.created_date.toISOString().split('T')[0] ||
-           formData.comment.trim() !== '' ||
-           formData.is_fat_defect !== initialFormData.is_fat_defect ||
-           formData.real_time !== initialFormData.real_time ||
-           formData.real_time_unit !== initialFormData.real_time_unit ||
-           linksChanged;
+      formData.description !== initialFormData.description ||
+      formData.area !== initialFormData.area ||
+      formData.status !== initialFormData.status ||
+      formData.link !== initialFormData.link ||
+      formData.created_date.toISOString().split('T')[0] !== initialFormData.created_date.toISOString().split('T')[0] ||
+      formData.comment.trim() !== '' ||
+      formData.is_fat_defect !== initialFormData.is_fat_defect ||
+      formData.real_time !== initialFormData.real_time ||
+      formData.real_time_unit !== initialFormData.real_time_unit ||
+      linksChanged || mapsChanged;
   }, [formData, initialFormData]);
 
   const handleCloseRequest = () => {
@@ -151,22 +165,22 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
         const subtasksByParent = {};
         subtasks.forEach(sub => {
-            if (!subtasksByParent[sub.parentId]) {
-                subtasksByParent[sub.parentId] = [];
-            }
-            subtasksByParent[sub.parentId].push(sub);
+          if (!subtasksByParent[sub.parentId]) {
+            subtasksByParent[sub.parentId] = [];
+          }
+          subtasksByParent[sub.parentId].push(sub);
         });
 
         parents.forEach(parent => {
-            result.push(parent);
-            if (subtasksByParent[parent.id]) {
-                result.push(...subtasksByParent[parent.id]);
-                delete subtasksByParent[parent.id];
-            }
+          result.push(parent);
+          if (subtasksByParent[parent.id]) {
+            result.push(...subtasksByParent[parent.id]);
+            delete subtasksByParent[parent.id];
+          }
         });
 
         Object.values(subtasksByParent).forEach(orphanedSubtasks => {
-            result.push(...orphanedSubtasks);
+          result.push(...orphanedSubtasks);
         });
 
         return result;
@@ -175,12 +189,12 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
       setAvailableRequirements(buildHierarchy(available));
       setSelectedRequirements(buildHierarchy(selected));
     } else {
-        setAvailableRequirements([]);
-        setSelectedRequirements([]);
-        setToAdd([]);
-        setToRemove([]);
-        setAvailableSearchQuery('');
-        setSelectedSearchQuery('');
+      setAvailableRequirements([]);
+      setSelectedRequirements([]);
+      setToAdd([]);
+      setToRemove([]);
+      setAvailableSearchQuery('');
+      setSelectedSearchQuery('');
     }
   }, [isOpen, requirementsForSelectedProject, formData.linkedRequirementGroupIds, availableSearchQuery, selectedSearchQuery]);
 
@@ -223,10 +237,15 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const handleRemove = () => {
     const toRemoveSet = new Set(toRemove);
-    setFormData(prev => ({
-      ...prev,
-      linkedRequirementGroupIds: prev.linkedRequirementGroupIds.filter(id => !toRemoveSet.has(id))
-    }));
+    setFormData(prev => {
+      const newMap = { ...prev.linkedReqReleaseMap };
+      toRemove.forEach(id => delete newMap[id]); // Clean up map
+      return {
+        ...prev,
+        linkedRequirementGroupIds: prev.linkedRequirementGroupIds.filter(id => !toRemoveSet.has(id)),
+        linkedReqReleaseMap: newMap
+      };
+    });
     setToRemove([]);
   };
 
@@ -238,7 +257,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!formData.project || !formData.title.trim() || !formData.area.trim()) {
       alert("Project, Title, and Area are required.");
       setActiveTab('core');
@@ -246,8 +265,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     }
 
     if (activeTab === 'core') {
-        setActiveTab('tracking');
-        return;
+      setActiveTab('tracking');
+      return;
     }
 
     if (!formData.status || !formData.created_date) {
@@ -256,11 +275,18 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     }
 
     const calcH = (v, u) => (v !== '' && v !== null && !isNaN(v) ? parseFloat(v) * (u === 'd' ? 8 : 1) : null);
-    
-    onSubmit({ 
-        ...formData, 
-        area: formData.area.trim(),
-        real_time: calcH(formData.real_time, formData.real_time_unit)
+
+    // <-- ADDED: Construct final array of objects for the backend
+    const finalLinkedReqs = formData.linkedRequirementGroupIds.map(id => ({
+      reqId: id,
+      releaseIds: formData.linkedReqReleaseMap[id] || []
+    }));
+
+    onSubmit({
+      ...formData,
+      area: formData.area.trim(),
+      real_time: calcH(formData.real_time, formData.real_time_unit),
+      linkedRequirementGroupIds: finalLinkedReqs // Overwrite with object format
     });
   };
 
@@ -328,7 +354,7 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               color: var(--text-primary);
             }
           `}</style>
-          
+
           <div id="defect-modal-header-id" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', marginBottom: '20px' }}>
             <h2 style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>{defect ? 'Edit Defect' : 'Create New Defect'}</h2>
             <div id="fat-defect-toggle-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -345,24 +371,24 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           </div>
 
           <div className="modal-tabs">
-              <button 
-                type="button" 
-                className={`modal-tab-button ${activeTab === 'core' ? 'active' : ''}`} 
-                onClick={() => setActiveTab('core')}
-              >
-                  Core Details
-              </button>
-              <button 
-                type="button" 
-                className={`modal-tab-button ${activeTab === 'tracking' ? 'active' : ''}`} 
-                onClick={() => setActiveTab('tracking')}
-              >
-                  Tracking & Links
-              </button>
+            <button
+              type="button"
+              className={`modal-tab-button ${activeTab === 'core' ? 'active' : ''}`}
+              onClick={() => setActiveTab('core')}
+            >
+              Core Details
+            </button>
+            <button
+              type="button"
+              className={`modal-tab-button ${activeTab === 'tracking' ? 'active' : ''}`}
+              onClick={() => setActiveTab('tracking')}
+            >
+              Tracking & Links
+            </button>
           </div>
 
           <form id="defect-modal-form-id" onSubmit={handleSubmit}>
-            
+
             <div style={{ display: activeTab === 'core' ? 'block' : 'none' }}>
               <div id="form-group-project-id" className="form-group">
                 <label id="defect-project-label" htmlFor="defect-project-button">Project:</label>
@@ -423,22 +449,23 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
               </div>
               <div id="form-group-date-logged-id" className="form-group">
                 <label htmlFor="defect-created-date">Date Logged:</label>
-                <DatePicker 
-                    id="defect-created-date" 
-                    name="created_date" 
-                    selected={formData.created_date} 
-                    onChange={handleDateChange} 
-                    dateFormat="MM/dd/yyyy" 
-                    className="notes-datepicker" 
-                    wrapperClassName="date-picker-wrapper" 
-                    popperPlacement="top-start" 
-                    portalId="root"
-                    popperProps={{
-                       strategy: "fixed" 
-                    }}
-                    autoComplete="off"
+                <DatePicker
+                  id="defect-created-date"
+                  name="created_date"
+                  selected={formData.created_date}
+                  onChange={handleDateChange}
+                  dateFormat="MM/dd/yyyy"
+                  className="notes-datepicker"
+                  wrapperClassName="date-picker-wrapper"
+                  popperPlacement="top-start"
+                  portalId="root"
+                  popperProps={{
+                    strategy: "fixed"
+                  }}
+                  autoComplete="off"
                 />
               </div>
+
               <div id="form-group-linked-requirements-id" className="form-group">
                 <fieldset id="linked-requirements-fieldset-id" style={{ border: 'none', padding: 0, margin: 0 }}>
                   <legend id="linked-requirements-legend-id" className="optional-label" style={{ padding: 0, marginBottom: '5px' }}>Link to Requirements:</legend>
@@ -457,11 +484,11 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                         {availableRequirements.map(req => {
                           const hasParentInList = req.parentId && availableRequirements.some(p => p.id === req.parentId);
                           return (
-                              <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
-                                  {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
-                              </option>
+                            <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
+                              {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
+                            </option>
                           );
-                      })}
+                        })}
                       </select>
                     </div>
                     <div id="listbox-actions-id" className="listbox-actions">
@@ -482,9 +509,9 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                         {selectedRequirements.map(req => {
                           const hasParentInList = req.parentId && selectedRequirements.some(p => p.id === req.parentId);
                           return (
-                              <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
-                                  {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
-                              </option>
+                            <option key={req.id} value={req.id} title={req.requirementUserIdentifier}>
+                              {req.parentId ? (hasParentInList ? `\u00A0\u00A0↳ [Sub-task] ${req.requirementUserIdentifier}` : `[Sub-task] ${req.requirementUserIdentifier}`) : req.requirementUserIdentifier}
+                            </option>
                           );
                         })}
                       </select>
@@ -492,40 +519,100 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                   </div>
                 </fieldset>
               </div>
+
+              {/* <-- ADDED: Granular Release Mapping for Defects --> */}
+              {isMultiReleaseMode && (() => {
+                // Βρίσκουμε ποια από τα επιλεγμένα requirements έχουν όντως releases
+                const reqsWithReleases = formData.linkedRequirementGroupIds.map(reqId => {
+                    return allRequirements.find(r => String(r.id) === String(reqId));
+                }).filter(req => req && req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.length > 0);
+
+                if (reqsWithReleases.length === 0) return null;
+
+                return (
+                  <div style={{ marginTop: '15px', padding: '10px', backgroundColor: 'var(--bg-primary)', borderRadius: '6px' }}>
+                    <label className="optional-label" style={{ marginBottom: '10px' }}>Specify Releases for Linked Requirements:</label>
+                    <p style={{ fontSize: '0.85em', color: 'var(--text-secondary)', marginTop: '0', marginBottom: '10px' }}>
+                      Select which release(s) this defect affects. If none are selected, it applies to all linked releases.
+                    </p>
+                    {reqsWithReleases.map(req => {
+                      const reqId = req.id;
+                      
+                      // Βρίσκουμε τα πραγματικά ονόματα των releases (ψάχνουμε και στα ενεργά και στα αρχειοθετημένα)
+                      const availableRels = req.currentStatusDetails.releaseIds.map(id => {
+                        const foundRel = allReleases.find(ar => String(ar.id) === String(id)) || 
+                                         archivedReleases.find(ar => String(ar.original_release_id) === String(id) || String(ar.id) === String(id));
+                        return { id, name: foundRel ? foundRel.name : `Release ID: ${id}` };
+                      });
+
+                      return (
+                        <div key={reqId} style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed var(--border-color)' }}>
+                          <span style={{ fontSize: '0.85em', fontWeight: 'bold' }}>{req.requirementUserIdentifier}</span>
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
+                            {availableRels.map(rel => (
+                              <label key={rel.id} style={{ fontSize: '0.8em', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={(formData.linkedReqReleaseMap[reqId] || []).includes(rel.id)}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setFormData(prev => {
+                                      const currentRels = prev.linkedReqReleaseMap[reqId] || [];
+                                      const newRels = checked ? [...currentRels, rel.id] : currentRels.filter(id => id !== rel.id);
+                                      return {
+                                        ...prev,
+                                        linkedReqReleaseMap: {
+                                          ...prev.linkedReqReleaseMap,
+                                          [reqId]: newRels
+                                        }
+                                      };
+                                    });
+                                  }}
+                                />
+                                {rel.name}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               <div id="form-group-comment-id" className="form-group">
                 <label htmlFor="defect-comment" className="optional-label">Comment:</label>
                 <textarea id="defect-comment" name="comment" value={formData.comment} onChange={handleChange} rows="2" />
               </div>
 
-              {/* NEW TIME TRACKING BLOCK FOR DEFECT */}
               <div id="form-group-real-time-id" className="form-group" style={{ marginTop: '10px' }}>
-                  <label style={{ fontSize: '0.85em' }} className="optional-label">Real Time Spent</label>
-                  <div style={{ display: 'flex', gap: '5px', maxWidth: '200px' }}>
-                      <input type="number" name="real_time" value={formData.real_time} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
-                      <select name="real_time_unit" value={formData.real_time_unit} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
-                          <option value="h">hours</option>
-                          <option value="d">days</option>
-                      </select>
-                  </div>
+                <label style={{ fontSize: '0.85em' }} className="optional-label">Real Time Spent</label>
+                <div style={{ display: 'flex', gap: '5px', maxWidth: '200px' }}>
+                  <input type="number" name="real_time" value={formData.real_time} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
+                  <select name="real_time_unit" value={formData.real_time_unit} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
+                    <option value="h">hours</option>
+                    <option value="d">days</option>
+                  </select>
+                </div>
               </div>
 
             </div>
 
             <div id="modal-actions-id" className="modal-actions">
               {activeTab === 'tracking' && (
-                 <button 
-                    type="button" 
-                    onClick={() => setActiveTab('core')} 
-                    className="modal-button-cancel" 
-                    style={{marginRight: 'auto'}}
-                 >
-                     Back
-                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('core')}
+                  className="modal-button-cancel"
+                  style={{ marginRight: 'auto' }}
+                >
+                  Back
+                </button>
               )}
               <button type="button" id="modal-button-cancel-id" onClick={onClose} className="modal-button-cancel">Cancel</button>
-              
+
               <button type="submit" id="modal-button-save-id" className="modal-button-save">
-                 {activeTab === 'core' ? 'Next: Tracking & Links' : (defect ? 'Save Changes' : 'Create Defect')}
+                {activeTab === 'core' ? 'Next: Tracking & Links' : (defect ? 'Save Changes' : 'Create Defect')}
               </button>
             </div>
           </form>

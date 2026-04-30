@@ -12,6 +12,7 @@ import SatBugModal from '../components/SatBugModal';
 import Tooltip from '../components/Tooltip';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { useGlobal } from '../context/GlobalContext'; // <-- ADDED IMPORT
 import '../App.css';
 import './ReleasesPage.css';
 
@@ -284,7 +285,7 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
             if (!response.ok) throw new Error(result.error || 'Failed to save SAT report.');
             showMainMessage(result.message, 'success');
             onClose();
-            onSave(); 
+            onSave();
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -307,14 +308,14 @@ const AddSatReportModal = ({ isOpen, onClose, onSave, archive, showMainMessage }
                             onFocus={e => e.target.select()}
                             min="0"
                             max="100"
-                            step="0.1" 
+                            step="0.1"
                         />
                     </div>
                 ))}
             </div>
             <div id="sat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
                 Total: {Number(total).toFixed(1).replace(/\.0$/, '')}%
-                {!isTotalValid && <div id="sat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be 100% to save, or 0% to clear.</div>}
+                {!isTotalValid && <div id="sat-report-total-error-message-id" style={{ fontSize: '0.8em', marginTop: '5px' }}>Total must be 100% to save, or 0% to clear.</div>}
             </div>
             <div id="sat-report-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
@@ -374,7 +375,7 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, project, totalR
             if (!response.ok) throw new Error(result.error || 'Failed to save FAT report.');
             showMainMessage(result.message, 'success');
             onClose();
-            onSave(); 
+            onSave();
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -402,7 +403,7 @@ const AddFatReportModal = ({ isOpen, onClose, onSave, fatPeriod, project, totalR
             </div>
             <div id="fat-report-total-summary-id" className={`sat-total-summary ${isTotalValid ? 'ok' : 'error'}`}>
                 Total: {total} / {totalRequirements}
-                {!isTotalValid && <div id="fat-report-total-error-message-id" style={{fontSize: '0.8em', marginTop: '5px'}}>Total must be {totalRequirements} to save, or 0 to clear.</div>}
+                {!isTotalValid && <div id="fat-report-total-error-message-id" style={{ fontSize: '0.8em', marginTop: '5px' }}>Total must be {totalRequirements} to save, or 0 to clear.</div>}
             </div>
             <div id="fat-report-modal-actions-id" className="modal-actions">
                 <button type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
@@ -468,7 +469,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
             legendItems
         };
     };
-    
+
     const { data: fatChartData, legendItems: fatLegendItems } = getFatChartConfig(fatPeriod.fat_report, chartBorderColor);
     const totalReported = fatPeriod.fat_report ? Object.values(fatPeriod.fat_report).reduce((a, b) => a + b, 0) : 0;
 
@@ -489,7 +490,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
         const defectForNav = { ...defect, project: project };
         onNavigateToDefect(defectForNav, defect.status === 'Closed');
     };
-    
+
     const handleRequirementClick = (req) => {
         const fullRequirement = allProcessedRequirements.find(fullReq => fullReq.id === req.id);
         if (fullRequirement) {
@@ -572,8 +573,8 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                             <ul className="fat-item-list">
                                 {filteredDefects.map(def => (
                                     <li key={def.id}>
-                                        <button 
-                                            onClick={() => handleDefectClick(def)} 
+                                        <button
+                                            onClick={() => handleDefectClick(def)}
                                             className="link-button"
                                             style={{ textDecoration: def.status === 'Closed' ? 'line-through' : 'none', opacity: def.status === 'Closed' ? 0.7 : 1 }}
                                         >
@@ -588,9 +589,9 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
                 </div>
             </div>
 
-            <KpiModal 
-                isOpen={isKpiModalOpen} 
-                onClose={() => setIsKpiModalOpen(false)} 
+            <KpiModal
+                isOpen={isKpiModalOpen}
+                onClose={() => setIsKpiModalOpen(false)}
                 fatPeriod={fatPeriod}
                 project={project}
                 showMainMessage={showMainMessage}
@@ -642,70 +643,70 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
         setIsKpiModalOpen(true);
     };
 
-   const handleStartPeriod = async (startDate, releaseId) => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/fat/${project}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start_date: startDate, release_id: releaseId })
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
-                
-                fetchFatData();
-                setIsStartModalOpen(false);
-                showMainMessage('FAT period started successfully.', 'success');
-                if (onDataRefresh) onDataRefresh();
-            } catch (error) {
-                showMainMessage(error.message, 'error');
-            }
-        };
+    const handleStartPeriod = async (startDate, releaseId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${project}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_date: startDate, release_id: releaseId })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to start FAT period.');
 
-        const handleCompletePeriod = async () => {
-            if (!activeFatPeriod) return;
+            fetchFatData();
+            setIsStartModalOpen(false);
+            showMainMessage('FAT period started successfully.', 'success');
+            if (onDataRefresh) onDataRefresh();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
 
-            if (!activeFatPeriod.fat_report) {
-                showMainMessage("Please add FAT results before completing the period.", "error");
-                return; 
-            }
+    const handleCompletePeriod = async () => {
+        if (!activeFatPeriod) return;
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, {
-                    method: 'PUT',
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
-                
-                fetchFatData();
-                showMainMessage('FAT period completed successfully.', 'success');
-                if (onDataRefresh) onDataRefresh();
-            } catch (error) {
-                showMainMessage(error.message, 'error');
-            }
-        };
+        if (!activeFatPeriod.fat_report) {
+            showMainMessage("Please add FAT results before completing the period.", "error");
+            return;
+        }
 
-        const handleDeleteRequest = (period) => {
-            setFatPeriodToDelete(period);
-        };
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${activeFatPeriod.id}/complete`, {
+                method: 'PUT',
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to complete FAT period.');
 
-        const handleConfirmDelete = async () => {
-            if (!fatPeriodToDelete) return;
-            try {
-                const response = await fetch(`${API_BASE_URL}/fat/${fatPeriodToDelete.id}`, {
-                    method: 'DELETE',
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
-                
-                fetchFatData();
-                showMainMessage('FAT period deleted successfully.', 'success');
-                if (onDataRefresh) onDataRefresh();
-            } catch (error) {
-                showMainMessage(error.message, 'error');
-            } finally {
-                setFatPeriodToDelete(null);
-            }
-        };
+            fetchFatData();
+            showMainMessage('FAT period completed successfully.', 'success');
+            if (onDataRefresh) onDataRefresh();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        }
+    };
+
+    const handleDeleteRequest = (period) => {
+        setFatPeriodToDelete(period);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!fatPeriodToDelete) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/fat/${fatPeriodToDelete.id}`, {
+                method: 'DELETE',
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to delete FAT period.');
+
+            fetchFatData();
+            showMainMessage('FAT period deleted successfully.', 'success');
+            if (onDataRefresh) onDataRefresh();
+        } catch (error) {
+            showMainMessage(error.message, 'error');
+        } finally {
+            setFatPeriodToDelete(null);
+        }
+    };
 
     if (isLoading) return <LoadingSpinner />;
 
@@ -774,7 +775,7 @@ const FatPage = ({ project, showMainMessage, onNavigateToDefect, onNavigateToReq
                 title={`Confirm ${fatPeriodToDelete?.status === 'active' ? 'Cancel' : 'Delete'} FAT Period`}
                 message={`Are you sure you want to permanently ${fatPeriodToDelete?.status === 'active' ? 'cancel this active' : 'delete this completed'} FAT period? This action cannot be undone.`}
             />
-            
+
             <KpiModal
                 isOpen={isKpiModalOpen}
                 onClose={() => setIsKpiModalOpen(false)}
@@ -913,7 +914,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     const [isDefectsCardOpen, setIsDefectsCardOpen] = useState(false);
     const [isFilterVisible, setIsFilterVisible] = useState(false);
     const [isPdfExporting, setIsPdfExporting] = useState(false);
-    
+
     const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
     const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
     const isDarkMode = useTheme();
@@ -921,17 +922,18 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
 
     const reqChartRef = useRef(null);
     const defectChartRef = useRef(null);
+    const { isMultiReleaseMode } = useGlobal(); // <-- ADDED THIS
 
     const releaseRequirements = useMemo(() => {
-        const directReqs = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseId === release.id);
+        const directReqs = allProcessedRequirements.filter(r => r.currentStatusDetails.releaseIds?.includes(release.id));
         const directReqIds = new Set(directReqs.map(r => r.id));
-        
+
         const subTasks = allProcessedRequirements.filter(r => r.parentId && directReqIds.has(r.parentId));
-        
+
         const combinedMap = new Map();
         directReqs.forEach(r => combinedMap.set(r.id, r));
         subTasks.forEach(r => combinedMap.set(r.id, r));
-        
+
         return Array.from(combinedMap.values());
     }, [allProcessedRequirements, release.id]);
 
@@ -947,7 +949,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         return releaseRequirements.filter(r => selectedSprints.includes(r.currentStatusDetails.sprint));
     }, [releaseRequirements, selectedSprints]);
 
-    const uniqueFilteredDefects = useMemo(() => 
+    const uniqueFilteredDefects = useMemo(() =>
         Array.from(new Map(filteredRequirements.flatMap(r => r.linkedDefects || []).map(d => [d.id, d])).values()),
         [filteredRequirements]
     );
@@ -983,14 +985,14 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         });
 
         if (done === 0 && notDone === 0) {
-             return { chartData: null, chartTitle: `Progress (${filteredRequirements.length} items)`, chartAriaLabel: 'No requirement data to display.', legendItems: [] };
+            return { chartData: null, chartTitle: `Progress (${filteredRequirements.length} items)`, chartAriaLabel: 'No requirement data to display.', legendItems: [] };
         }
 
         const data = {
             labels: ['Done', 'Not Done'],
             datasets: [{ data: [done, notDone], backgroundColor: ['#4CAF50', '#F44336'], borderColor: [chartBorderColor], borderWidth: 1 }],
         };
-        
+
         const dynamicLegendItems = [];
         if (done > 0) dynamicLegendItems.push({ text: `Done (${done})`, color: '#4CAF50' });
         if (notDone > 0) dynamicLegendItems.push({ text: `Not Done (${notDone})`, color: '#F44336' });
@@ -1033,7 +1035,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
 
     const handleSprintChange = (newSelection) => setSelectedSprints(newSelection);
     const handleDefectClick = () => setIsDefectsCardOpen(prev => !prev);
-    
+
     const sprintFilterElement = isFilterVisible ? (
         <SprintFilter
             availableSprints={availableSprints}
@@ -1043,10 +1045,10 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     ) : null;
 
     const releaseCard = (
-        <ReleaseCard 
-            key={release.id} 
-            release={release} 
-            requirements={filteredRequirements} 
+        <ReleaseCard
+            key={release.id}
+            release={release}
+            requirements={filteredRequirements}
             defects={displayDefects}
             defectCount={defectCount}
             onNavigate={onNavigateToRequirement}
@@ -1066,7 +1068,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
             chartRef={reqChartRef}
         />
     );
-    
+
     const defectDetailsCard = isDefectsCardOpen ? (
         <DefectDetailsCard
             key={`defect-details-${release.id}`}
@@ -1104,7 +1106,7 @@ const ReleaseCountdown = ({ activeReleases }) => {
     const calculateDaysLeft = () => {
         const releaseDate = new Date(currentRelease.release_date);
         const today = new Date();
-        today.setHours(0, 0, 0, 0); 
+        today.setHours(0, 0, 0, 0);
         releaseDate.setHours(0, 0, 0, 0);
 
         const differenceInTime = releaseDate.getTime() - today.getTime();
@@ -1162,7 +1164,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
                 <h3>Defects for {release.name}</h3>
                 <button type="button" onClick={onClose} className="close-button">X</button>
             </div>
-            
+
             {isFilterVisible && (
                 <div id={`defect-details-filter-container-${release.id}`} className="fat-filter-container">
                     <DefectFilter
@@ -1210,6 +1212,7 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
 const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, onFinalize, onEdit, onDefectClick, onExportExcel, onExportPdf, isPdfExporting, sprintFilter, onToggleFilter, showFilterToggle, chartData, chartRef, chartTitle, chartAriaLabel, legendItems }) => {
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const exportContainerRef = useRef(null);
+    const { isMultiReleaseMode } = useGlobal(); // <-- ADDED THIS
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -1232,10 +1235,30 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
     };
 
     const totalExpectedReqs = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.expected_time || 0), 0);
-    const totalRealTcCreation = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_tc_creation || 0), 0);
-    const totalRealTesting = requirements.reduce((sum, r) => sum + (r.currentStatusDetails.real_time_testing || 0), 0);
+
+    let totalRealTcCreation = 0;
+    let totalRealTesting = 0;
+
+    requirements.forEach(r => {
+        if (isMultiReleaseMode && r.currentStatusDetails.release_time_tracking && r.currentStatusDetails.release_time_tracking[release.id]) {
+            totalRealTcCreation += parseFloat(r.currentStatusDetails.release_time_tracking[release.id].tc || 0);
+            totalRealTesting += parseFloat(r.currentStatusDetails.release_time_tracking[release.id].test || 0);
+        } else {
+            // Fallback to legacy
+            totalRealTcCreation += (r.currentStatusDetails.real_time_tc_creation || 0);
+            totalRealTesting += (r.currentStatusDetails.real_time_testing || 0);
+        }
+    });
+
     const totalRealReqs = totalRealTcCreation + totalRealTesting;
-    const totalRealDefects = (defects || []).reduce((sum, d) => sum + (d.real_time || 0), 0);
+
+    // Filter defects based on release mapping
+    const applicableDefects = defects.filter(d => {
+        if (!isMultiReleaseMode || !d.release_ids || d.release_ids.length === 0) return true;
+        return d.release_ids.includes(release.id);
+    });
+
+    const totalRealDefects = (applicableDefects || []).reduce((sum, d) => sum + (d.real_time || 0), 0);
 
     return (
         <div id={`release-card-${release.id}`} className="release-card">
@@ -1248,7 +1271,7 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
                     </button>
                 </div>
             </div>
-            
+
             <div id={`release-card-body-${release.id}`} className="release-card-body">
                 <div id={`release-charts-container-${release.id}`} className="release-charts">
                     {chartData ? (
@@ -1275,7 +1298,7 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
                     </ul>
                 </div>
             </div>
-            
+
             <div className="release-time-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed var(--border-color)', fontSize: '0.85em', textAlign: 'center' }}>
                 <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '8px', borderRadius: '6px' }}>
                     <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Expected (Reqs)</div>
@@ -1298,7 +1321,7 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
                         {sprintFilter}
                     </div>
                 )}
-                
+
                 <div id={`release-card-actions-${release.id}`} className="release-card-actions">
                     {showFilterToggle && (
                         <button type="button" onClick={onToggleFilter} className="button-filter">Filter Sprints</button>
@@ -1455,7 +1478,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
             setBugToDelete(null);
         }
     };
-    
+
     const { data: fatExecutionChartData, legendItems: fatExecutionLegendItems } = getFatExecutionChartConfig(archive.fat_execution_report, chartBorderColor);
 
     const ourMetricsChartData = {
@@ -1481,28 +1504,28 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
     const primaryChartTitle = archive.fat_execution_report ? 'FAT Execution Results' : 'Our Final Metrics';
 
     const { data: satChartData, legendItems: satLegendItems } = getSatChartConfig(archive.sat_report, chartBorderColor);
-    
+
     const getBugLabelsChartConfig = (bugs) => {
         if (!bugs || bugs.length === 0) return { data: null, legendItems: [] };
-    
+
         const labeledBugs = bugs.filter(bug => bug.label);
-    
+
         if (labeledBugs.length === 0) {
             return { data: null, legendItems: [] };
         }
-    
+
         const labelCounts = labeledBugs.reduce((acc, bug) => {
             acc[bug.label] = (acc[bug.label] || 0) + 1;
             return acc;
         }, {});
-    
+
         const labels = Object.keys(labelCounts);
         const data = Object.values(labelCounts);
-    
+
         const colorPalette = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#f8f9fc', '#5e72e4', '#ffd600', '#2dce89', '#fb6340'];
         const labelColorMap = {};
         let colorIndex = 0;
-        
+
         const backgroundColor = labels.map(label => {
             if (!labelColorMap[label]) {
                 labelColorMap[label] = colorPalette[colorIndex % colorPalette.length];
@@ -1510,12 +1533,12 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
             }
             return labelColorMap[label];
         });
-    
+
         const legendItems = labels.map(label => ({
             text: `${label} (${labelCounts[label]})`,
             color: labelColorMap[label]
         }));
-    
+
         return {
             data: {
                 labels,
@@ -1535,7 +1558,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
             title: { display: false },
             tooltip: {
                 callbacks: {
-                    label: function(context) {
+                    label: function (context) {
                         let label = context.label || '';
                         if (label.length > 30) {
                             label = label.substring(0, 30) + '...';
@@ -1562,16 +1585,8 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
         return sum + (req?.currentStatusDetails.expected_time || 0);
     }, 0);
 
-    const totalRealTcCreation = items.reduce((sum, item) => {
-        const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
-        return sum + (req?.currentStatusDetails.real_time_tc_creation || 0);
-    }, 0);
-
-    const totalRealTesting = items.reduce((sum, item) => {
-        const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
-        return sum + (req?.currentStatusDetails.real_time_testing || 0);
-    }, 0);
-
+    const totalRealTcCreation = items.reduce((sum, item) => sum + (item.tc_time || 0), 0);
+    const totalRealTesting = items.reduce((sum, item) => sum + (item.test_time || 0), 0);
     const totalRealReqs = totalRealTcCreation + totalRealTesting;
 
     const totalRealDefects = defects.reduce((sum, d) => sum + (d.real_time || 0), 0);
@@ -1597,7 +1612,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                 </div>
 
                 <div id={`archived-release-card-body-${archive.id}`} className="release-card-body archived-details-body">
-                    
+
                     <div id="archived-charts-column-id" className="archived-details-column archived-charts-column">
                         <div id={`metrics-chart-wrapper-${archive.id}`} className="archived-details-chart-wrapper">
                             <h4>{primaryChartTitle}</h4>
@@ -1667,7 +1682,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
                     <div id="requirements-column-id" className="archived-details-column requirements-column">
                         <div id="archived-requirements-container-id" className="release-requirements">
-                             <h4>Requirements ({items.length})</h4>
+                            <h4>Requirements ({items.length})</h4>
                             <div id="archived-requirements-list-wrapper-id" className="requirements-list-wrapper">
                                 {isLoading ? <LoadingSpinner /> : (
                                     <ul className={`requirement-list frozen ${listHeightClass}`}>
@@ -1763,7 +1778,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
     const [isPdfExporting, setIsPdfExporting] = useState(false);
     const isDarkMode = useTheme();
     const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
-    
+
     const chartRefs = useRef({});
 
     useEffect(() => {
@@ -1791,8 +1806,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     return { ...archive, requirements: requirementsWithDefects };
                 });
                 setDetailedArchives(enrichedArchives);
-            } catch (error)
-            {
+            } catch (error) {
                 showMainMessage('Failed to load detailed data for comparison.', 'error');
             } finally {
                 setIsLoading(false);
@@ -1808,7 +1822,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
         let yPos = 15;
         const pageHeight = pdf.internal.pageSize.height;
         const leftMargin = 15;
-        
+
         try {
             for (const archive of detailedArchives) {
                 if (yPos > pageHeight - 120) {
@@ -1838,12 +1852,12 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
 
                 const metricsChart = chartRefs.current[`metrics-${archive.id}`];
                 const satChart = chartRefs.current[`sat-${archive.id}`];
-                
+
                 let finalMetricsLegendY = chartStartY + chartHeight + 5;
                 let finalSatLegendY = chartStartY + chartHeight + 5;
 
                 const metricsChartX = leftMargin + 15;
-                
+
                 yPos += 5;
                 if (metricsChart) {
                     metricsChart.resize(300, 300);
@@ -1871,7 +1885,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                         const metricsLegend = [];
                         if (archive.metrics.doneCount > 0) metricsLegend.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
                         if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
-                        
+
                         metricsLegend.forEach(item => {
                             pdf.setFillColor(item.color);
                             pdf.rect(metricsChartX, legendY, 3, 3, 'F');
@@ -1881,7 +1895,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     }
                     finalMetricsLegendY = legendY;
                 }
-                
+
                 const satChartX = leftMargin + chartWidth + 45;
                 yPos = chartStartY;
                 pdf.setFontSize(12);
@@ -1912,7 +1926,7 @@ const ComparisonView = ({ archives, onBack, allProcessedRequirements, showMainMe
                     pdf.text('No SAT Report', satChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
                     pdf.setTextColor(0, 0, 0);
                 }
-                
+
                 yPos = Math.max(finalMetricsLegendY, finalSatLegendY) + 10;
 
                 if (archive.requirements && archive.requirements.length > 0) {
@@ -2183,12 +2197,12 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const id = parseInt(archiveIdParam, 10);
             const arch = archivedReleases.find(a => a.id === id);
             setSelectedArchive(prev => {
-                 if (arch) {
-                     if (!prev || prev.id !== id || JSON.stringify(prev.sat_report) !== JSON.stringify(arch.sat_report)) {
-                         return arch;
-                     }
-                 }
-                 return prev;
+                if (arch) {
+                    if (!prev || prev.id !== id || JSON.stringify(prev.sat_report) !== JSON.stringify(arch.sat_report)) {
+                        return arch;
+                    }
+                }
+                return prev;
             });
         }
     }, [location.search, archivedReleases]);
@@ -2199,18 +2213,18 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
-            
+
             if (!response.ok) {
                 const result = await response.json();
                 throw new Error(result.error || 'Failed to complete release.');
             }
-            
+
             const params = new URLSearchParams(location.search);
             params.delete('archiveId');
-            
+
             navigate(`${location.pathname}?${params.toString()}`);
             fetchArchivedReleases();
-            
+
         } catch (error) {
             showMainMessage(error.message, 'error');
         }
@@ -2284,7 +2298,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to finalize release.');
             showMainMessage(result.message, 'success');
-            await fetchData(); 
+            await fetchData();
             await fetchActiveReleases();
         } catch (error) {
             showMainMessage(error.message, 'error');
@@ -2295,31 +2309,31 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     };
 
-const releasesPageTooltipContent = (
-    <div id="releases-page-tooltip-content-id">
-        <strong>Release Dashboard Guide</strong>
-        <p>Manage your project's release lifecycle. Switch between Active, Archived, and FAT views.</p>
-        
-        <strong style={{ marginTop: '10px', display: 'block' }}>Active Releases</strong>
-        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
-            <li>Track real-time progress with live charts.</li>
-            <li>Finalize a release to create a permanent record in the archives.</li>
-        </ul>
+    const releasesPageTooltipContent = (
+        <div id="releases-page-tooltip-content-id">
+            <strong>Release Dashboard Guide</strong>
+            <p>Manage your project's release lifecycle. Switch between Active, Archived, and FAT views.</p>
 
-        <strong style={{ marginTop: '10px', display: 'block' }}>Archived Releases</strong>
-        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
-            <li>Review final metrics and add SAT results.</li>
-            <li>Select multiple archives and click 'Compare Selected' for a side-by-side analysis.</li>
-        </ul>
+            <strong style={{ marginTop: '10px', display: 'block' }}>Active Releases</strong>
+            <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+                <li>Track real-time progress with live charts.</li>
+                <li>Finalize a release to create a permanent record in the archives.</li>
+            </ul>
 
-        <strong style={{ marginTop: '10px', display: 'block' }}>FAT (Factory Acceptance Testing)</strong>
-        <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
-            <li>Start a new FAT period for regression testing.</li>
-            <li>Select requirements from any combination of active and archived releases.</li>
-            <li>Automatically includes defects marked with the 'FAT Defect' flag.</li>
-        </ul>
-    </div>
-);
+            <strong style={{ marginTop: '10px', display: 'block' }}>Archived Releases</strong>
+            <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+                <li>Review final metrics and add SAT results.</li>
+                <li>Select multiple archives and click 'Compare Selected' for a side-by-side analysis.</li>
+            </ul>
+
+            <strong style={{ marginTop: '10px', display: 'block' }}>FAT (Factory Acceptance Testing)</strong>
+            <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+                <li>Start a new FAT period for regression testing.</li>
+                <li>Select requirements from any combination of active and archived releases.</li>
+                <li>Automatically includes defects marked with the 'FAT Defect' flag.</li>
+            </ul>
+        </div>
+    );
 
     const onSelectProject = (project) => {
         const params = new URLSearchParams(location.search);
@@ -2333,7 +2347,7 @@ const releasesPageTooltipContent = (
         params.delete('archiveId');
         params.set('view', 'active');
         navigate(`${location.pathname}?${params.toString()}`);
-        
+
         setComparisonList([]);
         setIsComparing(false);
     };
@@ -2343,7 +2357,7 @@ const releasesPageTooltipContent = (
         params.set('view', newView);
         params.delete('archiveId');
         navigate(`${location.pathname}?${params.toString()}`);
-        
+
         setComparisonList([]);
         setIsComparing(false);
     };
@@ -2359,7 +2373,7 @@ const releasesPageTooltipContent = (
         params.delete('archiveId');
         navigate(`${location.pathname}?${params.toString()}`);
     };
-    
+
     const fetchActiveReleases = useCallback(async () => {
         if (!selectedProject) return;
         setIsLoading(true);
@@ -2383,24 +2397,24 @@ const releasesPageTooltipContent = (
             if (!response.ok) throw new Error('Failed to fetch archived releases.');
             const result = await response.json();
             const archives = result.data || [];
-    
-        const archivesWithDefects = await Promise.all(archives.map(async (archive) => {
-            const detailsRes = await fetch(`${API_BASE_URL}/archives/details/${archive.id}`);
-            if (!detailsRes.ok) {
-                console.error(`Failed to fetch details for archive ${archive.id}`);
-                return { ...archive, defectCount: 0 };
-            }
-            const detailsData = await detailsRes.json();
-            const items = detailsData.data || [];
-            
-            const releaseDefects = items.flatMap(item => {
-                const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
-                return requirement ? (requirement.linkedDefects || []) : [];
-            });
-            const uniqueDefects = Array.from(new Map(releaseDefects.map(defect => [defect.id, defect])).values());
-            
-            return { ...archive, defectCount: uniqueDefects.length };
-        }));
+
+            const archivesWithDefects = await Promise.all(archives.map(async (archive) => {
+                const detailsRes = await fetch(`${API_BASE_URL}/archives/details/${archive.id}`);
+                if (!detailsRes.ok) {
+                    console.error(`Failed to fetch details for archive ${archive.id}`);
+                    return { ...archive, defectCount: 0 };
+                }
+                const detailsData = await detailsRes.json();
+                const items = detailsData.data || [];
+
+                const releaseDefects = items.flatMap(item => {
+                    const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
+                    return requirement ? (requirement.linkedDefects || []) : [];
+                });
+                const uniqueDefects = Array.from(new Map(releaseDefects.map(defect => [defect.id, defect])).values());
+
+                return { ...archive, defectCount: uniqueDefects.length };
+            }));
 
             setArchivedReleases(archivesWithDefects);
             return archivesWithDefects;
@@ -2457,7 +2471,7 @@ const releasesPageTooltipContent = (
         setIsSatModalOpen(false);
         fetchArchivedReleases();
     };
-    
+
     const handleToggleComparison = (archiveId) => {
         setComparisonList(prev =>
             prev.includes(archiveId)
@@ -2501,7 +2515,7 @@ const releasesPageTooltipContent = (
             border: border,
             alignment: { vertical: 'center', horizontal: 'center' }
         };
-        
+
         const cellStyle = {
             border: border,
             alignment: { wrapText: true, vertical: 'top' }
@@ -2532,7 +2546,7 @@ const releasesPageTooltipContent = (
 
         const processSheet = (data, headers) => {
             const dataAsArray = [headers, ...data.map(row => headers.map(header => row[header]))];
-            
+
             const ws = XLSX.utils.aoa_to_sheet(dataAsArray);
             ws['!cols'] = fitToColumn(dataAsArray);
 
@@ -2566,7 +2580,7 @@ const releasesPageTooltipContent = (
             'Requirement Link': req.currentStatusDetails.link || '',
             'Type': req.currentStatusDetails.type || '',
             'Sprint': req.currentStatusDetails.sprint || '',
-            'Linked Defects': (req.linkedDefects || []).map(d => d.title).join(', '), 
+            'Linked Defects': (req.linkedDefects || []).map(d => d.title).join(', '),
             'Status': req.currentStatusDetails.status
         }));
 
@@ -2613,7 +2627,7 @@ const releasesPageTooltipContent = (
             const wsReqs = processSheet(requirementsData, reqHeaders);
             XLSX.utils.book_append_sheet(wb, wsReqs, 'Requirements');
         }
-        
+
         if (reqDefectData.length > 0) {
             const reqDefectDataAsArray = [
                 reqDefectHeaders,
@@ -2631,7 +2645,7 @@ const releasesPageTooltipContent = (
             wsReqDefects['!cols'] = fitToColumn(reqDefectDataAsArray);
 
             const range = XLSX.utils.decode_range(wsReqDefects['!ref']);
-            for (let R = 1; R <= range.e.r; ++R) { 
+            for (let R = 1; R <= range.e.r; ++R) {
                 const rowData = reqDefectData[R - 1];
 
                 for (let C = 0; C <= range.e.c; C++) {
@@ -2657,7 +2671,7 @@ const releasesPageTooltipContent = (
             }
 
             for (let C = 0; C < reqDefectHeaders.length; C++) {
-                const cellRef = XLSX.utils.encode_cell({c: C, r: 0});
+                const cellRef = XLSX.utils.encode_cell({ c: C, r: 0 });
                 if (wsReqDefects[cellRef]) wsReqDefects[cellRef].s = headerStyle;
             }
 
@@ -2672,28 +2686,28 @@ const releasesPageTooltipContent = (
         XLSX.writeFile(wb, `${release.name}_Details.xlsx`);
     };
 
-const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs, sprintInfo) => {
+    const handleExportActiveReleaseToPdf = async (release, requirements, defects, chartRefs, sprintInfo) => {
         const { reqChart, defectChart } = chartRefs;
         const reqChartData = reqChart?.data;
         const defectChartData = defectChart?.data;
-    
+
         if (!reqChartData) {
             showMainMessage('Could not generate PDF. Requirements chart data is not available.', 'error');
             return;
         }
-    
+
         const pdf = new jsPDF('p', 'mm', 'a4');
         let yPos = 15;
         const leftMargin = 15;
-    
+
         const generateChartImage = (data) => {
             if (!data) return null;
-            
+
             const canvas = document.createElement('canvas');
             canvas.width = 800;
             canvas.height = 800;
             const ctx = canvas.getContext('2d');
-    
+
             const tempChart = new ChartJS(ctx, {
                 type: 'pie',
                 data: data,
@@ -2706,13 +2720,13 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                     },
                 },
             });
-    
+
             const imageData = tempChart.toBase64Image('image/png', 1.0);
             tempChart.destroy();
-    
+
             return imageData;
         };
-    
+
         const drawLegend = (pdfDoc, x, y, items) => {
             const itemHeight = 5;
             const boxSize = 3;
@@ -2725,7 +2739,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
             });
             return y + (items.length * itemHeight);
         };
-    
+
         try {
             const { selectedSprints, availableSprints } = sprintInfo || {};
 
@@ -2747,15 +2761,15 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
             yPos += 5;
             pdf.text(`Total Defects: ${defects.length}`, leftMargin, yPos);
             yPos += 10;
-    
+
             const chartStartY = yPos;
             const chartWidth = 60;
             const chartHeight = 60;
-    
+
             const reqChartX = leftMargin + 10;
-            
+
             yPos += 5;
-    
+
             const chartDataSource = release.fat_execution_report ? getFatExecutionChartConfig(release.fat_execution_report).data : reqChartData;
             const reqImg = generateChartImage(chartDataSource);
 
@@ -2763,7 +2777,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 pdf.addImage(reqImg, 'PNG', reqChartX, yPos, chartWidth, chartHeight);
             }
             let reqLegendY = yPos + chartHeight + 5;
-    
+
             let finalReqY;
             if (release.fat_execution_report) {
                 pdf.setFontSize(14);
@@ -2781,22 +2795,22 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 if (reqNotDone > 0) reqLegendItems.push({ text: `Not Done (${reqNotDone})`, color: '#F44336' });
                 finalReqY = drawLegend(pdf, reqChartX + 15, reqLegendY, reqLegendItems);
             }
-    
+
             yPos = chartStartY;
             const defectChartX = leftMargin + chartWidth + 30;
             pdf.setFontSize(14);
             pdf.text('Defect Status', defectChartX, yPos);
             yPos += 5;
-    
+
             let finalDefectY = yPos + chartHeight + 5;
-    
+
             if (defects.length > 0 && defectChartData) {
                 const defectImg = generateChartImage(defectChartData);
                 if (defectImg) {
                     pdf.addImage(defectImg, 'PNG', defectChartX, yPos, chartWidth, chartHeight);
                 }
                 let defectLegendY = yPos + chartHeight + 5;
-    
+
                 let defDone = 0, defNotDone = 0, defClosed = 0;
                 defects.forEach(d => {
                     if (d.status === 'Done') defDone++;
@@ -2808,7 +2822,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                     { text: `Not Done (${defNotDone})`, color: '#F44336' },
                     { text: `Closed (${defClosed})`, color: '#808080' }
                 ].filter(item => parseInt(item.text.match(/\((\d+)\)/)[1], 10) > 0);
-                
+
                 finalDefectY = drawLegend(pdf, defectChartX + 15, defectLegendY, defectLegendItems);
             } else {
                 pdf.setDrawColor(220, 220, 220);
@@ -2818,9 +2832,9 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 pdf.text('No Defects', defectChartX + chartWidth / 2, yPos + chartHeight / 2, { align: 'center', baseline: 'middle' });
                 pdf.setTextColor(0, 0, 0);
             }
-            
+
             yPos = Math.max(finalReqY, finalDefectY) + 10;
-    
+
             if (requirements.length > 0) {
                 if (yPos > 260) { pdf.addPage(); yPos = 15; }
                 pdf.setFontSize(14);
@@ -2851,7 +2865,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
-    
+
             if (defects.length > 0) {
                 if (yPos > 260) { pdf.addPage(); yPos = 15; }
                 pdf.setFontSize(14);
@@ -2880,7 +2894,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                         if (data.section === 'body' && data.column.index === 0 && data.cell.raw?.data?.isFat) {
                             const text = data.cell.text[0] || '';
                             const textWidth = pdf.getStringUnitWidth(text) * data.cell.styles.fontSize / pdf.internal.scaleFactor;
-                            
+
                             const labelFontSize = 7;
                             const labelPadding = 1.5;
                             const labelHeight = 4;
@@ -2908,7 +2922,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
                     }
                 });
             }
-    
+
             pdf.save(`${release.name}${sprintTitle}_Details.pdf`);
             showMainMessage('PDF exported successfully!', 'success');
         } catch (error) {
@@ -2952,7 +2966,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
             border: border,
             alignment: { vertical: 'center', horizontal: 'center' }
         };
-        
+
         const cellStyle = {
             border: border,
             alignment: { wrapText: true, vertical: 'top' }
@@ -2983,7 +2997,7 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
 
         const processSheet = (data, headers) => {
             const dataAsArray = [headers, ...data.map(row => headers.map(header => row[header]))];
-            
+
             const ws = XLSX.utils.aoa_to_sheet(dataAsArray);
             ws['!cols'] = fitToColumn(dataAsArray);
 
@@ -3106,21 +3120,21 @@ const handleExportActiveReleaseToPdf = async (release, requirements, defects, ch
             const wsSatBugs = processSheet(satBugsData, satBugsHeaders);
             XLSX.utils.book_append_sheet(wb, wsSatBugs, 'SAT Bugs');
         }
-        
+
         XLSX.writeFile(wb, `${archive.name}_Archive_Details.xlsx`);
     };
 
-const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs, chartRefs) => {
+    const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs, chartRefs) => {
         if (!chartRefs || !chartRefs.metricsChart) {
             showMainMessage('Could not generate PDF. Chart data is not available.', 'error');
             return;
         }
-    
+
         try {
             const pdf = new jsPDF('p', 'mm', 'a4');
             let yPos = 15;
             const leftMargin = 15;
-    
+
             pdf.setFontSize(18);
             pdf.text(archive.name, leftMargin, yPos);
             yPos += 8;
@@ -3131,7 +3145,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
             yPos += 5;
             pdf.text(`Total Defects: ${defects.length}`, leftMargin, yPos);
             yPos += 10;
-    
+
             const chartStartY = yPos;
             const chartWidth = 45;
             const chartHeight = 45;
@@ -3139,18 +3153,18 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
             const metricsChart = chartRefs.metricsChart;
             const satChart = chartRefs.satChart;
             const bugLabelsChart = chartRefs.bugLabelsChart;
-            
+
             let currentX = leftMargin;
             const finalYPositions = [];
 
-            
+
             let currentChartY = chartStartY + 5;
-            
+
             metricsChart.resize(300, 300);
             const metricsImg = metricsChart.toBase64Image();
             metricsChart.resize();
             pdf.addImage(metricsImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
-            
+
             let legendY = currentChartY + chartHeight + 5;
             pdf.setFontSize(9);
 
@@ -3170,7 +3184,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 const metricsLegend = [];
                 if (archive.metrics.doneCount > 0) metricsLegend.push({ text: `Done (${archive.metrics.doneCount})`, color: '#28a745' });
                 if (archive.metrics.notDoneCount > 0) metricsLegend.push({ text: `Not Done (${archive.metrics.notDoneCount})`, color: '#dc3545' });
-                
+
                 metricsLegend.forEach(item => {
                     pdf.setFillColor(item.color);
                     pdf.rect(currentX, legendY, 3, 3, 'F');
@@ -3213,19 +3227,19 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 const bugLabelsImg = bugLabelsChart.toBase64Image();
                 bugLabelsChart.resize();
                 pdf.addImage(bugLabelsImg, 'PNG', currentX, currentChartY, chartWidth, chartHeight);
-                
+
                 const bugLabelCounts = satBugs.reduce((acc, bug) => {
                     if (bug.label) {
                         acc[bug.label] = (acc[bug.label] || 0) + 1;
                     }
                     return acc;
                 }, {});
-    
+
                 const bugLabelsLegendItems = bugLabelsChart.data.labels.map((label, index) => ({
                     text: `${label} (${bugLabelCounts[label] || 0})`,
                     color: bugLabelsChart.data.datasets[0].backgroundColor[index]
                 }));
-    
+
                 let bugLabelsLegendY = currentChartY + chartHeight + 5;
                 pdf.setFontSize(8);
                 bugLabelsLegendItems.forEach(item => {
@@ -3236,9 +3250,9 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 });
                 finalYPositions.push(bugLabelsLegendY);
             }
-    
+
             yPos = (finalYPositions.length > 0 ? Math.max(...finalYPositions) : chartStartY + chartHeight + 5) + 10;
-    
+
             if (items.length > 0) {
                 const body = items.map(item => {
                     const req = allProcessedRequirements.find(r => r.id === item.requirement_group_id);
@@ -3247,7 +3261,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                         item.final_status
                     ];
                 });
-    
+
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Requirement', 'Final Status']],
@@ -3267,13 +3281,13 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
-    
+
             if (defects.length > 0) {
                 const defectBody = defects.map(d => [
                     { content: d.title, data: { url: d.link || '', isFat: d.is_fat_defect } },
                     d.status
                 ]);
-    
+
                 autoTable(pdf, {
                     startY: yPos,
                     head: [['Defect', 'Status']],
@@ -3293,7 +3307,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                         if (data.section === 'body' && data.column.index === 0 && data.cell.raw?.data?.isFat) {
                             const text = data.cell.text[0] || '';
                             const textWidth = pdf.getStringUnitWidth(text) * data.cell.styles.fontSize / pdf.internal.scaleFactor;
-                            
+
                             const labelFontSize = 7;
                             const labelPadding = 1.5;
                             const labelHeight = 4;
@@ -3322,7 +3336,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 });
                 yPos = pdf.lastAutoTable.finalY + 10;
             }
-    
+
             if (satBugs && satBugs.length > 0) {
                 const body = satBugs.map(bug => {
                     let fullTitle = bug.title;
@@ -3357,7 +3371,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                     }
                 });
             }
-    
+
             pdf.save(`${archive.name}_Archive_Details.pdf`);
             showMainMessage('PDF exported successfully!', 'success');
         } catch (error) {
@@ -3393,20 +3407,20 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
         const archivesToCompare = archivedReleases.filter(ar => comparisonList.includes(ar.id));
 
         if (isComparing) {
-            return <ComparisonView 
-                        archives={archivesToCompare} 
-                        onBack={() => setIsComparing(false)} 
-                        allProcessedRequirements={allProcessedRequirements}
-                        showMainMessage={showMainMessage} 
-                    />;
+            return <ComparisonView
+                archives={archivesToCompare}
+                onBack={() => setIsComparing(false)}
+                allProcessedRequirements={allProcessedRequirements}
+                showMainMessage={showMainMessage}
+            />;
         }
-        
+
         if (selectedArchive) {
-            return <ArchivedReleaseDetails 
-                archive={selectedArchive} 
-                onBack={handleBackToArchives} 
-                onNavigateToRequirement={onNavigateToRequirement} 
-                onNavigateToDefect={onNavigateToDefect} 
+            return <ArchivedReleaseDetails
+                archive={selectedArchive}
+                onBack={handleBackToArchives}
+                onNavigateToRequirement={onNavigateToRequirement}
+                onNavigateToDefect={onNavigateToDefect}
                 allProcessedRequirements={allProcessedRequirements}
                 onAddSatReport={handleOpenSatModal}
                 onCompleteRelease={handleCompleteRelease}
@@ -3430,9 +3444,9 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                     {archivedReleases.map(archive => (
                         <div key={archive.id} id={`archived-card-${archive.id}`} className="release-card archived-card">
                             <div id={`archived-card-header-${archive.id}`} className="release-card-header archived-card-header">
-                                <input 
-                                    type="checkbox" 
-                                    checked={comparisonList.includes(archive.id)} 
+                                <input
+                                    type="checkbox"
+                                    checked={comparisonList.includes(archive.id)}
                                     onChange={() => handleToggleComparison(archive.id)}
                                     aria-label={`Select ${archive.name} for comparison`}
                                 />
@@ -3495,7 +3509,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 <div id="select-project-prompt-releases-id" className="empty-column-message">Please select a project to view releases.</div>
             )}
 
-            <FinalizeReleaseModal 
+            <FinalizeReleaseModal
                 isOpen={isFinalizeModalOpen}
                 onClose={() => setIsFinalizeModalOpen(false)}
                 onConfirm={handleConfirmFinalize}
@@ -3503,7 +3517,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
             />
 
             {releaseToEdit && (
-                <EditReleaseModal 
+                <EditReleaseModal
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
@@ -3523,7 +3537,7 @@ const handleExportArchivedReleaseToPdf = async (archive, items, defects, satBugs
                 showMainMessage={showMainMessage}
             />
 
-            <ConfirmationModal 
+            <ConfirmationModal
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}
                 onConfirm={handleConfirmDelete}

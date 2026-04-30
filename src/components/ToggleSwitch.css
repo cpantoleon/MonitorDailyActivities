@@ -63,7 +63,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  right: 70px; /* Θέση για το "Collapsed" (αριστερά) */
+  right: calc(100% - 25px);
   border: 1px solid var(--border-color); 
   border-radius: 50%; /* Τέλειος κύκλος */
   transition: all 0.3s ease-in 0s;
@@ -110,11 +110,11 @@
 
 .simple-toggle-switch-switch {
   position: absolute;
-  content: '';
   height: 18px;
   width: 18px;
-  left: 4px;
-  bottom: 3px;
+  left: 3px;
+  top: 50%;
+  margin-top: -9px; /* Perfectly centers the 18px circle vertically */
   background-color: white;
   border: 1px solid var(--border-color);
   transition: .4s;
@@ -128,7 +128,7 @@
 }
 
 .simple-toggle-switch-checkbox:checked + .simple-toggle-switch-label .simple-toggle-switch-switch {
-  transform: translateX(22px);
+  transform: translateX(24px); /* (50px width - 2px borders - 18px circle - 6px padding) = 24px perfectly symmetric */
   border-color: transparent;
 }
 

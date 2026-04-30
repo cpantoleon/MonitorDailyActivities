@@ -74,7 +74,7 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal, onOpenJiraImport
   );
 };
 
-const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate }) => {
+const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, projectReleases, allReleases }) => {
   const [selectedProject, setSelectedProject] = useState('');
   const [allDefects, setAllDefects] = useState([]);
   const [activeDefects, setActiveDefects] = useState([]);
@@ -108,7 +108,6 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const [isChartTruncated, setIsChartTruncated] = useState(false);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [selectedReleases, setSelectedReleases] = useState([]);
-  const [projectReleases, setProjectReleases] = useState([]);
   const [archivedReleases, setArchivedReleases] = useState([]);
   const [fatDefectFilter, setFatDefectFilter] = useState(null);
   const [filterOptions, setFilterOptions] = useState({
@@ -158,20 +157,20 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   // Handle Manual Project Selection with URL Update
   const handleManualProjectSelect = useCallback((project) => {
-      setSelectedProject(project);
-      setIsSearching(false);
-      setDefectQuery('');
-      setSearchResults([]);
-      setSearchSuggestions([]);
-      setSelectedReleases([]);
-      
-      if (project) {
-          navigate(`/defects?d_project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
-      } else {
-          navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
-      }
+    setSelectedProject(project);
+    setIsSearching(false);
+    setDefectQuery('');
+    setSearchResults([]);
+    setSearchSuggestions([]);
+    setSelectedReleases([]);
+
+    if (project) {
+      navigate(`/defects?d_project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
+    } else {
+      navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
+    }
   }, [navigate, showClosedView]);
-  
+
   useEffect(() => {
     if (selectedProject) {
       sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
@@ -180,7 +179,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    let projectParam = params.get('d_project'); 
+    let projectParam = params.get('d_project');
     const viewParam = params.get('view');
     const highlightId = params.get('highlight');
     let needsReplace = false;
@@ -197,13 +196,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     if (projectParam && projectParam !== selectedProject) {
       setSelectedProject(projectParam);
     }
-    
+
     if (viewParam === 'closed' && !showClosedView) {
-        setShowClosedView(true);
+      setShowClosedView(true);
     } else if (viewParam !== 'closed' && showClosedView) {
-        setShowClosedView(false);
+      setShowClosedView(false);
     }
-    
+
     if (highlightId) {
       setHighlightedDefectId(highlightId);
       params.delete('highlight');
@@ -245,21 +244,21 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       setIsLoading(false);
     }
   }, [showMessage]);
-  
+
   const fetchArchivedReleases = useCallback(async (project) => {
-      if (!project) {
-          setArchivedReleases([]);
-          return;
-      }
-      try {
-          const response = await fetch(`${API_BASE_URL}/archives/${project}`);
-          if (!response.ok) throw new Error('Failed to fetch archived releases');
-          const result = await response.json();
-          setArchivedReleases(result.data || []);
-      } catch (error) {
-          showMessage(`Error loading archived releases: ${error.message}`, 'error');
-          setArchivedReleases([]);
-      }
+    if (!project) {
+      setArchivedReleases([]);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/archives/${project}`);
+      if (!response.ok) throw new Error('Failed to fetch archived releases');
+      const result = await response.json();
+      setArchivedReleases(result.data || []);
+    } catch (error) {
+      showMessage(`Error loading archived releases: ${error.message}`, 'error');
+      setArchivedReleases([]);
+    }
   }, [showMessage]);
 
   useEffect(() => {
@@ -290,7 +289,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           element.classList.add('highlight-item');
-          
+
           setTimeout(() => {
             element.classList.remove('highlight-item');
           }, 3000);
@@ -315,51 +314,50 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     }
 
     if (selectedReleases.length === 0) {
-        return defectsToFilter;
+      return defectsToFilter;
     }
 
     const originalReleaseIdToArchiveIdMap = new Map(
-        archivedReleases.map(ar => [ar.original_release_id, ar.id])
+      archivedReleases.map(ar => [ar.original_release_id, ar.id])
     );
 
     return defectsToFilter.filter(defect => {
-        if (!defect.linkedRequirements || defect.linkedRequirements.length === 0) {
-            return false;
-        }
-        
-        const linkedReqsWithDetails = defect.linkedRequirements.map(lr => 
-            allRequirements.find(ar => ar.id === lr.groupId)
-        ).filter(Boolean);
+      if (!defect.linkedRequirements || defect.linkedRequirements.length === 0) {
+        return false;
+      }
 
-        if (showClosedView) {
-            return linkedReqsWithDetails.some(req => {
-                const sprint = req.currentStatusDetails.sprint;
-                if (sprint && sprint.startsWith('Archived_from_')) {
-                    const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
-                    const matchingArchivedRelease = archivedReleases.find(ar => ar.name === releaseName);
-                    if (matchingArchivedRelease && selectedReleases.includes(matchingArchivedRelease.id)) {
-                        return true;
-                    }
-                } 
-                
-                if (req.currentStatusDetails.releaseId) {
-                    const originalReleaseId = req.currentStatusDetails.releaseId;
-                    const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
-                    
-                    if (archiveId && selectedReleases.includes(archiveId)) {
-                        return true;
-                    }
-                    if (!archiveId && selectedReleases.includes(originalReleaseId)) {
-                        return true;
-                    }
-                }
-                return false;
+      const linkedReqsWithDetails = defect.linkedRequirements.map(lr =>
+        allRequirements.find(ar => ar.id === lr.groupId)
+      ).filter(Boolean);
+
+      if (showClosedView) {
+        return linkedReqsWithDetails.some(req => {
+          const sprint = req.currentStatusDetails.sprint;
+          if (sprint && sprint.startsWith('Archived_from_')) {
+            const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
+            const matchingArchivedRelease = archivedReleases.find(ar => ar.name === releaseName);
+            if (matchingArchivedRelease && selectedReleases.includes(matchingArchivedRelease.id)) {
+              return true;
+            }
+          }
+
+          // ΔΙΟΡΘΩΣΗ ΕΔΩ
+          if (req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.length > 0) {
+            return req.currentStatusDetails.releaseIds.some(originalReleaseId => {
+              const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
+              if (archiveId && selectedReleases.includes(archiveId)) return true;
+              if (!archiveId && selectedReleases.includes(originalReleaseId)) return true;
+              return false;
             });
-        } else {
-            return linkedReqsWithDetails.some(req => 
-                req.currentStatusDetails.releaseId && selectedReleases.includes(req.currentStatusDetails.releaseId)
-            );
-        }
+          }
+          return false;
+        });
+      } else {
+        // ΔΙΟΡΘΩΣΗ ΕΔΩ
+        return linkedReqsWithDetails.some(req =>
+          req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.some(id => selectedReleases.includes(id))
+        );
+      }
     });
   }, [isSearching, searchResults, showClosedView, closedDefects, activeDefects, selectedReleases, allRequirements, archivedReleases, fatDefectFilter]);
 
@@ -373,18 +371,18 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   const handleSelectAll = () => {
     if (selectedIds.length === filteredDefects.length && filteredDefects.length > 0) {
-        setSelectedIds([]);
+      setSelectedIds([]);
     } else {
-        setSelectedIds(filteredDefects.map(d => d.id));
+      setSelectedIds(filteredDefects.map(d => d.id));
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} defects?`)) return;
-    
+
     for (const id of selectedIds) {
-        await fetch(`${API_BASE_URL}/defects/${id}`, { method: 'DELETE' }).catch(console.error);
+      await fetch(`${API_BASE_URL}/defects/${id}`, { method: 'DELETE' }).catch(console.error);
     }
     setSelectedIds([]);
     setIsSelectionMode(false);
@@ -392,70 +390,55 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   };
 
   useEffect(() => {
-    if (selectedProject) {
-        const releases = allRequirements
-            .filter(r => r.project === selectedProject && r.isActive && r.currentStatusDetails.releaseId && r.currentStatusDetails.releaseName)
-            .map(r => ({
-                id: r.currentStatusDetails.releaseId,
-                name: r.currentStatusDetails.releaseName,
-                is_current: false 
-            }));
-        const uniqueReleases = Array.from(new Map(releases.map(item => [item.id, item])).values())
-            .sort((a, b) => a.name.localeCompare(b.name));
-        setProjectReleases(uniqueReleases);
-    } else {
-        setProjectReleases([]);
-    }
-  }, [selectedProject, allRequirements]);
-
-  useEffect(() => {
     if (!selectedProject) {
-        setFilterOptions({ enabledReleases: [], isFatDefectYesEnabled: false, isFatDefectNoEnabled: false });
-        return;
+      setFilterOptions({ enabledReleases: [], isFatDefectYesEnabled: false, isFatDefectNoEnabled: false });
+      return;
     }
     const baseItems = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
-    
+
     const originalReleaseIdToArchiveIdMap = new Map(
-        archivedReleases.map(ar => [ar.original_release_id, ar.id])
+      archivedReleases.map(ar => [ar.original_release_id, ar.id])
     );
 
     const relevantReleaseIds = new Set();
     if (showClosedView) {
-        baseItems.forEach(defect => {
-            const linkedReqs = (defect.linkedRequirements || []).map(lr => allRequirements.find(ar => ar.id === lr.groupId)).filter(Boolean);
-            linkedReqs.forEach(req => {
-                const sprint = req.currentStatusDetails.sprint;
-                
-                if (sprint && sprint.startsWith('Archived_from_')) {
-                    const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
-                    const matchingArchive = archivedReleases.find(ar => ar.name === releaseName);
-                    if (matchingArchive) {
-                        relevantReleaseIds.add(matchingArchive.id);
-                    }
-                } else if (req.currentStatusDetails.releaseId) {
-                    const originalReleaseId = req.currentStatusDetails.releaseId;
-                    const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
-                    
-                    if (archiveId) {
-                        relevantReleaseIds.add(archiveId);
-                    } else {
-                        relevantReleaseIds.add(originalReleaseId);
-                    }
-                }
-            });
-        });
-    } else {
-        baseItems.forEach(defect => {
-            const linkedReqsWithDetails = (defect.linkedRequirements || []).map(lr => 
-                allRequirements.find(ar => ar.id === lr.groupId)
-            ).filter(Boolean);
+      baseItems.forEach(defect => {
+        const linkedReqs = (defect.linkedRequirements || []).map(lr => allRequirements.find(ar => ar.id === lr.groupId)).filter(Boolean);
+        linkedReqs.forEach(req => {
+          const sprint = req.currentStatusDetails.sprint;
 
-            linkedReqsWithDetails.forEach(req => {
-                if (req.currentStatusDetails.releaseId) {
-                    relevantReleaseIds.add(req.currentStatusDetails.releaseId);
-                }
+          if (sprint && sprint.startsWith('Archived_from_')) {
+            const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
+            const matchingArchive = archivedReleases.find(ar => ar.name === releaseName);
+            if (matchingArchive) {
+              relevantReleaseIds.add(matchingArchive.id);
+            }
+          } else if (req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.length > 0) {
+            // ΔΙΟΡΘΩΣΗ ΕΔΩ
+            req.currentStatusDetails.releaseIds.forEach(originalReleaseId => {
+              const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
+              if (archiveId) {
+                relevantReleaseIds.add(archiveId);
+              } else {
+                relevantReleaseIds.add(originalReleaseId);
+              }
             });
+          }
         });
+      });
+    } else {
+      baseItems.forEach(defect => {
+        const linkedReqsWithDetails = (defect.linkedRequirements || []).map(lr =>
+          allRequirements.find(ar => ar.id === lr.groupId)
+        ).filter(Boolean);
+
+        linkedReqsWithDetails.forEach(req => {
+          // ΔΙΟΡΘΩΣΗ ΕΔΩ
+          if (req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.length > 0) {
+            req.currentStatusDetails.releaseIds.forEach(id => relevantReleaseIds.add(id));
+          }
+        });
+      });
     }
 
     const isFatDefectYesEnabled = baseItems.some(d => d.is_fat_defect);
@@ -471,113 +454,113 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   const updateChartData = useCallback(async (defectsForChart) => {
     if (!selectedProject) {
-        setAreaChartData(null);
-        setReturnToDevChartData(null);
-        setDoneNotDoneChartData(null);
-        setIsChartTruncated(false);
-        return;
+      setAreaChartData(null);
+      setReturnToDevChartData(null);
+      setDoneNotDoneChartData(null);
+      setIsChartTruncated(false);
+      return;
     }
 
     if (!showClosedView && defectsForChart.length > 0) {
-        let doneCount = 0, notDoneCount = 0;
-        defectsForChart.forEach(defect => {
-            if (defect.status === 'Done') doneCount++;
-            else notDoneCount++;
+      let doneCount = 0, notDoneCount = 0;
+      defectsForChart.forEach(defect => {
+        if (defect.status === 'Done') doneCount++;
+        else notDoneCount++;
+      });
+      if (doneCount > 0 || notDoneCount > 0) {
+        setDoneNotDoneChartData({
+          labels: ['Done', 'Not Done'],
+          datasets: [{
+            label: 'Defect Status',
+            data: [doneCount, notDoneCount],
+            backgroundColor: ['#151078', '#b84459'],
+            borderColor: ['#ffffff', '#ffffff'],
+            borderWidth: 1,
+          }],
         });
-        if (doneCount > 0 || notDoneCount > 0) {
-            setDoneNotDoneChartData({
-                labels: ['Done', 'Not Done'],
-                datasets: [{
-                    label: 'Defect Status',
-                    data: [doneCount, notDoneCount],
-                    backgroundColor: ['#151078', '#b84459'],
-                    borderColor: ['#ffffff', '#ffffff'],
-                    borderWidth: 1,
-                }],
-            });
-        } else {
-            setDoneNotDoneChartData(null);
-        }
-    } else {
+      } else {
         setDoneNotDoneChartData(null);
+      }
+    } else {
+      setDoneNotDoneChartData(null);
     }
 
     const defectsForAreaChart = defectsForChart.filter(defect => defect.area !== 'Imported');
     if (defectsForAreaChart.length > 0) {
-        const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
-            acc[defect.area] = (acc[defect.area] || 0) + 1;
-            return acc;
-        }, {});
-        setAreaChartData({
-            labels: Object.keys(areaCounts),
-            datasets: [{
-                label: '# of Defects',
-                data: Object.values(areaCounts),
-                backgroundColor: ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(199, 199, 199, 0.7)', 'rgba(83, 102, 255, 0.7)', 'rgba(102, 255, 83, 0.7)', 'rgba(143, 255, 193, 0.7)', 'rgba(255, 173, 191, 0.7)', 'rgba(221, 171, 255, 0.7)', 'rgba(43, 63, 63, 0.7)', 'rgba(65, 5, 23, 0.7)', 'rgba(224, 255, 51, 0.7)'],
-                borderColor: ['rgba(255,99,132,1)', 'rgba(54,162,235,1)', 'rgba(255,206,86,1)', 'rgba(75,192,192,1)', 'rgba(153,102,255,1)', 'rgba(255,159,64,1)', 'rgba(199,199,199,1)', 'rgba(83,102,255,1)', 'rgba(102,255,83,1)', 'rgba(143, 255, 193, 1)', 'rgba(255, 173, 191, 1)', 'rgba(221, 171, 255, 1)', 'rgba(43, 63, 63, 1)', 'rgba(65, 5, 23, 1)', 'rgba(224, 255, 51, 1)'],
-                borderWidth: 1,
-            }],
-        });
+      const areaCounts = defectsForAreaChart.reduce((acc, defect) => {
+        acc[defect.area] = (acc[defect.area] || 0) + 1;
+        return acc;
+      }, {});
+      setAreaChartData({
+        labels: Object.keys(areaCounts),
+        datasets: [{
+          label: '# of Defects',
+          data: Object.values(areaCounts),
+          backgroundColor: ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(199, 199, 199, 0.7)', 'rgba(83, 102, 255, 0.7)', 'rgba(102, 255, 83, 0.7)', 'rgba(143, 255, 193, 0.7)', 'rgba(255, 173, 191, 0.7)', 'rgba(221, 171, 255, 0.7)', 'rgba(43, 63, 63, 0.7)', 'rgba(65, 5, 23, 0.7)', 'rgba(224, 255, 51, 0.7)'],
+          borderColor: ['rgba(255,99,132,1)', 'rgba(54,162,235,1)', 'rgba(255,206,86,1)', 'rgba(75,192,192,1)', 'rgba(153,102,255,1)', 'rgba(255,159,64,1)', 'rgba(199,199,199,1)', 'rgba(83,102,255,1)', 'rgba(102,255,83,1)', 'rgba(143, 255, 193, 1)', 'rgba(255, 173, 191, 1)', 'rgba(221, 171, 255, 1)', 'rgba(43, 63, 63, 1)', 'rgba(65, 5, 23, 1)', 'rgba(224, 255, 51, 1)'],
+          borderWidth: 1,
+        }],
+      });
     } else {
-        setAreaChartData(null);
+      setAreaChartData(null);
     }
 
     if (selectedProject) {
-        try {
-            const statusType = showClosedView ? 'closed' : 'active';
-            const response = await fetch(`${API_BASE_URL}/defects/${selectedProject}/return-counts?statusType=${statusType}`);
-            if (!response.ok) throw new Error('Failed to fetch return to developer counts');
-            const result = await response.json();
-            if (result.data && result.data.length > 0) {
-                const defectIdsInView = new Set(defectsForChart.map(d => d.id));
-                let filteredData = result.data.filter(d => d.return_count >= 2 && defectIdsInView.has(d.id));
-                if (filteredData.length > 5) {
-                    setIsChartTruncated(true);
-                    filteredData = filteredData.slice(-5);
-                } else {
-                    setIsChartTruncated(false);
-                }
+      try {
+        const statusType = showClosedView ? 'closed' : 'active';
+        const response = await fetch(`${API_BASE_URL}/defects/${selectedProject}/return-counts?statusType=${statusType}`);
+        if (!response.ok) throw new Error('Failed to fetch return to developer counts');
+        const result = await response.json();
+        if (result.data && result.data.length > 0) {
+          const defectIdsInView = new Set(defectsForChart.map(d => d.id));
+          let filteredData = result.data.filter(d => d.return_count >= 2 && defectIdsInView.has(d.id));
+          if (filteredData.length > 5) {
+            setIsChartTruncated(true);
+            filteredData = filteredData.slice(-5);
+          } else {
+            setIsChartTruncated(false);
+          }
 
-                if (filteredData.length > 0) {
-                    const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
-                        const words = label.split(' ');
-                        let lines = [], currentLine = '';
-                        for (const word of words) {
-                            if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
-                                lines.push(currentLine);
-                                currentLine = word;
-                            } else {
-                                currentLine = currentLine ? `${currentLine} ${word}` : word;
-                            }
-                        }
-                        if (currentLine) lines.push(currentLine);
-                        return lines;
-                    };
-                    const fullLabels = filteredData.map(d => d.title);
-                    const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
-                    setReturnToDevChartData({
-                        labels: multilineLabels,
-                        datasets: [{
-                            label: 'Times Returned to Developer',
-                            data: filteredData.map(d => d.return_count),
-                            backgroundColor: 'rgba(255, 159, 64, 0.7)',
-                            borderColor: 'rgba(255, 159, 64, 1)',
-                            borderWidth: 1,
-                            fullLabels: fullLabels,
-                        }]
-                    });
+          if (filteredData.length > 0) {
+            const splitLabelIntoLines = (label, maxCharsPerLine = 35) => {
+              const words = label.split(' ');
+              let lines = [], currentLine = '';
+              for (const word of words) {
+                if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+                  lines.push(currentLine);
+                  currentLine = word;
                 } else {
-                    setReturnToDevChartData(null);
+                  currentLine = currentLine ? `${currentLine} ${word}` : word;
                 }
-            } else {
-                setReturnToDevChartData(null);
-            }
-        } catch (error) {
-            showMessage(`Could not load return counts chart: ${error.message}`, 'error');
+              }
+              if (currentLine) lines.push(currentLine);
+              return lines;
+            };
+            const fullLabels = filteredData.map(d => d.title);
+            const multilineLabels = fullLabels.map(label => splitLabelIntoLines(label));
+            setReturnToDevChartData({
+              labels: multilineLabels,
+              datasets: [{
+                label: 'Times Returned to Developer',
+                data: filteredData.map(d => d.return_count),
+                backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1,
+                fullLabels: fullLabels,
+              }]
+            });
+          } else {
             setReturnToDevChartData(null);
+          }
+        } else {
+          setReturnToDevChartData(null);
         }
-    } else {
+      } catch (error) {
+        showMessage(`Could not load return counts chart: ${error.message}`, 'error');
         setReturnToDevChartData(null);
+      }
+    } else {
+      setReturnToDevChartData(null);
     }
   }, [selectedProject, showClosedView, showMessage]);
 
@@ -594,13 +577,13 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const refreshDefectsState = useCallback(async () => {
     const freshDefects = await fetchAllDefects();
     if (isSearching) {
-        const lowerCaseQuery = defectQuery.toLowerCase();
-        const sourceData = freshDefects.filter(defect => 
-            (showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed') &&
-            (selectedProject ? defect.project === selectedProject : true)
-        );
-        const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
-        setSearchResults(newSearchResults);
+      const lowerCaseQuery = defectQuery.toLowerCase();
+      const sourceData = freshDefects.filter(defect =>
+        (showClosedView ? defect.status === 'Closed' : defect.status !== 'Closed') &&
+        (selectedProject ? defect.project === selectedProject : true)
+      );
+      const newSearchResults = sourceData.filter(defect => defect.title.toLowerCase().includes(lowerCaseQuery));
+      setSearchResults(newSearchResults);
     }
     if (onDefectUpdate) onDefectUpdate();
   }, [fetchAllDefects, isSearching, defectQuery, showClosedView, selectedProject, onDefectUpdate]);
@@ -617,7 +600,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'create'} defect`);
-      
+
       showMessage(`Defect ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
       await refreshDefectsState();
       handleManualProjectSelect(projectForSubmit);
@@ -636,23 +619,23 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
         body: JSON.stringify({ orderedIds })
       });
       if (!response.ok) throw new Error('Failed to save new order');
-      await refreshDefectsState(); 
+      await refreshDefectsState();
     } catch (error) {
       showMessage("Failed to save order", "error");
     }
   };
 
   const handleExpandAll = async (isExpanded) => {
-      try {
-          await fetch(`${API_BASE_URL}/defects/expand-all`, { 
-              method: 'PUT', 
-              headers: {'Content-Type': 'application/json'}, 
-              body: JSON.stringify({ project: selectedProject, is_expanded: isExpanded ? 1 : 0 }) 
-          });
-          await refreshDefectsState();
-      } catch (error) {
-          showMessage("Failed to update card visibility", "error");
-      }
+    try {
+      await fetch(`${API_BASE_URL}/defects/expand-all`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: selectedProject, is_expanded: isExpanded ? 1 : 0 })
+      });
+      await refreshDefectsState();
+    } catch (error) {
+      showMessage("Failed to update card visibility", "error");
+    }
   };
 
   const handleDeleteRequest = (defect) => { setDefectToDelete(defect); setIsDeleteConfirmModalOpen(true); };
@@ -688,28 +671,28 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   };
 
   const handleUpdateHistoryComment = async (historyId, newComment) => {
-      try {
-          const response = await fetch(`${API_BASE_URL}/defects/history/${historyId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ comment: newComment })
-          });
-          
-          if (!response.ok) throw new Error("Failed to update history comment.");
-          
-          showMessage("Comment updated successfully.", "success");
-          
-          if (defectForHistory) {
-              const histResponse = await fetch(`${API_BASE_URL}/defects/${defectForHistory.id}/history`);
-              const histResult = await histResponse.json();
-              setDefectHistory(histResult.data || []);
-          }
+    try {
+      const response = await fetch(`${API_BASE_URL}/defects/history/${historyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: newComment })
+      });
 
-          await refreshDefectsState();
-          
-      } catch (error) {
-          showMessage(`Error: ${error.message}`, 'error');
+      if (!response.ok) throw new Error("Failed to update history comment.");
+
+      showMessage("Comment updated successfully.", "success");
+
+      if (defectForHistory) {
+        const histResponse = await fetch(`${API_BASE_URL}/defects/${defectForHistory.id}/history`);
+        const histResult = await histResponse.json();
+        setDefectHistory(histResult.data || []);
       }
+
+      await refreshDefectsState();
+
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    }
   };
 
   const handleNavigateToRequirement = useCallback((project, sprint, requirementId) => {
@@ -722,8 +705,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   const handleOpenJiraImportModal = useCallback(() => setIsJiraImportModalOpen(true), []);
   const handleCloseJiraImportModal = useCallback(() => setIsJiraImportModalOpen(false), []);
   const handleJiraImportSuccess = useCallback(async (project) => {
-      await refreshDefectsState();
-      if (project) handleManualProjectSelect(project);
+    await refreshDefectsState();
+    if (project) handleManualProjectSelect(project);
   }, [refreshDefectsState, handleManualProjectSelect]);
 
   const executeDefectImport = useCallback(async (file, project, importMode = 'all') => {
@@ -732,16 +715,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     formData.append('project', project);
     formData.append('importMode', importMode);
     try {
-        const response = await fetch(`${API_BASE_URL}/import/defects`, { method: 'POST', body: formData });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to import defects.');
-        showMessage(result.message, 'success');
-        await refreshDefectsState();
-        handleManualProjectSelect(project);
+      const response = await fetch(`${API_BASE_URL}/import/defects`, { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to import defects.');
+      showMessage(result.message, 'success');
+      await refreshDefectsState();
+      handleManualProjectSelect(project);
     } catch (error) {
-        showMessage(`Import Error: ${error.message}`, 'error');
+      showMessage(`Import Error: ${error.message}`, 'error');
     } finally {
-        handleCloseImportModal();
+      handleCloseImportModal();
     }
   }, [refreshDefectsState, showMessage, handleCloseImportModal, handleManualProjectSelect]);
 
@@ -750,26 +733,26 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     formData.append('file', file);
     formData.append('project', project);
     try {
-        const response = await fetch(`${API_BASE_URL}/import/defects/validate`, { method: 'POST', body: formData });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Validation failed');
-        const { newCount, duplicateCount, skippedCount } = result.data;
-        if (newCount === 0 && duplicateCount === 0) {
-            let message = "Import finished. No valid defects found to import.";
-            if (skippedCount > 0) message += ` Skipped items: ${skippedCount}.`;
-            showMessage(message, 'info');
-            handleCloseImportModal();
-            return;
-        }
-        if (duplicateCount > 0) {
-            setImportConfirmData({ file, project, ...result.data });
-            setIsImportConfirmModalOpen(true);
-        } else {
-            executeDefectImport(file, project);
-        }
-    } catch (error) {
-        showMessage(`Validation Error: ${error.message}`, 'error');
+      const response = await fetch(`${API_BASE_URL}/import/defects/validate`, { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Validation failed');
+      const { newCount, duplicateCount, skippedCount } = result.data;
+      if (newCount === 0 && duplicateCount === 0) {
+        let message = "Import finished. No valid defects found to import.";
+        if (skippedCount > 0) message += ` Skipped items: ${skippedCount}.`;
+        showMessage(message, 'info');
         handleCloseImportModal();
+        return;
+      }
+      if (duplicateCount > 0) {
+        setImportConfirmData({ file, project, ...result.data });
+        setIsImportConfirmModalOpen(true);
+      } else {
+        executeDefectImport(file, project);
+      }
+    } catch (error) {
+      showMessage(`Validation Error: ${error.message}`, 'error');
+      handleCloseImportModal();
     }
   }, [executeDefectImport, showMessage, handleCloseImportModal]);
 
@@ -859,11 +842,11 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     if (!defect) return;
 
     // Προσθέτουμε τον χρόνο που γύρισε το Modal στο payload
-    const payload = { 
-        ...defect, 
-        status: newStatus, 
-        comment,
-        real_time: timeData.real_time !== undefined ? timeData.real_time : defect.real_time
+    const payload = {
+      ...defect,
+      status: newStatus,
+      comment,
+      real_time: timeData.real_time !== undefined ? timeData.real_time : defect.real_time
     };
 
     try {
@@ -933,9 +916,9 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
   const handleReleaseChange = (releaseId) => {
     setSelectedReleases(prev =>
-        prev.includes(releaseId)
-            ? prev.filter(id => id !== releaseId)
-            : [...prev, releaseId]
+      prev.includes(releaseId)
+        ? prev.filter(id => id !== releaseId)
+        : [...prev, releaseId]
     );
   };
 
@@ -949,19 +932,19 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
   };
 
   const handleSaveFixedDate = async (defect, newDate) => {
-      const payload = { fixed_date: newDate ? new Date(newDate).toISOString() : null };
-      try {
-          const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-          });
-          if (!response.ok) throw new Error('Failed to update fixed date.');
-          showMessage('Fixed date updated successfully!', 'success');
-          await refreshDefectsState();
-      } catch (error) {
-          showMessage(`Error: ${error.message}`, 'error');
-      }
+    const payload = { fixed_date: newDate ? new Date(newDate).toISOString() : null };
+    try {
+      const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update fixed date.');
+      showMessage('Fixed date updated successfully!', 'success');
+      await refreshDefectsState();
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    }
   };
 
   const baseChartOptions = {
@@ -986,81 +969,81 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     indexAxis: 'y',
     layout: { padding: { left: 20 } },
     plugins: {
-        ...baseChartOptions.plugins,
-        legend: { display: false },
-        title: { 
-            ...baseChartOptions.plugins.title,
-            text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}${isChartTruncated ? ' (Last 5 items)' : ''}`
-        },
-        tooltip: {
-            callbacks: {
-                title: function(context) { 
-                    const dataIndex = context[0].dataIndex;
-                    const fullLabel = context[0].dataset.fullLabels[dataIndex];
-                    const maxCharsPerLine = 50;
-                    const words = fullLabel.split(' ');
-                    const lines = [];
-                    let currentLine = '';
-                    for (const word of words) {
-                        if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
-                            lines.push(currentLine);
-                            currentLine = word;
-                        } else {
-                            currentLine = currentLine ? `${currentLine} ${word}` : word;
-                        }
-                    }
-                    if (currentLine) {
-                        lines.push(currentLine);
-                    }
-                    return lines;
-                }, 
-                label: function(context) { 
-                    let label = context.dataset.label || ''; 
-                    if (label) { 
-                        label += ': '; 
-                    } 
-                    if (context.parsed.x !== null) { 
-                        label += context.parsed.x; 
-                    } 
-                    return label; 
-                },
-                afterBody: function() {
-                    if (isChartTruncated) {
-                        return [
-                            '',
-                            'Note: Displaying only the last 5 items based on return count.',
-                            'For the complete history and details, please visit the',
-                            'release page and download the detailed Excel report.'
-                        ];
-                    }
-                    return [];
-                }
+      ...baseChartOptions.plugins,
+      legend: { display: false },
+      title: {
+        ...baseChartOptions.plugins.title,
+        text: `Defect "Back to Developer" Count for ${selectedProject || 'Project'}${isChartTruncated ? ' (Last 5 items)' : ''}`
+      },
+      tooltip: {
+        callbacks: {
+          title: function (context) {
+            const dataIndex = context[0].dataIndex;
+            const fullLabel = context[0].dataset.fullLabels[dataIndex];
+            const maxCharsPerLine = 50;
+            const words = fullLabel.split(' ');
+            const lines = [];
+            let currentLine = '';
+            for (const word of words) {
+              if ((currentLine + ' ' + word).length > maxCharsPerLine && currentLine.length > 0) {
+                lines.push(currentLine);
+                currentLine = word;
+              } else {
+                currentLine = currentLine ? `${currentLine} ${word}` : word;
+              }
             }
+            if (currentLine) {
+              lines.push(currentLine);
+            }
+            return lines;
+          },
+          label: function (context) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.x !== null) {
+              label += context.parsed.x;
+            }
+            return label;
+          },
+          afterBody: function () {
+            if (isChartTruncated) {
+              return [
+                '',
+                'Note: Displaying only the last 5 items based on return count.',
+                'For the complete history and details, please visit the',
+                'release page and download the detailed Excel report.'
+              ];
+            }
+            return [];
+          }
         }
+      }
     },
-    scales: { 
-        x: { 
-            beginAtZero: true, 
-            ticks: { 
-                stepSize: 1 
-            } 
-        }, 
-        y: {
-            ticks: {autoSkip: false}
-        } 
-    } 
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1
+        }
+      },
+      y: {
+        ticks: { autoSkip: false }
+      }
+    }
   };
 
   const renderBoard = (defectsToDisplay) => {
     if (showClosedView) {
       return (
         <div className="defects-board-container">
-          <DefectColumn 
-            title="Closed" 
-            defects={defectsToDisplay} 
-            onEditDefect={handleOpenModal} 
-            onShowHistory={handleShowHistory} 
-            onDeleteRequest={handleDeleteRequest} 
+          <DefectColumn
+            title="Closed"
+            defects={defectsToDisplay}
+            onEditDefect={handleOpenModal}
+            onShowHistory={handleShowHistory}
+            onDeleteRequest={handleDeleteRequest}
             onNavigate={handleNavigateToRequirement}
             onUpdateFixedDate={handleSaveFixedDate}
             isSelectionMode={isSelectionMode}
@@ -1073,16 +1056,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
     return (
       <div className="defects-board-container">
         {DEFECT_STATUS_COLUMNS.map(column => (
-          <DefectColumn 
-            key={column.status} 
-            title={column.title} 
-            defects={defectsToDisplay.filter(d => d.status === column.status)} 
-            onEditDefect={handleOpenModal} 
-            onShowHistory={handleShowHistory} 
-            onDeleteRequest={handleDeleteRequest} 
-            onNavigate={handleNavigateToRequirement} 
-            onDragStart={handleDragStart} 
-            onDrop={handleDrop} 
+          <DefectColumn
+            key={column.status}
+            title={column.title}
+            defects={defectsToDisplay.filter(d => d.status === column.status)}
+            onEditDefect={handleOpenModal}
+            onShowHistory={handleShowHistory}
+            onDeleteRequest={handleDeleteRequest}
+            onNavigate={handleNavigateToRequirement}
+            onDragStart={handleDragStart}
+            onDrop={handleDrop}
             onMoveToClosed={handleMoveToClosed}
             onUpdateFixedDate={handleSaveFixedDate}
             onReorder={handleReorderDefects}
@@ -1094,110 +1077,114 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
       </div>
     );
   };
-  
-  const releasesForFilter = useMemo(() => {
-      if (!showClosedView) {
-          return projectReleases;
-      }
-      
-      const archivedAsReleases = archivedReleases.map(ar => ({ 
-          id: ar.id, 
-          name: ar.name, 
-          is_current: false 
-      }));
-      
-      const combined = [...projectReleases, ...archivedAsReleases];
-      
-      return Array.from(new Map(combined.map(item => [item.name, item])).values())
-          .sort((a, b) => a.name.localeCompare(b.name));
 
-  }, [showClosedView, projectReleases, archivedReleases]);
+  // Replace the releasesForFilter useMemo:
+  const releasesForFilter = useMemo(() => {
+    // Filter allReleases by the defects page's own selectedProject
+    const activeForProject = allReleases.filter(r => r.project === selectedProject);
+
+    if (!showClosedView) {
+      return activeForProject;
+    }
+
+    const archivedAsReleases = archivedReleases.map(ar => ({
+      id: ar.id,
+      name: ar.name,
+      is_current: false
+    }));
+
+    const combined = [...activeForProject, ...archivedAsReleases];
+
+    return Array.from(new Map(combined.map(item => [item.name, item])).values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+  }, [showClosedView, allReleases, selectedProject, archivedReleases]);
 
   return (
     <div className="main-content-area">
       <div className="selection-controls">
         <div className="selection-group-container">
-            <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={handleManualProjectSelect} />
-            <SearchComponent
-              query={defectQuery}
-              onQueryChange={handleDefectQueryChange}
-              onSearch={handleDefectSearch}
-              onClear={handleClearDefectSearch}
-              onSuggestionSelect={handleDefectSuggestionSelect}
-              suggestions={searchSuggestions}
-              placeholder="Search defects by title..."
-            />
-            <button
-              ref={filterButtonRef}
-              className="btn-primary filter-toggle-button"
-              disabled={!selectedProject}
-            >
-                Filter
-            </button>
+          <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={handleManualProjectSelect} />
+          <SearchComponent
+            query={defectQuery}
+            onQueryChange={handleDefectQueryChange}
+            onSearch={handleDefectSearch}
+            onClear={handleClearDefectSearch}
+            onSuggestionSelect={handleDefectSuggestionSelect}
+            suggestions={searchSuggestions}
+            placeholder="Search defects by title..."
+          />
+          <button
+            ref={filterButtonRef}
+            className="btn-primary filter-toggle-button"
+            disabled={!selectedProject}
+          >
+            Filter
+          </button>
         </div>
         <div className="page-actions-group">
-            
-            {/* ΠΡΟΣΘΗΚΗ: Expand / Collapse All */}
-            <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
-                <button 
-                    onClick={() => handleExpandAll(true)} 
-                    className="btn-primary" 
-                    style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
-                    disabled={!selectedProject}>
-                    Expand All
-                </button>
-                <button 
-                    onClick={() => handleExpandAll(false)} 
-                    className="btn-primary" 
-                    style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} 
-                    disabled={!selectedProject}>
-                    Collapse All
-                </button>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px', paddingRight: '8px' }}>
-                <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject}>
-                    {isSelectionMode ? 'Cancel Selection' : 'Select Mode'}
-                </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <Tooltip content={defectChartTooltipContent} position="bottom" />
-                <button onClick={handleToggleCharts} className="btn-primary" disabled={!selectedProject || filteredDefects.length === 0}>
-                    {showAreaChart ? 'Hide' : 'Show'} Charts
-                </button>
-            </div>
-            <button onClick={() => setShowClosedView(p => !p)} className="btn-primary btn-toggle-closed" disabled={isLoading || closedDefects.length === 0}>
-                {showClosedView ? 'Show Active Defects' : 'Show Closed Defects'}
+          {/* ΠΡΟΣΘΗΚΗ: Expand / Collapse All */}
+          <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+            <button
+              onClick={() => handleExpandAll(true)}
+              className="btn-primary"
+              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              disabled={!selectedProject}>
+              Expand All
             </button>
-            <DefectOptionsMenu
-                onOpenAddModal={() => handleOpenModal()}
-                onOpenImportModal={handleOpenImportModal}
-                onOpenJiraImportModal={handleOpenJiraImportModal}
-            />
+            <button
+              onClick={() => handleExpandAll(false)}
+              className="btn-primary"
+              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              disabled={!selectedProject}>
+              Collapse All
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px', paddingRight: '8px' }}>
+            <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject}>
+              {isSelectionMode ? 'Cancel Selection' : 'Select Mode'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Tooltip content={defectChartTooltipContent} position="bottom" />
+            <button onClick={handleToggleCharts} className="btn-primary" disabled={!selectedProject || filteredDefects.length === 0}>
+              {showAreaChart ? 'Hide' : 'Show'} Charts
+            </button>
+          </div>
+          <button onClick={() => setShowClosedView(p => !p)} className="btn-primary btn-toggle-closed" disabled={isLoading || closedDefects.length === 0}>
+            {showClosedView ? 'Show Active Defects' : 'Show Closed Defects'}
+          </button>
+          <DefectOptionsMenu
+            onOpenAddModal={() => handleOpenModal()}
+            onOpenImportModal={handleOpenImportModal}
+            onOpenJiraImportModal={handleOpenJiraImportModal}
+          />
         </div>
       </div>
 
       {isSelectionMode && (
-          <div style={{
-              display: 'flex', alignItems: 'center', gap: '15px', padding: '15px 20px', 
-              backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', 
-              borderRadius: '12px', marginBottom: '25px', boxShadow: 'var(--card-shadow)',
-              flexWrap: 'nowrap', overflowX: 'auto'
-          }}>
-              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{selectedIds.length} Selected</span>
-              <button onClick={handleSelectAll} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Select All</button>
-              <button onClick={() => setSelectedIds([])} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} disabled={selectedIds.length === 0}>Deselect</button>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto' }}>
-                  <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none' }} disabled={selectedIds.length === 0}>Delete</button>
-              </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '15px', padding: '15px 20px',
+          backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+          borderRadius: '12px', marginBottom: '25px', boxShadow: 'var(--card-shadow)',
+          flexWrap: 'nowrap', overflowX: 'auto'
+        }}>
+          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{selectedIds.length} Selected</span>
+          <button onClick={handleSelectAll} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Select All</button>
+          <button onClick={() => setSelectedIds([])} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} disabled={selectedIds.length === 0}>Deselect</button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto' }}>
+            <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none' }} disabled={selectedIds.length === 0}>Delete</button>
           </div>
+        </div>
       )}
 
       {isLoading && <p className="loading-message">Loading defects...</p>}
       {!isLoading && !isSearching && !selectedProject && <p className="empty-column-message">Please select a project to view defects, or use the search bar for all projects.</p>}
-      
+
       {showAreaChart && selectedProject && (
         <div className="charts-wrapper">
           {doneNotDoneChartData && !showClosedView && (
@@ -1217,46 +1204,46 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate })
 
       {!isLoading && (isSearching ? (filteredDefects.length > 0 ? renderBoard(filteredDefects) : <div className="empty-column-message">No results found for your search.</div>) : (selectedProject ? renderBoard(filteredDefects) : null))}
 
-      <UpdateStatusModal 
-        isOpen={isUpdateStatusModalOpen} 
-        onClose={handleCloseUpdateStatusModal} 
-        onSave={handleConfirmDefectStatusUpdate} 
-        item={statusUpdateInfo.defect} 
-        itemType="defect" 
-        newStatus={statusUpdateInfo.newStatus} 
-        showMessage={showMessage} 
+      <UpdateStatusModal
+        isOpen={isUpdateStatusModalOpen}
+        onClose={handleCloseUpdateStatusModal}
+        onSave={handleConfirmDefectStatusUpdate}
+        item={statusUpdateInfo.defect}
+        itemType="defect"
+        newStatus={statusUpdateInfo.newStatus}
+        showMessage={showMessage}
       />
-      <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} />
-      {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]);}} defect={defectForHistory} history={defectHistory} onSaveComment={handleUpdateHistoryComment} />}
+      <DefectModal isOpen={isModalOpen} onClose={handleCloseModal} onSubmit={handleSubmitDefect} defect={editingDefect} projects={projects || []} currentSelectedProject={selectedProject} allRequirements={allRequirements} allDefects={allDefects} allReleases={allReleases} archivedReleases={archivedReleases} />
+      {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]); }} defect={defectForHistory} history={defectHistory} onSaveComment={handleUpdateHistoryComment} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
       <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
       <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
       <JiraImportModal isOpen={isJiraImportModalOpen} onClose={handleCloseJiraImportModal} onImportSuccess={handleJiraImportSuccess} projects={projects || []} releases={projectReleases} currentProject={selectedProject} importType="defects" showMessage={showMessage} />
-      
+
       {isImportConfirmModalOpen && importConfirmData && (
-          <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
-              <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
-                  <h3>Confirm Defect Import</h3>
-                  <p>
-                      The file contains {importConfirmData.newCount} new defect(s) and {importConfirmData.duplicateCount} duplicate(s).
-                      {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
-                  </p>
-                  <p>How would you like to proceed?</p>
-                  <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
-                      <button onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
-                          Import All
-                      </button>
-                      {importConfirmData.newCount > 0 && (
-                          <button onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
-                              Import New Only
-                          </button>
-                      )}
-                      <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
-                          Cancel
-                      </button>
-                  </div>
-              </div>
+        <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>
+          <div className="confirmation-modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Confirm Defect Import</h3>
+            <p>
+              The file contains {importConfirmData.newCount} new defect(s) and {importConfirmData.duplicateCount} duplicate(s).
+              {importConfirmData.skippedCount > 0 && ` ${importConfirmData.skippedCount} row(s) were skipped due to invalid type.`}
+            </p>
+            <p>How would you like to proceed?</p>
+            <div className="modal-actions" style={{ justifyContent: 'center', gap: '12px' }}>
+              <button onClick={handleConfirmImportAll} className="modal-button-confirm" style={{ backgroundColor: '#c0392b' }}>
+                Import All
+              </button>
+              {importConfirmData.newCount > 0 && (
+                <button onClick={handleConfirmImportNewOnly} className="modal-button-confirm" style={{ backgroundColor: '#A0522D' }}>
+                  Import New Only
+                </button>
+              )}
+              <button onClick={() => { setIsImportConfirmModalOpen(false); setImportConfirmData(null); }} className="modal-button-cancel">
+                Cancel
+              </button>
+            </div>
           </div>
+        </div>
       )}
       <div ref={sidebarWrapperRef}>
         <FilterSidebar

@@ -140,13 +140,14 @@ const SprintActivitiesPage = ({
           link: req.currentStatusDetails.link || '',
           type: req.currentStatusDetails.type || '',
           tags: req.currentStatusDetails.tags || '',
-          release_id: req.currentStatusDetails.releaseId || '',
+          release_ids: req.currentStatusDetails.releaseIds || [], // ΔΙΟΡΘΩΣΗ ΕΔΩ
           parent_id: req.parentId || null,
           statusDate: new Date().toISOString().split('T')[0],
           existingRequirementGroupId: req.id,
           expected_time: req.currentStatusDetails.expected_time,
           real_time_tc_creation: req.currentStatusDetails.real_time_tc_creation,
-          real_time_testing: req.currentStatusDetails.real_time_testing
+          real_time_testing: req.currentStatusDetails.real_time_testing,
+          release_time_tracking: req.currentStatusDetails.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
         };
         await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(console.error);
       }
@@ -158,11 +159,11 @@ const SprintActivitiesPage = ({
   };
 
   const handleBulkAddRelease = async () => {
-    if (selectedIds.length === 0 || !bulkTargetRelease) return;
+    if (selectedIds.length === 0 || bulkTargetReleaseIds.length === 0) return;
     for (const id of selectedIds) {
       const req = displayableRequirements.find(r => r.id === id);
       if (req) {
-        const releaseVal = bulkTargetRelease === 'remove' ? '' : bulkTargetRelease;
+        const releaseVals = bulkTargetReleaseIds.includes('remove') ? [] : bulkTargetReleaseIds;
         const payload = {
           project: req.project,
           requirementName: req.requirementUserIdentifier,
@@ -172,20 +173,21 @@ const SprintActivitiesPage = ({
           link: req.currentStatusDetails.link || '',
           type: req.currentStatusDetails.type || '',
           tags: req.currentStatusDetails.tags || '',
-          release_id: releaseVal,
+          release_ids: releaseVals, // Αυτό ήταν σωστό
           parent_id: req.parentId || null,
           statusDate: new Date().toISOString().split('T')[0],
           existingRequirementGroupId: req.id,
           expected_time: req.currentStatusDetails.expected_time,
           real_time_tc_creation: req.currentStatusDetails.real_time_tc_creation,
-          real_time_testing: req.currentStatusDetails.real_time_testing
+          real_time_testing: req.currentStatusDetails.real_time_testing,
+          release_time_tracking: req.currentStatusDetails.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
         };
         await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(console.error);
       }
     }
     setSelectedIds([]);
     setIsSelectionMode(false);
-    setBulkTargetRelease('');
+    setBulkTargetReleaseIds([]);
     onDataRefresh();
   };
 
@@ -555,6 +557,7 @@ const SprintActivitiesPage = ({
         isSelectionMode={isSelectionMode}
         selectedIds={selectedIds}
         onToggleSelect={handleToggleSelect}
+        projectReleases={projectReleases}
       />
     </div>
   );

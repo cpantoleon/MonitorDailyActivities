@@ -4,79 +4,85 @@ import ToggleSwitch from './ToggleSwitch';
 import { useGlobal } from '../context/GlobalContext';
 
 const LayoutIcon = ({ type, isActive }) => {
-  const color = isActive ? 'var(--accent-color)' : 'var(--text-secondary)';
-  
-  if (type === 'layout-dense') {
-    return (
-      <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
-        <rect x="2" y="2" width="20" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="2" y="16" width="20" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="24" y="2" width="14" height="26" rx="2" stroke={color} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-  if (type === 'layout-grid-2') {
-    return (
-      <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
-        <rect x="2" y="2" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="22" y="2" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="2" y="16" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="22" y="16" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-  if (type === 'layout-grid-3') {
-    return (
-      <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
-        <rect x="1" y="2" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="14" y="2" width="12" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="28" y="2" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="1" y="16" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="14" y="16" width="12" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="28" y="16" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-  if (type === 'layout-top-full-bottom-3') {
-    return (
-      <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
-        <rect x="2" y="2" width="36" height="10" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="2" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="15" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
-        <rect x="28" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-  return null;
+    const color = isActive ? 'var(--accent-color)' : 'var(--text-secondary)';
+
+    if (type === 'layout-dense') {
+        return (
+            <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
+                <rect x="2" y="2" width="20" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="2" y="16" width="20" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="24" y="2" width="14" height="26" rx="2" stroke={color} strokeWidth="1.5" />
+            </svg>
+        );
+    }
+    if (type === 'layout-grid-2') {
+        return (
+            <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
+                <rect x="2" y="2" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="22" y="2" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="2" y="16" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="22" y="16" width="16" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+            </svg>
+        );
+    }
+    if (type === 'layout-grid-3') {
+        return (
+            <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
+                <rect x="1" y="2" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="14" y="2" width="12" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="28" y="2" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="1" y="16" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="14" y="16" width="12" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="28" y="16" width="11" height="12" rx="2" stroke={color} strokeWidth="1.5" />
+            </svg>
+        );
+    }
+    if (type === 'layout-top-full-bottom-3') {
+        return (
+            <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
+                <rect x="2" y="2" width="36" height="10" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="2" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="15" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
+                <rect x="28" y="15" width="10" height="13" rx="2" stroke={color} strokeWidth="1.5" />
+            </svg>
+        );
+    }
+    return null;
 };
 
 const SettingsModal = ({ isOpen, onClose, showMessage }) => {
     const { dashboardGridStyle, setDashboardGridStyle } = useGlobal();
     const [isDefaultExpanded, setIsDefaultExpanded] = useState(true);
     const [isGitCheckEnabled, setIsGitCheckEnabled] = useState(true);
+    const [isMultiReleaseModeLocal, setIsMultiReleaseModeLocal] = useState(false); // <-- ΔΗΛΩΣΗ ΕΔΩ
     const [localGridStyle, setLocalGridStyle] = useState(dashboardGridStyle);
     const [isLoading, setIsLoading] = useState(false);
 
     const layoutOptions = [
-      { id: 'layout-dense', name: 'Smart Layout' },
-      { id: 'layout-grid-2', name: 'Grid 2x2' },
-      { id: 'layout-grid-3', name: 'Grid 3x3' },
-      { id: 'layout-top-full-bottom-3', name: 'Top Row + 3 Cols' }
+        { id: 'layout-dense', name: 'Smart Layout' },
+        { id: 'layout-grid-2', name: 'Grid 2x2' },
+        { id: 'layout-grid-3', name: 'Grid 3x3' },
+        { id: 'layout-top-full-bottom-3', name: 'Top Row + 3 Cols' }
     ];
 
     useEffect(() => {
         if (isOpen) {
             setLocalGridStyle(dashboardGridStyle);
-            
+
             fetch('/api/settings/default-expanded')
                 .then(res => res.json())
                 .then(data => setIsDefaultExpanded(data.isExpanded))
-                .catch(() => {});
-            
+                .catch(() => { });
+
             fetch('/api/settings/git-check')
                 .then(res => res.json())
                 .then(data => setIsGitCheckEnabled(data.isEnabled))
-                .catch(() => {});
+                .catch(() => { });
+
+            fetch('/api/settings/multi-release-mode')
+                .then(res => res.json())
+                .then(data => setIsMultiReleaseModeLocal(data.isEnabled))
+                .catch(() => { });
         }
     }, [isOpen, dashboardGridStyle]);
 
@@ -84,7 +90,7 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
         setIsLoading(true);
         try {
             setDashboardGridStyle(localGridStyle);
-            
+
             await fetch('/api/settings/default-expanded', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -97,8 +103,20 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 body: JSON.stringify({ isEnabled: isGitCheckEnabled })
             });
 
+            await fetch('/api/settings/multi-release-mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isEnabled: isMultiReleaseModeLocal })
+            });
+
             showMessage("Settings saved successfully!", "success");
             onClose();
+
+            // Κάνουμε reload για να εφαρμοστεί το Multi-Release Mode παντού
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+
         } catch (error) {
             showMessage(error.message, "error");
         } finally {
@@ -186,6 +204,24 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 />
             </div>
 
+            <div className="settings-section-divider" style={{ margin: '15px 0' }}></div>
+
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
+                <div>
+                    <label style={{ margin: 0, fontSize: '1.1em', color: 'var(--text-primary)' }}>Advanced Multi-Release Mode</label>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>
+                        Enable granular time tracking and defect mapping per release for items spanning multiple releases.
+                    </p>
+                </div>
+                <ToggleSwitch
+                    id="multi-release-toggle"
+                    checked={isMultiReleaseModeLocal}
+                    onChange={(e) => setIsMultiReleaseModeLocal(e.target.checked)}
+                    option1="On"
+                    option2="Off"
+                />
+            </div>
+
             <div className="settings-section-divider"></div>
 
             <div className="form-group">
@@ -195,7 +231,7 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 </p>
                 <div className="layout-selector-grid">
                     {layoutOptions.map(layout => (
-                        <div 
+                        <div
                             key={layout.id}
                             className={`layout-option-card ${localGridStyle === layout.id ? 'active' : ''}`}
                             onClick={() => setLocalGridStyle(layout.id)}

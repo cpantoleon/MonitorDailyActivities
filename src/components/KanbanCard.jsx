@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGlobal } from '../context/GlobalContext';
 
 const FocusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,9 +52,18 @@ const KanbanCard = React.memo(({
   onAddSubtask,
   isSelectionMode,
   isSelected,
-  onToggleSelect
+  onToggleSelect,
+  projectReleases
 }) => {
-  const { comment, link, type, tags, releaseName, releaseDate, activityId, is_expanded } = requirement.currentStatusDetails;
+  const { isMultiReleaseMode } = useGlobal();
+  const { comment, link, type, tags, releaseIds, activityId, is_expanded } = requirement.currentStatusDetails;
+  
+  // ΔΙΟΡΘΩΣΗ: Χρήση Number() για να ταιριάζουν τα IDs ανεξάρτητα αν είναι String ή Int
+  const matchedReleases = useMemo(() => {
+     if (!releaseIds || !Array.isArray(releaseIds) || !projectReleases) return [];
+     return releaseIds.map(id => projectReleases.find(r => Number(r.id) === Number(id))).filter(Boolean);
+  }, [releaseIds, projectReleases]);
+  
   const navigate = useNavigate();
 
   const [isExpanded, setIsExpanded] = useState(is_expanded !== 0);
@@ -234,11 +244,28 @@ const KanbanCard = React.memo(({
 
         {isExpanded && (
           <div id={`kanban-card-details-${requirement.id}`} className="kanban-card-details">
-            {!isSubtask && releaseName && (
-              <p id={`card-detail-item-release-${requirement.id}`} className="card-detail-item">
-                <span className="detail-label">Release:</span>
-                <span className="detail-value">{releaseName} (Due: {formatDate(releaseDate)})</span>
-              </p>
+            
+            {/* ΔΙΟΡΘΩΣΗ: Εμφάνιση των Releases σαν όμορφα tags */}
+            {!isSubtask && matchedReleases.length > 0 && (
+              <div id={`card-detail-item-release-${requirement.id}`} className="card-detail-item">
+                <span className="detail-label">Releases:</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                    {matchedReleases.map(mr => (
+                        <span key={mr.id} style={{ 
+                            backgroundColor: 'var(--bg-tertiary)', 
+                            border: '1px solid var(--border-color)', 
+                            color: 'var(--text-primary)',
+                            padding: '3px 10px', 
+                            borderRadius: '12px', 
+                            fontSize: '0.85em', 
+                            fontWeight: '600',
+                            display: 'inline-block'
+                        }}>
+                            {mr.name}
+                        </span>
+                    ))}
+                </div>
+              </div>
             )}
 
             {type && (
@@ -271,8 +298,7 @@ const KanbanCard = React.memo(({
               </p>
             )}
 
-            {/* NEW TIME TRACKING DISPLAY */}
-            {(requirement.currentStatusDetails.expected_time || requirement.currentStatusDetails.real_time_tc_creation || requirement.currentStatusDetails.real_time_testing) && (
+            {(requirement.currentStatusDetails.expected_time || requirement.currentStatusDetails.real_time_tc_creation || requirement.currentStatusDetails.real_time_testing || Object.keys(requirement.currentStatusDetails.release_time_tracking || {}).length > 0) && (
               <div className="card-detail-item time-tracking-details" style={{ backgroundColor: 'var(--bg-tertiary)', padding: '10px', borderRadius: '6px', marginTop: '10px', borderLeft: '3px solid var(--accent-color)' }}>
                   {requirement.currentStatusDetails.expected_time && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -280,19 +306,37 @@ const KanbanCard = React.memo(({
                           <span className="detail-value" style={{ fontWeight: 'bold' }}>{formatTimeHelper(requirement.currentStatusDetails.expected_time)}</span>
                       </div>
                   )}
-                  {(requirement.currentStatusDetails.real_time_tc_creation || requirement.currentStatusDetails.real_time_testing) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '5px', borderTop: '1px dashed var(--border-color)', paddingTop: '5px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span className="detail-label" style={{ color: 'var(--text-primary)' }}>Total Real Time:</span> 
-                              <span className="detail-value" style={{ fontWeight: 'bold' }}>
-                                  {formatTimeHelper((requirement.currentStatusDetails.real_time_tc_creation || 0) + (requirement.currentStatusDetails.real_time_testing || 0))}
-                              </span>
-                          </div>
-                          <span style={{ fontSize: '0.80em', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                              {`[TC: ${formatTimeHelper(requirement.currentStatusDetails.real_time_tc_creation) || '0h'}, Test: ${formatTimeHelper(requirement.currentStatusDetails.real_time_testing) || '0h'}]`}
-                          </span>
-                      </div>
-                  )}
+                  
+                  {(() => {
+                      let totalTc = requirement.currentStatusDetails.real_time_tc_creation || 0;
+                      let totalTest = requirement.currentStatusDetails.real_time_testing || 0;
+                      
+                      const rtt = requirement.currentStatusDetails.release_time_tracking;
+                      if (isMultiReleaseMode && rtt && Object.keys(rtt).length > 0) {
+                          totalTc = 0; totalTest = 0;
+                          Object.values(rtt).forEach(times => {
+                              totalTc += parseFloat(times.tc || 0);
+                              totalTest += parseFloat(times.test || 0);
+                          });
+                      }
+
+                      if (totalTc > 0 || totalTest > 0) {
+                          return (
+                              <div style={{ display: 'flex', flexDirection: 'column', marginTop: '5px', borderTop: '1px dashed var(--border-color)', paddingTop: '5px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span className="detail-label" style={{ color: 'var(--text-primary)' }}>Total Real Time:</span> 
+                                      <span className="detail-value" style={{ fontWeight: 'bold' }}>
+                                          {formatTimeHelper(totalTc + totalTest)}
+                                      </span>
+                                  </div>
+                                  <span style={{ fontSize: '0.80em', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                                      {`[TC: ${formatTimeHelper(totalTc) || '0h'}, Test: ${formatTimeHelper(totalTest) || '0h'}]`}
+                                  </span>
+                              </div>
+                          );
+                      }
+                      return null;
+                  })()}
               </div>
             )}
 

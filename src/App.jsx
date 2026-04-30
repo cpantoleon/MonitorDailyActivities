@@ -59,8 +59,8 @@ function App() {
 
   // ΠΡΟΣΘΗΚΗ: parent_id: null στο αρχικό state
   const [newReqFormState, setNewReqFormState] = useState({
-    project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null,
-    expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h'
+    project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_ids: [], parent_id: null,
+    expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h', release_time_tracking: {}
   });
 
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
@@ -207,10 +207,9 @@ function App() {
   }, [selectedProject, selectedSprint, allProcessedRequirements, showArchivedSprints, navigate, location.pathname]);
 
   const handleManualProjectSelect = useCallback((project) => {
-    setSelectedProject(project);
+    // ΑΦΑΙΡΕΘΗΚΕ ΤΟ setSelectedProject(project) από εδώ!
 
     if (!project) {
-      setSelectedSprint('');
       sessionStorage.removeItem('sprintBoardProject');
       sessionStorage.removeItem('sprintBoardSprint');
       navigate(`/sprint-board`, { replace: true });
@@ -234,20 +233,21 @@ function App() {
       }
     }
 
-    setSelectedSprint(sprintToSelect);
     if (sprintToSelect) {
       sessionStorage.setItem('sprintBoardSprint', sprintToSelect);
     } else {
       sessionStorage.removeItem('sprintBoardSprint');
     }
 
-    const newUrl = `/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprintToSelect)}`;
+    // Αλλάζουμε ΜΟΝΟ το URL. Το useEffect του URL θα αναλάβει να ενημερώσει τα states χωρίς flickering!
+    const newUrl = `/sprint-board?project=${encodeURIComponent(project)}${sprintToSelect ? `&sprint=${encodeURIComponent(sprintToSelect)}` : ''}`;
     navigate(newUrl, { replace: true });
 
   }, [allProcessedRequirements, showArchivedSprints, navigate]);
 
   const handleManualSprintSelect = useCallback((sprint) => {
-    setSelectedSprint(sprint);
+    // ΑΦΑΙΡΕΘΗΚΕ ΤΟ setSelectedSprint(sprint) από εδώ!
+
     if (sprint) {
       sessionStorage.setItem('sprintBoardSprint', sprint);
     } else {
@@ -329,6 +329,7 @@ function App() {
   const fetchData = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
+
       const projectsResponse = await fetch(`${API_BASE_URL}/projects`);
       const projectsResult = await projectsResponse.json();
       const officialProjects = projectsResult.data || [];
@@ -375,11 +376,15 @@ function App() {
 
       baseReqs.forEach(req => {
         if (req.currentStatusDetails?.type) types.add(req.currentStatusDetails.type);
-        if (req.currentStatusDetails?.releaseId) {
-          releaseIds.add(req.currentStatusDetails.releaseId);
+
+        // ΔΙΟΡΘΩΣΗ: Διαβάζουμε το array releaseIds αντί για το παλιό releaseId
+        const rIds = req.currentStatusDetails?.releaseIds;
+        if (rIds && Array.isArray(rIds) && rIds.length > 0) {
+          rIds.forEach(id => releaseIds.add(id));
         } else {
           hasNoReleaseItems = true;
         }
+
         if (Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0) hasLinkedDefects = true
         else hasNoLinkedDefects = true;
       });
@@ -392,7 +397,7 @@ function App() {
         hasNoReleaseItems: hasNoReleaseItems
       });
     } else {
-      setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false });
+      setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false, hasNoReleaseItems: false });
     }
   }, [selectedProject, selectedSprint, allProcessedRequirements]);
 
@@ -407,9 +412,10 @@ function App() {
       }
       if (selectedReleases.length > 0) {
         filteredRequirements = filteredRequirements.filter(req => {
-          const rId = req.currentStatusDetails.releaseId;
-          if (!rId) return selectedReleases.includes('no-release');
-          return selectedReleases.includes(rId);
+          // ΔΙΟΡΘΩΣΗ: Ελέγχουμε αν κάποιο από τα releaseIds ταιριάζει με τα επιλεγμένα
+          const rIds = req.currentStatusDetails?.releaseIds;
+          if (!rIds || !Array.isArray(rIds) || rIds.length === 0) return selectedReleases.includes('no-release');
+          return rIds.some(id => selectedReleases.includes(id));
         });
       }
       if (dateFrom) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) >= new Date(dateFrom));
@@ -535,8 +541,10 @@ function App() {
       requirementName: '', status: 'To Do',
       sprint: isParent ? (parentReq.currentStatusDetails.sprint === 'Backlog' ? '1' : parentReq.currentStatusDetails.sprint.replace('Sprint ', '')) : '1',
       comment: '', link: '', isBacklog: isParent ? parentReq.currentStatusDetails.sprint === 'Backlog' : false,
-      type: isParent ? 'Sub-task' : '', tags: '', release_id: isParent ? parentReq.currentStatusDetails.releaseId : '', parent_id: isParent ? parentReq.id : null,
-      expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h'
+      type: isParent ? 'Sub-task' : '', tags: '',
+      release_ids: isParent ? (parentReq.currentStatusDetails.releaseIds || []) : [], // ΔΙΟΡΘΩΣΗ
+      parent_id: isParent ? parentReq.id : null,
+      expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h', release_time_tracking: {}
     });
     setIsAddModalOpen(true);
   }, [selectedProject]);
@@ -544,7 +552,7 @@ function App() {
   // ΠΡΟΣΘΗΚΗ: Ενημερωμένο handleCloseAddModal
   const handleCloseAddModal = useCallback(() => {
     setIsAddModalOpen(false);
-    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_id: '', parent_id: null, expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h' });
+    setNewReqFormState({ project: '', requirementName: '', status: 'To Do', sprint: '1', comment: '', link: '', isBacklog: false, type: '', tags: '', release_ids: [], parent_id: null, expected_time: '', expected_time_unit: 'h', real_time_tc_creation: '', real_time_tc_creation_unit: 'h', real_time_testing: '', real_time_testing_unit: 'h', release_time_tracking: {} });
   }, []);
 
   const handleNewReqFormChange = useCallback((e) => {
@@ -584,11 +592,13 @@ function App() {
       project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus,
       sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link,
       type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags,
-      release_id: requirement.currentStatusDetails.releaseId, parent_id: requirement.parentId,
+      release_ids: requirement.currentStatusDetails.releaseIds || [], // ΔΙΟΡΘΩΣΗ ΕΔΩ
+      parent_id: requirement.parentId,
       statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex,
       expected_time: requirement.currentStatusDetails.expected_time,
       real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
-      real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing
+      real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing,
+      release_time_tracking: requirement.currentStatusDetails.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
     };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -624,8 +634,6 @@ function App() {
 
   const handleSaveRequirementEdit = useCallback(async (formData) => {
     try {
-      const calcHours = (val, unit) => val ? (unit === 'd' ? parseFloat(val) * 8 : parseFloat(val)) : null;
-
       if (formData.name !== editingRequirement.requirementUserIdentifier) {
         await fetch(`${API_BASE_URL}/requirements/${editingRequirement.id}/rename`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -636,15 +644,17 @@ function App() {
       const payload = {
         project: editingRequirement.project, requirementName: formData.name, status: formData.status,
         sprint: newSprint, comment: formData.comment, link: formData.link, type: formData.type,
-        tags: formData.tags, release_id: formData.release_id,
+        tags: formData.tags,
+        release_ids: formData.release_ids || [], // ΔΙΟΡΘΩΣΗ ΕΔΩ
         parent_id: formData.type === 'Sub-task' ? formData.parent_id : null,
         statusDate: new Date().toISOString().split('T')[0],
         existingRequirementGroupId: editingRequirement.id,
         expected_time: formData.expected_time,
         real_time_tc_creation: formData.real_time_tc_creation,
-        real_time_testing: formData.real_time_testing
+        real_time_testing: formData.real_time_testing,
+        release_time_tracking: formData.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
       };
-      // ... rest of function
+
       const response = await fetch(`${API_BASE_URL}/activities`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
@@ -711,12 +721,14 @@ function App() {
         body: JSON.stringify({
           project: targetProject, requirementName: newReqFormState.requirementName, status: newReqFormState.status,
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
-          tags: newReqFormState.tags, release_id: newReqFormState.release_id,
+          tags: newReqFormState.tags,
+          release_ids: newReqFormState.release_ids || [], // ΔΙΟΡΘΩΣΗ
           parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null,
           statusDate: new Date().toISOString().split('T')[0],
           expected_time: calcHours(newReqFormState.expected_time, newReqFormState.expected_time_unit),
           real_time_tc_creation: calcHours(newReqFormState.real_time_tc_creation, newReqFormState.real_time_tc_creation_unit),
-          real_time_testing: calcHours(newReqFormState.real_time_testing, newReqFormState.real_time_testing_unit)
+          real_time_testing: calcHours(newReqFormState.real_time_testing, newReqFormState.real_time_testing_unit),
+          release_time_tracking: newReqFormState.release_time_tracking || {}
         }),
       });
 
@@ -982,7 +994,8 @@ function App() {
               />
             } />
 
-            <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} />} />
+            // Find this line in App.jsx:
+            <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} projectReleases={projectReleases} allReleases={allReleases} />} />
             <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
             <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
             <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMainMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />

@@ -13,7 +13,8 @@ const KanbanBoard = ({
   onReorderRequirements,
   isSelectionMode,
   selectedIds,
-  onToggleSelect
+  onToggleSelect,
+  projectReleases
 }) => {
   const columnTitles = ['To Do', 'Scenarios created', 'Under testing', 'Done'];
   
@@ -59,6 +60,7 @@ const KanbanBoard = ({
           isSelectionMode={isSelectionMode}
           selectedIds={selectedIds}
           onToggleSelect={onToggleSelect}
+          projectReleases={projectReleases}
         />
       ))}
     </div>

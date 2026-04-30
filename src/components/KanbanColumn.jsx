@@ -16,7 +16,8 @@ const KanbanColumn = ({
   onReorder,
   isSelectionMode,
   selectedIds,
-  onToggleSelect
+  onToggleSelect,
+  projectReleases
 }) => {
   const [isDraggedOver, setIsDraggedOver] = useState(false);
   const dragCounter = useRef(0);
@@ -206,6 +207,7 @@ const KanbanColumn = ({
                 isSelectionMode={isSelectionMode}
                 isSelected={selectedIds && selectedIds.includes(req.id)}
                 onToggleSelect={onToggleSelect}
+                projectReleases={projectReleases}
               />
             </div>
           );

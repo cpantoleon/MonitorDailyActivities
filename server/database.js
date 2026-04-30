@@ -3,8 +3,8 @@ const DBSOURCE = "db.sqlite";
 
 let db = new sqlite3.Database(DBSOURCE, (err) => {
     if (err) {
-      console.error(err.message);
-      throw err;
+        console.error(err.message);
+        throw err;
     } else {
         console.log('Connected to the SQLite database.');
 
@@ -31,6 +31,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 name TEXT NOT NULL,
                 release_date TEXT NOT NULL,
                 is_current INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                closed_at TEXT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project_id, name),
@@ -38,7 +40,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             )`, (err) => {
                 if (err) console.error("Error creating releases table", err.message);
             });
-            
+
+            // UPDATED: Added release_ids, parent_id, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking
             db.run(`CREATE TABLE IF NOT EXISTS activities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 requirementGroupId INTEGER,
@@ -53,15 +56,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 tags TEXT,
                 key TEXT,
                 isCurrent INTEGER DEFAULT 0,
-                release_id INTEGER,
+                release_ids TEXT DEFAULT '[]',
                 parent_id INTEGER DEFAULT NULL,
+                display_order INTEGER DEFAULT 0,
+                is_expanded INTEGER DEFAULT 1,
                 expected_time REAL DEFAULT NULL,
                 real_time_tc_creation REAL DEFAULT NULL,
                 real_time_testing REAL DEFAULT NULL,
+                release_time_tracking TEXT DEFAULT '{}',
                 created_at TEXT,
                 updated_at TEXT,
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-                FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE SET NULL
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )`, (err) => {
                 if (err) console.error("Error creating activities table", err.message);
             });
@@ -91,7 +96,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 project_id INTEGER NOT NULL,
                 column_type TEXT NOT NULL CHECK(column_type IN ('well', 'wrong', 'improve')),
                 description TEXT NOT NULL,
-                details TEXT NOT NULL,
+                details TEXT NOT NULL DEFAULT '',
                 item_date TEXT NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -108,18 +113,22 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 closed_at TEXT NOT NULL,
                 metrics_json TEXT,
                 close_action TEXT,
+                fat_report_id INTEGER NULL REFERENCES fat_reports(id) ON DELETE SET NULL,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
                 FOREIGN KEY (original_release_id) REFERENCES releases(id) ON DELETE CASCADE
             )`, (err) => {
                 if (err) console.error("Error creating archived_releases table", err.message);
             });
 
+            // UPDATED: Added tc_time and test_time
             db.run(`CREATE TABLE IF NOT EXISTS archived_release_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 archive_id INTEGER NOT NULL,
                 requirement_group_id INTEGER NOT NULL,
                 requirement_title TEXT NOT NULL,
                 final_status TEXT NOT NULL,
+                tc_time REAL DEFAULT 0,
+                test_time REAL DEFAULT 0,
                 FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
             )`, (err) => {
                 if (err) console.error("Error creating archived_release_items table", err.message);
@@ -145,6 +154,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 archive_id INTEGER NOT NULL,
                 title TEXT NOT NULL,
                 link TEXT NOT NULL,
+                estimation INTEGER NULL,
+                label TEXT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (archive_id) REFERENCES archived_releases(id) ON DELETE CASCADE
@@ -152,6 +163,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating sat_bugs table", err.message);
             });
 
+            // UPDATED: Added is_fat_defect, fixed_date, is_expanded, display_order, real_time
             db.run(`CREATE TABLE IF NOT EXISTS defects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
@@ -161,6 +173,10 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 status TEXT NOT NULL CHECK(status IN ('Assigned to Developer', 'Assigned to Tester', 'Done', 'Closed')),
                 link TEXT,
                 created_date TEXT NOT NULL,
+                fixed_date TEXT,
+                is_fat_defect INTEGER DEFAULT 0,
+                is_expanded INTEGER DEFAULT 1,
+                display_order INTEGER DEFAULT 0,
                 real_time REAL DEFAULT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -180,15 +196,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating defect_history table", err.message);
             });
 
+            // UPDATED: Added release_ids
             db.run(`CREATE TABLE IF NOT EXISTS defect_requirement_links (
                 defect_id INTEGER NOT NULL,
                 requirement_group_id INTEGER NOT NULL,
+                release_ids TEXT DEFAULT '[]',
                 PRIMARY KEY (defect_id, requirement_group_id),
                 FOREIGN KEY (defect_id) REFERENCES defects(id) ON DELETE CASCADE
             )`, (err) => {
                 if (err) console.error("Error creating defect_requirement_links table", err.message);
             });
-            
+
             db.run(`CREATE TABLE IF NOT EXISTS fat_periods (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
@@ -249,6 +267,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['weather_location', 'Marousi, Athens']);
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['default_card_expanded', '1']);
                     db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['check_git_updates', '1']);
+                    db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`, ['multi_release_mode', '0']);
                 }
             });
 
@@ -260,211 +279,79 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating jira_project_configs table", err.message);
             });
 
-            db.all("PRAGMA table_info(retrospective_items)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching retrospective_items table info:", err.message);
-                    return;
-                }
-                
-                const hasDetailsColumn = columns.some(col => col.name === 'details');
-                if (!hasDetailsColumn) {
-                    db.run("ALTER TABLE retrospective_items ADD COLUMN details TEXT NOT NULL DEFAULT ''", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding details column to retrospective_items:", alterErr.message);
-                        } else {
-                            console.log("Column 'details' added to retrospective_items table.");
-                        }
-                    });
-                }
-            });
 
-            db.all("PRAGMA table_info(releases)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching releases table info:", err.message);
-                    return;
-                }
-                
-                const hasStatusColumn = columns.some(col => col.name === 'status');
-                if (!hasStatusColumn) {
-                    db.run("ALTER TABLE releases ADD COLUMN status TEXT DEFAULT 'active'", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding status column to releases:", alterErr.message);
-                        } else {
-                            console.log("Column 'status' added to releases table.");
-                        }
-                    });
-                }
-
-                const hasClosedAtColumn = columns.some(col => col.name === 'closed_at');
-                if (!hasClosedAtColumn) {
-                    db.run("ALTER TABLE releases ADD COLUMN closed_at TEXT NULL", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding closed_at column to releases:", alterErr.message);
-                        } else {
-                            console.log("Column 'closed_at' added to releases table.");
-                        }
-                    });
-                }
-            });
-
-            db.all("PRAGMA table_info(archived_releases)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching archived_releases table info:", err.message);
-                    return;
-                }
-                
-                const hasCloseActionColumn = columns.some(col => col.name === 'close_action');
-                if (!hasCloseActionColumn) {
-                    db.run("ALTER TABLE archived_releases ADD COLUMN close_action TEXT", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding close_action column to archived_releases:", alterErr.message);
-                        } else {
-                            console.log("Column 'close_action' added to archived_releases table.");
-                        }
-                    });
-                }
-
-                const hasFatReportIdColumn = columns.some(col => col.name === 'fat_report_id');
-                if (!hasFatReportIdColumn) {
-                    db.run("ALTER TABLE archived_releases ADD COLUMN fat_report_id INTEGER NULL REFERENCES fat_reports(id) ON DELETE SET NULL", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding fat_report_id column to archived_releases:", alterErr.message);
-                        } else {
-                            console.log("Column 'fat_report_id' added to archived_releases table.");
-                        }
-                    });
-                }
-            });
-
-            db.all("PRAGMA table_info(sat_bugs)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching sat_bugs table info:", err.message);
-                    return;
-                }
-                
-                const hasEstimationColumn = columns.some(col => col.name === 'estimation');
-                if (!hasEstimationColumn) {
-                    db.run("ALTER TABLE sat_bugs ADD COLUMN estimation INTEGER NULL", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding estimation column to sat_bugs:", alterErr.message);
-                        } else {
-                            console.log("Column 'estimation' added to sat_bugs table.");
-                        }
-                    });
-                }
-
-                const hasLabelColumn = columns.some(col => col.name === 'label');
-                if (!hasLabelColumn) {
-                    db.run("ALTER TABLE sat_bugs ADD COLUMN label TEXT NULL", (alterErr) => {
-                        if (alterErr) {
-                            console.error("Error adding label column to sat_bugs:", alterErr.message);
-                        } else {
-                            console.log("Column 'label' added to sat_bugs table.");
-                        }
-                    });
-                }
-            });
+            // =====================================================================================
+            // MIGRATION CHECKS (PRAGMAS) - KEEP THESE SO EXISTING DATABASES DON'T LOSE DATA
+            // =====================================================================================
 
             db.all("PRAGMA table_info(activities)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching activities table info:", err.message);
-                    return;
-                }
-                const hasParentIdColumn = columns.some(col => col.name === 'parent_id');
-                if (!hasParentIdColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN parent_id INTEGER DEFAULT NULL", (alterErr) => {
-                        if (alterErr) console.error("Error adding parent_id column:", alterErr.message);
-                        else console.log("Column 'parent_id' added to activities table.");
-                    });
-                }
+                if (!err && columns) {
+                    const hasReleaseIds = columns.some(c => c.name === 'release_ids');
+                    if (!hasReleaseIds) {
+                        db.run("ALTER TABLE activities ADD COLUMN release_ids TEXT DEFAULT '[]'", (alterErr) => {
+                            if (!alterErr) {
+                                db.run("UPDATE activities SET release_ids = '[' || release_id || ']' WHERE release_id IS NOT NULL");
+                            }
+                        });
+                    }
+                    const hasParentIdColumn = columns.some(col => col.name === 'parent_id');
+                    if (!hasParentIdColumn) db.run("ALTER TABLE activities ADD COLUMN parent_id INTEGER DEFAULT NULL");
 
-                const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
-                if (!hasDisplayOrderColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) console.error("Error adding display_order column:", alterErr.message);
-                        else console.log("Column 'display_order' added to activities table.");
-                    });
-                }
+                    const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
+                    if (!hasDisplayOrderColumn) db.run("ALTER TABLE activities ADD COLUMN display_order INTEGER DEFAULT 0");
 
-                const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
-                if (!hasIsExpandedColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
-                        if (alterErr) console.error("Error adding is_expanded column:", alterErr.message);
-                        else console.log("Column 'is_expanded' added to activities table.");
-                    });
-                }
+                    const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
+                    if (!hasIsExpandedColumn) db.run("ALTER TABLE activities ADD COLUMN is_expanded INTEGER DEFAULT 1");
 
-                // NEW COLUMNS FOR TIME TRACKING
-                const hasExpectedTimeColumn = columns.some(col => col.name === 'expected_time');
-                if (!hasExpectedTimeColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN expected_time REAL DEFAULT NULL", (alterErr) => {
-                        if (alterErr) console.error("Error adding expected_time column:", alterErr.message);
-                        else console.log("Column 'expected_time' added to activities table.");
-                    });
-                }
+                    const hasExpectedTimeColumn = columns.some(col => col.name === 'expected_time');
+                    if (!hasExpectedTimeColumn) db.run("ALTER TABLE activities ADD COLUMN expected_time REAL DEFAULT NULL");
 
-                const hasRealTimeTcCreationColumn = columns.some(col => col.name === 'real_time_tc_creation');
-                if (!hasRealTimeTcCreationColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN real_time_tc_creation REAL DEFAULT NULL", (alterErr) => {
-                        if (alterErr) console.error("Error adding real_time_tc_creation column:", alterErr.message);
-                        else console.log("Column 'real_time_tc_creation' added to activities table.");
-                    });
-                }
+                    const hasRealTimeTcCreationColumn = columns.some(col => col.name === 'real_time_tc_creation');
+                    if (!hasRealTimeTcCreationColumn) db.run("ALTER TABLE activities ADD COLUMN real_time_tc_creation REAL DEFAULT NULL");
 
-                const hasRealTimeTestingColumn = columns.some(col => col.name === 'real_time_testing');
-                if (!hasRealTimeTestingColumn) {
-                    db.run("ALTER TABLE activities ADD COLUMN real_time_testing REAL DEFAULT NULL", (alterErr) => {
-                        if (alterErr) console.error("Error adding real_time_testing column:", alterErr.message);
-                        else console.log("Column 'real_time_testing' added to activities table.");
-                    });
+                    const hasRealTimeTestingColumn = columns.some(col => col.name === 'real_time_testing');
+                    if (!hasRealTimeTestingColumn) db.run("ALTER TABLE activities ADD COLUMN real_time_testing REAL DEFAULT NULL");
+
+                    const hasReleaseTimeTracking = columns.some(c => c.name === 'release_time_tracking');
+                    if (!hasReleaseTimeTracking) db.run("ALTER TABLE activities ADD COLUMN release_time_tracking TEXT DEFAULT '{}'");
+                }
+            });
+
+            db.all("PRAGMA table_info(defect_requirement_links)", (err, columns) => {
+                if (!err && columns) {
+                    const hasReleaseIds = columns.some(c => c.name === 'release_ids');
+                    if (!hasReleaseIds) {
+                        db.run("ALTER TABLE defect_requirement_links ADD COLUMN release_ids TEXT DEFAULT '[]'");
+                    }
+                }
+            });
+
+            db.all("PRAGMA table_info(archived_release_items)", (err, columns) => {
+                if (!err && columns) {
+                    const hasTcTime = columns.some(c => c.name === 'tc_time');
+                    if (!hasTcTime) {
+                        db.run("ALTER TABLE archived_release_items ADD COLUMN tc_time REAL DEFAULT 0");
+                        db.run("ALTER TABLE archived_release_items ADD COLUMN test_time REAL DEFAULT 0");
+                    }
                 }
             });
 
             db.all("PRAGMA table_info(defects)", (err, columns) => {
-                if (err) {
-                    console.error("Error fetching defects table info:", err.message);
-                    return;
-                }
+                if (!err && columns) {
+                    const hasFixedDate = columns.some(c => c.name === 'fixed_date');
+                    if (!hasFixedDate) db.run("ALTER TABLE defects ADD COLUMN fixed_date TEXT");
 
-                const hasIsFatDefectColumn = columns.some(col => col.name === 'is_fat_defect');
-                if (!hasIsFatDefectColumn) {
-                    db.run("ALTER TABLE defects ADD COLUMN is_fat_defect INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) console.error("Error adding is_fat_defect column to defects:", alterErr.message);
-                        else console.log("Column 'is_fat_defect' added to defects table.");
-                    });
-                }
+                    const hasIsFatDefectColumn = columns.some(col => col.name === 'is_fat_defect');
+                    if (!hasIsFatDefectColumn) db.run("ALTER TABLE defects ADD COLUMN is_fat_defect INTEGER DEFAULT 0");
 
-                const hasFixedDateColumn = columns.some(col => col.name === 'fixed_date');
-                if (!hasFixedDateColumn) {
-                    db.run("ALTER TABLE defects ADD COLUMN fixed_date TEXT", (alterErr) => {
-                        if (alterErr) console.error("Error adding fixed_date column to defects:", alterErr.message);
-                        else console.log("Column 'fixed_date' added to defects table.");
-                    });
-                }
+                    const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
+                    if (!hasIsExpandedColumn) db.run("ALTER TABLE defects ADD COLUMN is_expanded INTEGER DEFAULT 1");
 
-                const hasIsExpandedColumn = columns.some(col => col.name === 'is_expanded');
-                if (!hasIsExpandedColumn) {
-                    db.run("ALTER TABLE defects ADD COLUMN is_expanded INTEGER DEFAULT 1", (alterErr) => {
-                        if (alterErr) console.error("Error adding is_expanded column to defects:", alterErr.message);
-                        else console.log("Column 'is_expanded' added to defects table.");
-                    });
-                }
+                    const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
+                    if (!hasDisplayOrderColumn) db.run("ALTER TABLE defects ADD COLUMN display_order INTEGER DEFAULT 0");
 
-                const hasDisplayOrderColumn = columns.some(col => col.name === 'display_order');
-                if (!hasDisplayOrderColumn) {
-                    db.run("ALTER TABLE defects ADD COLUMN display_order INTEGER DEFAULT 0", (alterErr) => {
-                        if (alterErr) console.error("Error adding display_order column to defects:", alterErr.message);
-                        else console.log("Column 'display_order' added to defects table.");
-                    });
-                }
-                
-                // NEW COLUMN FOR DEFECT REAL TIME TRACKING
-                const hasRealTimeColumn = columns.some(col => col.name === 'real_time');
-                if (!hasRealTimeColumn) {
-                    db.run("ALTER TABLE defects ADD COLUMN real_time REAL DEFAULT NULL", (alterErr) => {
-                        if (alterErr) console.error("Error adding real_time column:", alterErr.message);
-                        else console.log("Column 'real_time' added to defects table.");
-                    });
+                    const hasRealTimeColumn = columns.some(col => col.name === 'real_time');
+                    if (!hasRealTimeColumn) db.run("ALTER TABLE defects ADD COLUMN real_time REAL DEFAULT NULL");
                 }
             });
 
