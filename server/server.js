@@ -3989,6 +3989,57 @@ app.get("/api/meetings/today", (req, res) => {
     res.json({ message: "success", data: cachedTodayMeetings });
 });
 
+// ==========================================
+// STICKY NOTES / SNIPPETS API
+// ==========================================
+
+app.get("/api/stickynotes", (req, res) => {
+    const sql = "SELECT * FROM sticky_notes ORDER BY category ASC, updated_at DESC";
+    db.all(sql, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "success", data: rows });
+    });
+});
+
+app.post("/api/stickynotes", (req, res) => {
+    const { title, content, color, category } = req.body;
+    if (!title || title.trim() === '') {
+        return res.status(400).json({ error: "Title is required" });
+    }
+    const finalCategory = category && category.trim() !== '' ? category.trim() : 'General';
+    
+    const sql = `INSERT INTO sticky_notes (title, content, color, category) VALUES (?, ?, ?, ?)`;
+    db.run(sql, [title.trim(), content || '', color || 'yellow', finalCategory], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ message: "Note created", data: { id: this.lastID, title, content, color, category: finalCategory } });
+    });
+});
+
+app.put("/api/stickynotes/:id", (req, res) => {
+    const { title, content, color, category } = req.body;
+    const noteId = req.params.id;
+    if (!title || title.trim() === '') {
+        return res.status(400).json({ error: "Title is required" });
+    }
+    const finalCategory = category && category.trim() !== '' ? category.trim() : 'General';
+
+    const sql = `UPDATE sticky_notes SET title = ?, content = ?, color = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(sql, [title.trim(), content || '', color || 'yellow', finalCategory, noteId], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: "Note not found" });
+        res.json({ message: "Note updated" });
+    });
+});
+
+app.delete("/api/stickynotes/:id", (req, res) => {
+    const sql = 'DELETE FROM sticky_notes WHERE id = ?';
+    db.run(sql, req.params.id, function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: "Note not found" });
+        res.json({ message: "Note deleted successfully" });
+    });
+});
+
 app.use(function (req, res) {
     res.status(404).json({ "error": "Endpoint not found" });
 });

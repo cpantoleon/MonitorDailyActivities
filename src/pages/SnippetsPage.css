@@ -1,0 +1,262 @@
+/* src/pages/SnippetsPage.css */
+
+.snippets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+}
+
+.snippets-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    gap: 20px;
+}
+
+.snippets-search-wrapper {
+    flex-grow: 1;
+    max-width: 400px;
+}
+
+.snippets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding-bottom: 20px;
+}
+
+/* STICKY NOTE DESIGN - Base */
+.snippet-card {
+    position: relative;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 180px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-primary);
+}
+
+.snippet-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+}
+
+.snippet-title {
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.snippet-preview {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    flex-grow: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4; /* Πρόσθεσε αυτή τη γραμμή */
+    -webkit-box-orient: vertical;
+    opacity: 0.85;
+}
+
+.snippet-footer {
+    margin-top: 15px;
+    padding-top: 10px;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed var(--border-color);
+}
+
+.snippet-date {
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.snippet-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.snippet-action-btn {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.snippet-action-btn:hover {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.snippet-action-btn.delete {
+    color: var(--danger-color);
+}
+
+.snippet-action-btn.delete:hover {
+    background-color: var(--danger-color);
+    color: white;
+    border-color: var(--danger-color);
+}
+
+/* Colors - Light Mode (Default) */
+:root {
+    --snippet-bg-yellow: #FEFCBF; --snippet-border-yellow: #D69E2E;
+    --snippet-bg-blue: #EBF8FF;   --snippet-border-blue: #3182CE;
+    --snippet-bg-green: #C6F6D5;  --snippet-border-green: #38A169;
+    --snippet-bg-pink: #FED7D7;   --snippet-border-pink: #E53E3E;
+}
+
+/* Colors - Dark Mode */
+[data-theme='dark'] {
+    --snippet-bg-yellow: rgba(214, 158, 46, 0.15); --snippet-border-yellow: #D69E2E;
+    --snippet-bg-blue: rgba(49, 130, 206, 0.15);   --snippet-border-blue: #3182CE;
+    --snippet-bg-green: rgba(56, 161, 105, 0.15);  --snippet-border-green: #38A169;
+    --snippet-bg-pink: rgba(229, 62, 62, 0.15);    --snippet-border-pink: #E53E3E;
+}
+
+.snippet-color-yellow { background-color: var(--snippet-bg-yellow); border-top: 4px solid var(--snippet-border-yellow); }
+.snippet-color-blue { background-color: var(--snippet-bg-blue); border-top: 4px solid var(--snippet-border-blue); }
+.snippet-color-green { background-color: var(--snippet-bg-green); border-top: 4px solid var(--snippet-border-green); }
+.snippet-color-pink { background-color: var(--snippet-bg-pink); border-top: 4px solid var(--snippet-border-pink); }
+
+/* Modal Editor Specifics */
+.color-picker {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s;
+}
+
+.color-dot:hover { transform: scale(1.2); }
+.color-dot.selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-secondary); }
+
+.bg-yellow { background-color: #D69E2E; }
+.bg-blue { background-color: #3182CE; }
+.bg-green { background-color: #38A169; }
+.bg-pink { background-color: #E53E3E; }
+
+/* Κατηγορίες / Φάκελοι */
+.snippet-category-section {
+    margin-bottom: 30px;
+}
+
+.snippet-category-header {
+    font-size: 1.3rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    transition: color 0.2s;
+    user-select: none;
+    font-weight: 600;
+}
+
+.snippet-category-header:hover {
+    color: var(--accent-color);
+}
+
+.category-arrow {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+}
+
+.category-count {
+    font-size: 0.8em;
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 5px;
+}
+
+/* Custom Category ComboBox */
+.category-combobox-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.category-combobox-arrow {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 5px;
+}
+
+.category-dropdown-list {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: var(--card-shadow);
+    z-index: 2000; /* Πάνω από το Modal */
+    margin: 0;
+    padding: 5px 0;
+    list-style: none;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.category-dropdown-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s;
+}
+
+.category-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.category-dropdown-item:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-color);
+}
+
+/* CKEditor in this modal needs to be tall */
+#snippet-modal-content-id .ck-editor__editable_inline {
+    min-height: 350px;
+    max-height: 500px;
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}

@@ -7,6 +7,7 @@ import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import CustomDropdown from '../components/CustomDropdown';
 import ToggleSwitch from '../components/ToggleSwitch';
+import SearchComponent from '../components/SearchComponent';
 
 const KEYWORD_CONFIG = [
   { keyword: 'release date', type: 'release', label: 'Release Date' },
@@ -116,6 +117,59 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     return `${year}-${month}`;
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+
+  const stripHtml = (html) => {
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  };
+
+  const handleQueryChange = (q) => {
+    setSearchQuery(q);
+    if (q.length < 3 || !selectedProject) {
+        setSearchSuggestions([]);
+        return;
+    }
+    const lowerQ = q.toLowerCase();
+    const suggestions = [];
+    
+    // Ψάχνουμε μέσα στα κατεβασμένα notes του επιλεγμένου project
+    Object.entries(projectNotesMap).forEach(([dateKey, html]) => {
+        const plainText = stripHtml(html).toLowerCase();
+        if (plainText.includes(lowerQ)) {
+            suggestions.push({ 
+                id: dateKey, 
+                name: dateKey, // Δείχνουμε την ημερομηνία ως τίτλο
+                context: plainText.substring(0, 40) + '...' // Preview του κειμένου
+            });
+        }
+    });
+    setSearchSuggestions(suggestions.slice(0, 10)); // Δείχνουμε τα 10 πρώτα
+  };
+
+  const handleSearch = (q) => { handleQueryChange(q); };
+  const handleClearSearch = () => { setSearchQuery(''); setSearchSuggestions([]); };
+
+  const handleSuggestionSelect = (suggestion) => {
+    // Όταν επιλέξει μια πρόταση (μια ημερομηνία), αλλάζουμε το ημερολόγιο σε εκείνη την ημέρα!
+    const parts = suggestion.id.split('-');
+    let newDate;
+    if (parts.length === 2) {
+        newDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        setDateSelectionMode('month');
+    } else {
+        newDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        setDateSelectionMode('date');
+    }
+    
+    executeWithUnsavedCheck(() => {
+        setSelectedDate(newDate);
+        handleClearSearch();
+    });
+  };
+
   // --- Determine if there are unsaved changes ---
   const currentDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
   const originalNoteText = projectNotesMap[currentDateKey] || '';
@@ -167,6 +221,35 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       document.removeEventListener('click', handleNavigationClick, true);
     };
   }, [hasUnsavedChanges, navigate]);
+
+  // --- Navigation Handlers for Previous / Next Date ---
+  const handlePrevDate = () => {
+    executeWithUnsavedCheck(() => {
+      setSelectedDate(prev => {
+        const newDate = new Date(prev);
+        if (isGeneralMode && dateSelectionMode === 'month') {
+          newDate.setMonth(newDate.getMonth() - 1);
+        } else {
+          newDate.setDate(newDate.getDate() - 1);
+        }
+        return newDate;
+      });
+    });
+  };
+
+  const handleNextDate = () => {
+    executeWithUnsavedCheck(() => {
+      setSelectedDate(prev => {
+        const newDate = new Date(prev);
+        if (isGeneralMode && dateSelectionMode === 'month') {
+          newDate.setMonth(newDate.getMonth() + 1);
+        } else {
+          newDate.setDate(newDate.getDate() + 1);
+        }
+        return newDate;
+      });
+    });
+  };
 
   const handleSaveNote = useCallback(async (textToSave) => {
     if (!selectedProject) {
@@ -450,6 +533,28 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             opacity: 0.6;
           }
 
+          .date-nav-btn {
+            height: 42px;
+            width: 42px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+            flex-shrink: 0;
+          }
+          
+          .date-nav-btn:hover {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+          }
+
           /* DatePicker overrides */
           .react-datepicker-wrapper { width: 100%; }
           .react-datepicker__input-container input {
@@ -517,9 +622,11 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           }
         `}</style>
 
-      <div className="selection-controls">
-        <div className="selection-group-container">
-          <div className="selection-group">
+      <div className="selection-controls" style={{ flexWrap: 'wrap' }}>
+        <div className="selection-group-container" style={{ width: '100%' }}>
+          
+          {/* 1. Project Dropdown */}
+          <div className="selection-group" style={{ minWidth: '200px' }}>
             <label className="dropdown-label" htmlFor="note-project">Project</label>
             <CustomDropdown
               id="note-project"
@@ -532,12 +639,33 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             />
           </div>
 
-          <div className="selection-group" style={{ minWidth: '300px' }}>
+          {/* 2. NEW: Search Component (Ενεργό μόνο αν έχει επιλεγεί Project) */}
+          <div className="selection-group search-container" style={{ flexGrow: 1, minWidth: '250px' }}>
+             <label className="dropdown-label">Search in {selectedProject || 'Project'}</label>
+             <SearchComponent
+                query={searchQuery}
+                onQueryChange={handleQueryChange}
+                onSearch={handleSearch}
+                onClear={handleClearSearch}
+                onSuggestionSelect={handleSuggestionSelect}
+                suggestions={searchSuggestions}
+                placeholder="Search notes content..."
+             />
+          </div>
+
+          {/* 3. Date Selection & Toggles */}
+          <div className="selection-group" style={{ minWidth: isGeneralMode ? '380px' : '280px', flex: 'none' }}>
             <label className="dropdown-label" htmlFor="note-date">
               {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
             </label>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: '100%' }}>
-              <div style={{ flexGrow: 1 }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+              
+              <button type="button" className="date-nav-btn" onClick={handlePrevDate} title="Previous">
+                 &lt;
+              </button>
+
+              {/* ΕΔΩ είναι το Fix για το UI Glitch (minWidth: '130px') */}
+              <div style={{ flexGrow: 1, minWidth: '130px' }}>
                 <DatePicker
                   id="note-date"
                   name="noteDate"
@@ -550,14 +678,17 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                   wrapperClassName="date-picker-wrapper"
                   popperPlacement="bottom-start"
                   portalId="root"
-                  popperProps={{
-                    strategy: "fixed"
-                  }}
+                  popperProps={{ strategy: "fixed" }}
                   autoComplete="off"
                 />
               </div>
+
+              <button type="button" className="date-nav-btn" onClick={handleNextDate} title="Next">
+                 &gt;
+              </button>
+
               {isGeneralMode ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '5px' }}>
                   <ToggleSwitch
                     id="date-selection-mode"
                     checked={dateSelectionMode === 'month'}
@@ -570,26 +701,19 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                     title="Toggle between month and date selection"
                   />
                   {dateSelectionMode === 'date' && (
-                    <button
-                      onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))}
-                      disabled={isToday(selectedDate)}
-                      className="today-button"
-                    >
+                    <button onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))} disabled={isToday(selectedDate)} className="today-button">
                       Today
                     </button>
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))}
-                  disabled={isToday(selectedDate)}
-                  className="today-button"
-                >
+                <button onClick={() => executeWithUnsavedCheck(() => setSelectedDate(new Date()))} disabled={isToday(selectedDate)} className="today-button" style={{ marginLeft: '5px' }}>
                   Today
                 </button>
               )}
             </div>
           </div>
+
         </div>
       </div>
 

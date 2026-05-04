@@ -13,6 +13,7 @@ const Sidebar = () => {
     { path: '/releases', label: 'Releases', icon: '🚀' },
     { path: '/sprint-analysis', label: 'Analysis', icon: '📈' },
     { path: '/notes', label: 'Notes', icon: '📝' },
+    { path: '/snippets', label: 'Snippets', icon: '📌' },
   ];
 
   const getActiveStyle = ({ isActive }) => {

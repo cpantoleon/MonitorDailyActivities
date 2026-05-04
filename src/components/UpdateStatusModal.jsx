@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import { useGlobal } from '../context/GlobalContext';
 
 // Το modal πλέον δέχεται 'item' (το πλήρες αντικείμενο) και 'itemType' ('requirement' ή 'defect')
-const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus, showMessage }) => {
+const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus, showMessage, releases = [] }) => {
+  const { isMultiReleaseMode } = useGlobal();
   const [comment, setComment] = useState('');
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [acknowledgeDefects, setAcknowledgeDefects] = useState(false);
@@ -13,6 +15,7 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
   const [realTimeTcUnit, setRealTimeTcUnit] = useState('h');
   const [realTimeTesting, setRealTimeTesting] = useState('');
   const [realTimeTestingUnit, setRealTimeTestingUnit] = useState('h');
+  const [releaseTimeTracking, setReleaseTimeTracking] = useState({});
 
   // States για τον χρόνο (Defects)
   const [realTimeDefect, setRealTimeDefect] = useState('');
@@ -35,6 +38,17 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
     return { val: h, unit: 'h' };
   };
 
+  const formatTimeHelper = (val, unit) => {
+    if (!val || isNaN(val) || val <= 0) return '';
+    const totalHours = unit === 'd' ? parseFloat(val) * 8 : parseFloat(val);
+    const d = Math.floor(totalHours / 8);
+    const h = parseFloat((totalHours % 8).toFixed(2));
+
+    if (d > 0 && h > 0) return `(${d}d ${h}h)`;
+    if (d > 0) return `(${d}d)`;
+    return `(${h}h)`;
+  };
+
   useEffect(() => {
     if (isOpen && item) {
       setComment('');
@@ -46,6 +60,7 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
         const test = parseTimeToObj(item.currentStatusDetails?.real_time_testing);
         setRealTimeTc(tc.val); setRealTimeTcUnit(tc.unit);
         setRealTimeTesting(test.val); setRealTimeTestingUnit(test.unit);
+        setReleaseTimeTracking(item.currentStatusDetails?.release_time_tracking || {});
       } else {
         const rt = parseTimeToObj(item.real_time);
         setRealTimeDefect(rt.val); setRealTimeDefectUnit(rt.unit);
@@ -65,6 +80,16 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
 
   const calcH = (v, u) => (v !== '' && v !== null && !isNaN(v) ? parseFloat(v) * (u === 'd' ? 8 : 1) : null);
 
+  const handleReleaseTimeChange = (releaseId, field, value) => {
+    setReleaseTimeTracking(prev => ({
+      ...prev,
+      [releaseId]: {
+        ...(prev[releaseId] || { tc: '', test: '', tc_unit: 'h', test_unit: 'h' }),
+        [field]: value
+      }
+    }));
+  };
+
   const handleSave = () => {
     if (openDefects.length > 0 && !acknowledgeDefects) {
       showMessage('Please acknowledge the open defects before proceeding.', 'error');
@@ -76,17 +101,40 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
 
     if (newStatus === 'Done') {
       if (itemType === 'requirement') {
-        const tcHours = calcH(realTimeTc, realTimeTcUnit) || 0;
-        const testHours = calcH(realTimeTesting, realTimeTestingUnit) || 0;
-        
-        if (!noTestingRequired && (tcHours + testHours <= 0)) {
-          showMessage('Please fill in the real time spent (Test Cases or Testing) before closing this requirement, or check "No testing/fixing required".', 'error');
-          return;
+        if (isMultiReleaseMode && item.currentStatusDetails?.releaseIds?.length > 0) {
+          let totalHours = 0;
+          item.currentStatusDetails.releaseIds.forEach(relId => {
+            const relData = releaseTimeTracking[relId] || {};
+            const tcH = calcH(relData.tc, relData.tc_unit) || 0;
+            const testH = calcH(relData.test, relData.test_unit) || 0;
+            totalHours += (tcH + testH);
+          });
+
+          if (!noTestingRequired && totalHours <= 0) {
+            showMessage('Please fill in the real time spent per release before closing this requirement, or check "No testing/fixing required".', 'error');
+            return;
+          }
+
+          finalTimeData = {
+            real_time_tc_creation: item.currentStatusDetails?.real_time_tc_creation, // Maintain legacy
+            real_time_testing: item.currentStatusDetails?.real_time_testing,         // Maintain legacy
+            release_time_tracking: releaseTimeTracking
+          };
+        } else {
+          // Legacy check
+          const tcHours = calcH(realTimeTc, realTimeTcUnit) || 0;
+          const testHours = calcH(realTimeTesting, realTimeTestingUnit) || 0;
+          
+          if (!noTestingRequired && (tcHours + testHours <= 0)) {
+            showMessage('Please fill in the real time spent (Test Cases or Testing) before closing this requirement, or check "No testing/fixing required".', 'error');
+            return;
+          }
+          finalTimeData = {
+            real_time_tc_creation: calcH(realTimeTc, realTimeTcUnit),
+            real_time_testing: calcH(realTimeTesting, realTimeTestingUnit),
+            release_time_tracking: item.currentStatusDetails?.release_time_tracking || {}
+          };
         }
-        finalTimeData = {
-          real_time_tc_creation: calcH(realTimeTc, realTimeTcUnit),
-          real_time_testing: calcH(realTimeTesting, realTimeTestingUnit)
-        };
       } else if (itemType === 'defect') {
         const defectHours = calcH(realTimeDefect, realTimeDefectUnit) || 0;
         
@@ -97,18 +145,17 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
         finalTimeData = { real_time: calcH(realTimeDefect, realTimeDefectUnit) };
       }
     } else {
-      // Αν δεν πάει στο done, απλά στέλνουμε τις μετατροπές (αν υπάρχουν)
       if (itemType === 'requirement') {
         finalTimeData = {
           real_time_tc_creation: calcH(realTimeTc, realTimeTcUnit),
-          real_time_testing: calcH(realTimeTesting, realTimeTestingUnit)
+          real_time_testing: calcH(realTimeTesting, realTimeTestingUnit),
+          release_time_tracking: releaseTimeTracking
         };
       } else {
         finalTimeData = { real_time: calcH(realTimeDefect, realTimeDefectUnit) };
       }
     }
 
-    // Στέλνουμε το comment και τα timeData πίσω στο parent component
     onSave({ comment, timeData: finalTimeData });
   };
 
@@ -151,12 +198,92 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                 </p>
                 
                 {itemType === 'requirement' ? (
+                    isMultiReleaseMode && item.currentStatusDetails?.releaseIds && item.currentStatusDetails.releaseIds.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <label style={{ fontSize: '0.85em', fontWeight: 'bold', borderBottom: '1px solid var(--border-color)', paddingBottom: '5px' }}>
+                                Real Time Logged Per Release: {!noTestingRequired && <span style={{ color: 'var(--danger-color)' }}>*</span>}
+                            </label>
+                            {item.currentStatusDetails.releaseIds.map(relId => {
+                                const relName = releases.find(r => String(r.id) === String(relId))?.name || `Release ${relId}`;
+                                const relData = releaseTimeTracking[relId] || { tc: '', test: '', tc_unit: 'h', test_unit: 'h' };
+
+                                const tcDisplayVal = relData.tc_unit === 'd' && relData.tc !== '' ? relData.tc / 8 : relData.tc;
+                                const testDisplayVal = relData.test_unit === 'd' && relData.test !== '' ? relData.test / 8 : relData.test;
+
+                                return (
+                                    <div key={relId} style={{ backgroundColor: 'var(--bg-primary)', padding: '10px', borderRadius: '4px' }}>
+                                        <span style={{ fontSize: '0.85em', fontWeight: '600', display: 'block', marginBottom: '8px' }}>{relName}</span>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                            <div>
+                                                <label style={{ fontSize: '0.8em', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                                                    TC Creation
+                                                    <span style={{ color: 'var(--accent-color)', fontWeight: 'bold', marginLeft: '5px' }}>
+                                                        {formatTimeHelper(tcDisplayVal, relData.tc_unit)}
+                                                    </span>
+                                                </label>
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <input
+                                                        type="number"
+                                                        value={tcDisplayVal}
+                                                        onChange={(e) => {
+                                                            const raw = e.target.value;
+                                                            const inHours = raw !== '' ? parseFloat(raw) * (relData.tc_unit === 'd' ? 8 : 1) : '';
+                                                            handleReleaseTimeChange(relId, 'tc', inHours);
+                                                        }}
+                                                        min="0" step="0.5"
+                                                        style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                    />
+                                                    <select
+                                                        value={relData.tc_unit || 'h'}
+                                                        onChange={(e) => handleReleaseTimeChange(relId, 'tc_unit', e.target.value)}
+                                                        style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                    >
+                                                        <option value="h">hours</option>
+                                                        <option value="d">days</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.8em', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                                                    Testing
+                                                    <span style={{ color: 'var(--accent-color)', fontWeight: 'bold', marginLeft: '5px' }}>
+                                                        {formatTimeHelper(testDisplayVal, relData.test_unit)}
+                                                    </span>
+                                                </label>
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <input
+                                                        type="number"
+                                                        value={testDisplayVal}
+                                                        onChange={(e) => {
+                                                            const raw = e.target.value;
+                                                            const inHours = raw !== '' ? parseFloat(raw) * (relData.test_unit === 'd' ? 8 : 1) : '';
+                                                            handleReleaseTimeChange(relId, 'test', inHours);
+                                                        }}
+                                                        min="0" step="0.5"
+                                                        style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                    />
+                                                    <select
+                                                        value={relData.test_unit || 'h'}
+                                                        onChange={(e) => handleReleaseTimeChange(relId, 'test_unit', e.target.value)}
+                                                        style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                    >
+                                                        <option value="h">hours</option>
+                                                        <option value="d">days</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                         <div>
                             <label style={{ fontSize: '0.85em' }}>Test Cases Creation</label>
                             <div style={{ display: 'flex', gap: '5px' }}>
-                                <input type="number" value={realTimeTc} onChange={(e) => setRealTimeTc(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)' }} />
-                                <select value={realTimeTcUnit} onChange={(e) => setRealTimeTcUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)' }}>
+                                <input type="number" value={realTimeTc} onChange={(e) => setRealTimeTc(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
+                                <select value={realTimeTcUnit} onChange={(e) => setRealTimeTcUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
                                     <option value="h">hours</option>
                                     <option value="d">days</option>
                                 </select>
@@ -165,20 +292,21 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                         <div>
                             <label style={{ fontSize: '0.85em' }}>Testing Execution</label>
                             <div style={{ display: 'flex', gap: '5px' }}>
-                                <input type="number" value={realTimeTesting} onChange={(e) => setRealTimeTesting(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)' }} />
-                                <select value={realTimeTestingUnit} onChange={(e) => setRealTimeTestingUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)' }}>
+                                <input type="number" value={realTimeTesting} onChange={(e) => setRealTimeTesting(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
+                                <select value={realTimeTestingUnit} onChange={(e) => setRealTimeTestingUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
                                     <option value="h">hours</option>
                                     <option value="d">days</option>
                                 </select>
                             </div>
                         </div>
                     </div>
+                    )
                 ) : (
                     <div>
                         <label style={{ fontSize: '0.85em' }}>Real Time Spent (Defect Fix/Test)</label>
                         <div style={{ display: 'flex', gap: '5px', maxWidth: '250px' }}>
-                            <input type="number" value={realTimeDefect} onChange={(e) => setRealTimeDefect(e.target.value)} min="0" step="0.5" style={{ width: '80px', padding: '6px', backgroundColor: 'var(--bg-primary)' }} />
-                            <select value={realTimeDefectUnit} onChange={(e) => setRealTimeDefectUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)' }}>
+                            <input type="number" value={realTimeDefect} onChange={(e) => setRealTimeDefect(e.target.value)} min="0" step="0.5" style={{ width: '80px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
+                            <select value={realTimeDefectUnit} onChange={(e) => setRealTimeDefectUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
                                 <option value="h">hours</option>
                                 <option value="d">days</option>
                             </select>

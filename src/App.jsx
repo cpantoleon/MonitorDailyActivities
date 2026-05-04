@@ -34,6 +34,7 @@ import FilterSidebar from './components/FilterSidebar';
 import './components/FilterSidebar.css';
 import SprintActivitiesPage from './pages/SprintBoardPage';
 import SettingsModal from './components/SettingsModal';
+import SnippetsPage from './pages/SnippetsPage';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
@@ -598,7 +599,7 @@ function App() {
       expected_time: requirement.currentStatusDetails.expected_time,
       real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
       real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing,
-      release_time_tracking: requirement.currentStatusDetails.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
+      release_time_tracking: timeData.release_time_tracking !== undefined ? timeData.release_time_tracking : (requirement.currentStatusDetails.release_time_tracking || {})
     };
     try {
       const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -998,6 +999,7 @@ function App() {
             <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} projectReleases={projectReleases} allReleases={allReleases} />} />
             <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
             <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
+            <Route path="/snippets" element={<SnippetsPage apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} /> {/* <--- ΠΡΟΣΘΗΚΗ ΑΥΤΟΥ */}
             <Route path="/releases" element={<ReleasesPage projects={projects} allProcessedRequirements={allProcessedRequirements} showMainMessage={showMainMessage} onNavigateToRequirement={handleNavigateToRequirement} onNavigateToDefect={handleNavigateToDefect} onEditRelease={handleEditRelease} onDeleteRelease={(release) => handleDeleteRequest('release', release)} onDeleteArchivedRelease={(release) => handleDeleteRequest('archived-release', release)} fetchData={fetchData} />} />
 
             <Route path="/:projectName" element={
@@ -1029,6 +1031,7 @@ function App() {
           itemType="requirement"
           newStatus={statusUpdateInfo.newStatus}
           showMessage={showMainMessage}
+          releases={allReleases}
         />
         <FilterSidebar
           isOpen={isFilterSidebarOpen}

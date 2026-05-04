@@ -91,6 +91,18 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating notes table", err.message);
             });
 
+            db.run(`CREATE TABLE IF NOT EXISTS sticky_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                content TEXT,
+                color TEXT DEFAULT 'yellow',
+                category TEXT DEFAULT 'General',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )`, (err) => {
+                if (err) console.error("Error creating sticky_notes table", err.message);
+            });
+
             db.run(`CREATE TABLE IF NOT EXISTS retrospective_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
@@ -322,6 +334,15 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     const hasReleaseIds = columns.some(c => c.name === 'release_ids');
                     if (!hasReleaseIds) {
                         db.run("ALTER TABLE defect_requirement_links ADD COLUMN release_ids TEXT DEFAULT '[]'");
+                    }
+                }
+            });
+
+            db.all("PRAGMA table_info(sticky_notes)", (err, columns) => {
+                if (!err && columns) {
+                    const hasCategory = columns.some(c => c.name === 'category');
+                    if (!hasCategory) {
+                        db.run("ALTER TABLE sticky_notes ADD COLUMN category TEXT DEFAULT 'General'");
                     }
                 }
             });
