@@ -3928,6 +3928,27 @@ app.post("/api/settings/default-expanded", async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- ΠΑΙΡΝΕΙ ΤΗ ΣΕΙΡΑ ΤΩΝ ΦΑΚΕΛΩΝ SNIPPETS ---
+app.get("/api/settings/snippet-category-order", async (req, res) => {
+    try {
+        const row = await dbGet("SELECT value FROM app_settings WHERE key = 'snippet_category_order'");
+        res.json({ order: row ? JSON.parse(row.value) : [] });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// --- ΑΠΟΘΗΚΕΥΕΙ ΤΗ ΣΕΙΡΑ ΤΩΝ ΦΑΚΕΛΩΝ SNIPPETS ---
+app.post("/api/settings/snippet-category-order", async (req, res) => {
+    try {
+        const { order } = req.body;
+        await dbRun("INSERT INTO app_settings (key, value) VALUES ('snippet_category_order', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [JSON.stringify(order)]);
+        res.json({ message: "Category order saved" });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
 app.get("/api/settings/git-check", async (req, res) => {
     try {
         const row = await dbGet("SELECT value FROM app_settings WHERE key = 'check_git_updates'");
@@ -3994,7 +4015,8 @@ app.get("/api/meetings/today", (req, res) => {
 // ==========================================
 
 app.get("/api/stickynotes", (req, res) => {
-    const sql = "SELECT * FROM sticky_notes ORDER BY category ASC, updated_at DESC";
+    // Φέρνει τα notes με βάση την κατηγορία και τη σειρά (display_order)
+    const sql = "SELECT * FROM sticky_notes ORDER BY category ASC, display_order ASC, updated_at DESC";
     db.all(sql, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "success", data: rows });
@@ -4008,21 +4030,43 @@ app.post("/api/stickynotes", (req, res) => {
     }
     const finalCategory = category && category.trim() !== '' ? category.trim() : 'General';
     
-    const sql = `INSERT INTO sticky_notes (title, content, color, category) VALUES (?, ?, ?, ?)`;
-    db.run(sql, [title.trim(), content || '', color || 'yellow', finalCategory], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ message: "Note created", data: { id: this.lastID, title, content, color, category: finalCategory } });
+    // Βρίσκουμε το μεγαλύτερο display_order σε αυτή την κατηγορία για να μπει στο τέλος
+    db.get("SELECT MAX(display_order) as maxOrder FROM sticky_notes WHERE category = ?", [finalCategory], (err, row) => {
+        const nextOrder = (row && row.maxOrder !== null) ? row.maxOrder + 1 : 0;
+        
+        const sql = `INSERT INTO sticky_notes (title, content, color, category, display_order) VALUES (?, ?, ?, ?, ?)`;
+        db.run(sql, [title.trim(), content || '', color || 'yellow', finalCategory, nextOrder], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ message: "Note created", data: { id: this.lastID, title, content, color, category: finalCategory, display_order: nextOrder } });
+        });
     });
+});
+
+// ΝΕΟ ENDPOINT: Αποθήκευση της σειράς μετά από Drag & Drop
+app.put("/api/stickynotes/reorder", async (req, res) => {
+    const { updates } = req.body; // Αναμένει Array: [{id, category, display_order}]
+    if (!updates || !Array.isArray(updates)) return res.status(400).json({ error: "Invalid data format." });
+
+    try {
+        await dbRun("BEGIN TRANSACTION");
+        for (const u of updates) {
+            await dbRun("UPDATE sticky_notes SET category = ?, display_order = ? WHERE id = ?", [u.category, u.display_order, u.id]);
+        }
+        await dbRun("COMMIT");
+        res.json({ message: "Order updated successfully." });
+    } catch (error) {
+        await dbRun("ROLLBACK");
+        console.error("Reorder error:", error);
+        res.status(500).json({ error: "Failed to save order." });
+    }
 });
 
 app.put("/api/stickynotes/:id", (req, res) => {
     const { title, content, color, category } = req.body;
     const noteId = req.params.id;
-    if (!title || title.trim() === '') {
-        return res.status(400).json({ error: "Title is required" });
-    }
+    if (!title || title.trim() === '') return res.status(400).json({ error: "Title is required" });
+    
     const finalCategory = category && category.trim() !== '' ? category.trim() : 'General';
-
     const sql = `UPDATE sticky_notes SET title = ?, content = ?, color = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
     db.run(sql, [title.trim(), content || '', color || 'yellow', finalCategory, noteId], function (err) {
         if (err) return res.status(500).json({ error: err.message });

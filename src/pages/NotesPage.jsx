@@ -655,17 +655,17 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
           {/* 3. Date Selection & Toggles */}
           <div className="selection-group" style={{ minWidth: isGeneralMode ? '380px' : '280px', flex: 'none' }}>
-            <label className="dropdown-label" htmlFor="note-date">
-              {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', width: '100%' }}>
+
               
               <button type="button" className="date-nav-btn" onClick={handlePrevDate} title="Previous">
                  &lt;
               </button>
 
-              {/* ΕΔΩ είναι το Fix για το UI Glitch (minWidth: '130px') */}
-              <div style={{ flexGrow: 1, minWidth: '130px' }}>
+              <div style={{ flexGrow: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="dropdown-label" htmlFor="note-date">
+                  {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
+                </label>
                 <DatePicker
                   id="note-date"
                   name="noteDate"

@@ -1,262 +1,151 @@
 /* src/pages/SnippetsPage.css */
 
-.snippets-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    height: 100%;
-}
+.snippets-container { display: flex; flex-direction: column; gap: 20px; height: 100%; }
+.snippets-toolbar { display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-secondary); border: 1px solid var(--border-color); padding: 15px 20px; border-radius: 12px; box-shadow: var(--card-shadow); gap: 20px; }
+.snippets-search-wrapper { flex-grow: 1; max-width: 400px; }
 
-.snippets-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    padding: 15px 20px;
-    border-radius: 12px;
-    box-shadow: var(--card-shadow);
-    gap: 20px;
-}
+/* Κατηγορίες / Φάκελοι */
+.snippet-category-section { margin-bottom: 30px; border-radius: 12px; padding: 10px; transition: all 0.2s; position: relative; }
+.snippet-category-section.drag-over { background-color: var(--bg-tertiary); border: 2px dashed var(--accent-color); }
 
-.snippets-search-wrapper {
-    flex-grow: 1;
-    max-width: 400px;
-}
+/* Δείκτες Drag & Drop για τους Φακέλους */
+.snippet-category-section.cat-drop-before { border-top: 4px solid var(--accent-color); }
+.snippet-category-section.cat-drop-after { border-bottom: 4px solid var(--accent-color); padding-bottom: 20px;}
 
-.snippets-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
-    padding-bottom: 20px;
+.snippet-category-header { 
+    font-size: 1.3rem; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 10px; 
+    border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; transition: color 0.2s; 
+    user-select: none; font-weight: 600; 
 }
+.snippet-category-header:hover { color: var(--accent-color); }
+.snippet-category-header.dragging { opacity: 0.5; }
 
-/* STICKY NOTE DESIGN - Base */
-.snippet-card {
-    position: relative;
-    border-radius: 8px;
-    padding: 20px;
-    min-height: 180px;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    color: var(--text-primary);
+.category-drag-handle { cursor: grab; color: var(--text-secondary); opacity: 0.4; font-size: 1rem; margin-right: 5px; transition: opacity 0.2s; }
+.snippet-category-header:hover .category-drag-handle { opacity: 1; }
+.category-drag-handle:active { cursor: grabbing; }
+
+.category-arrow { font-size: 0.9em; color: var(--text-secondary); transition: transform 0.2s; }
+.category-count { font-size: 0.8em; background-color: var(--bg-tertiary); color: var(--text-secondary); padding: 2px 8px; border-radius: 12px; margin-left: 5px; }
+
+.snippets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding-bottom: 20px; }
+
+/* STICKY NOTE DESIGN - ΣΤΑΘΕΡΟ ΥΨΟΣ! */
+.snippet-card-wrapper { transition: all 0.1s ease; border-radius: 8px; }
+.snippet-card { 
+    position: relative; border-radius: 8px; padding: 20px; 
+    height: 240px; /* <--- ΑΥΤΟ ΚΑΝΕΙ ΟΛΕΣ ΤΙΣ ΚΑΡΤΕΣ ΙΣΕΣ */
+    cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s; 
+    display: flex; flex-direction: column; color: var(--text-primary); 
+    box-sizing: border-box;
 }
+.snippet-card:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 8px 15px rgba(0,0,0,0.15); }
+.snippet-card.dragging { opacity: 0.4; transform: scale(0.95); box-shadow: none; cursor: grabbing; }
 
-.snippet-card:hover {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 8px 15px rgba(0,0,0,0.15);
-}
+.snippet-title { margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.snippet-preview { font-size: 0.95rem; line-height: 1.5; flex-grow: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; opacity: 0.85; }
 
-.snippet-title {
-    margin: 0 0 10px 0;
-    font-size: 1.2rem;
-    font-weight: 700;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
-}
+/* LINK STYLING IN CARDS */
+.snippet-preview a, .snippet-view-content a { color: #3182CE; text-decoration: none; font-weight: 500; transition: text-decoration 0.2s; }
+.snippet-preview a:hover, .snippet-view-content a:hover { text-decoration: underline; }
+[data-theme='dark'] .snippet-preview a, [data-theme='dark'] .snippet-view-content a { color: #63B3ED; }
 
-.snippet-preview {
-    font-size: 0.95rem;
-    line-height: 1.5;
-    flex-grow: 1;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4; /* Πρόσθεσε αυτή τη γραμμή */
-    -webkit-box-orient: vertical;
-    opacity: 0.85;
-}
+.snippet-preview img { max-width: 100%; height: auto; border-radius: 4px; display: none; /* Κρύβουμε τις εικόνες στο preview */ }
+.snippet-preview table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+.snippet-preview td, .snippet-preview th { border: 1px solid var(--border-color); padding: 2px; }
 
-.snippet-footer {
-    margin-top: 15px;
-    padding-top: 10px;
-    font-size: 0.85rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px dashed var(--border-color);
-}
+.snippet-footer { margin-top: 10px; padding-top: 10px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-color); flex-shrink: 0;}
+.snippet-date { opacity: 0.7; font-style: italic; }
+.snippet-actions { display: flex; gap: 8px; }
 
-.snippet-date {
-    opacity: 0.7;
-    font-style: italic;
-}
+.snippet-action-btn { background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.snippet-action-btn:hover { background-color: var(--accent-color); color: white; border-color: var(--accent-color); }
+.snippet-action-btn.delete { color: var(--danger-color); }
+.snippet-action-btn.delete:hover { background-color: var(--danger-color); color: white; border-color: var(--danger-color); }
 
-.snippet-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.snippet-action-btn {
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.snippet-action-btn:hover {
-    background-color: var(--accent-color);
-    color: white;
-    border-color: var(--accent-color);
-}
-
-.snippet-action-btn.delete {
-    color: var(--danger-color);
-}
-
-.snippet-action-btn.delete:hover {
-    background-color: var(--danger-color);
-    color: white;
-    border-color: var(--danger-color);
-}
-
-/* Colors - Light Mode (Default) */
+/* Colors */
 :root {
     --snippet-bg-yellow: #FEFCBF; --snippet-border-yellow: #D69E2E;
     --snippet-bg-blue: #EBF8FF;   --snippet-border-blue: #3182CE;
     --snippet-bg-green: #C6F6D5;  --snippet-border-green: #38A169;
     --snippet-bg-pink: #FED7D7;   --snippet-border-pink: #E53E3E;
 }
-
-/* Colors - Dark Mode */
 [data-theme='dark'] {
     --snippet-bg-yellow: rgba(214, 158, 46, 0.15); --snippet-border-yellow: #D69E2E;
     --snippet-bg-blue: rgba(49, 130, 206, 0.15);   --snippet-border-blue: #3182CE;
     --snippet-bg-green: rgba(56, 161, 105, 0.15);  --snippet-border-green: #38A169;
     --snippet-bg-pink: rgba(229, 62, 62, 0.15);    --snippet-border-pink: #E53E3E;
 }
-
 .snippet-color-yellow { background-color: var(--snippet-bg-yellow); border-top: 4px solid var(--snippet-border-yellow); }
 .snippet-color-blue { background-color: var(--snippet-bg-blue); border-top: 4px solid var(--snippet-border-blue); }
 .snippet-color-green { background-color: var(--snippet-bg-green); border-top: 4px solid var(--snippet-border-green); }
 .snippet-color-pink { background-color: var(--snippet-bg-pink); border-top: 4px solid var(--snippet-border-pink); }
 
-/* Modal Editor Specifics */
-.color-picker {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.color-dot {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: transform 0.2s;
-}
-
+.color-picker { display: flex; gap: 10px; margin-bottom: 15px; }
+.color-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
 .color-dot:hover { transform: scale(1.2); }
 .color-dot.selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-secondary); }
-
-.bg-yellow { background-color: #D69E2E; }
-.bg-blue { background-color: #3182CE; }
-.bg-green { background-color: #38A169; }
-.bg-pink { background-color: #E53E3E; }
-
-/* Κατηγορίες / Φάκελοι */
-.snippet-category-section {
-    margin-bottom: 30px;
-}
-
-.snippet-category-header {
-    font-size: 1.3rem;
-    color: var(--text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    transition: color 0.2s;
-    user-select: none;
-    font-weight: 600;
-}
-
-.snippet-category-header:hover {
-    color: var(--accent-color);
-}
-
-.category-arrow {
-    font-size: 0.9em;
-    color: var(--text-secondary);
-    transition: transform 0.2s;
-}
-
-.category-count {
-    font-size: 0.8em;
-    background-color: var(--bg-tertiary);
-    color: var(--text-secondary);
-    padding: 2px 8px;
-    border-radius: 12px;
-    margin-left: 5px;
-}
+.bg-yellow { background-color: #D69E2E; } .bg-blue { background-color: #3182CE; } .bg-green { background-color: #38A169; } .bg-pink { background-color: #E53E3E; }
 
 /* Custom Category ComboBox */
-.category-combobox-wrapper {
-    position: relative;
-    width: 100%;
+.category-combobox-wrapper { position: relative; width: 100%; }
+.category-combobox-arrow { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-secondary); font-size: 0.8rem; padding: 5px; }
+.category-dropdown-list { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: var(--card-shadow); z-index: 2000; margin: 0; padding: 5px 0; list-style: none; max-height: 150px; overflow-y: auto; }
+.category-dropdown-item { padding: 10px 15px; cursor: pointer; color: var(--text-primary); border-bottom: 1px solid var(--border-color); transition: background-color 0.2s; }
+.category-dropdown-item:last-child { border-bottom: none; }
+.category-dropdown-item:hover { background-color: var(--bg-tertiary); color: var(--accent-color); }
+
+/* CKEditor in modal */
+#snippet-modal-content-id .ck-editor__editable_inline { min-height: 350px; max-height: 500px; background-color: var(--bg-primary) !important; color: var(--text-primary) !important; }
+
+/* VIEW MODAL (Blurred backdrop, pop animation) */
+.snippet-view-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1060; padding: 20px;
 }
 
-.category-combobox-arrow {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    padding: 5px;
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
-.category-dropdown-list {
-    position: absolute;
-    top: calc(100% + 5px);
-    left: 0;
-    right: 0;
+.snippet-view-content {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    box-shadow: var(--card-shadow);
-    z-index: 2000; /* Πάνω από το Modal */
-    margin: 0;
-    padding: 5px 0;
-    list-style: none;
-    max-height: 150px;
-    overflow-y: auto;
+    border-radius: 12px;
+    width: 100%; max-width: 800px;
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.category-dropdown-item {
-    padding: 10px 15px;
-    cursor: pointer;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.2s;
+.snippet-view-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 25px; border-bottom: 1px solid var(--border-color);
+}
+.snippet-view-header h2 { margin: 0; font-size: 1.5rem; color: var(--text-primary); }
+
+.snippet-view-close-btn {
+    background: none; border: none; font-size: 1.5rem; color: var(--text-secondary);
+    cursor: pointer; transition: color 0.2s; padding: 0 5px;
+}
+.snippet-view-close-btn:hover { color: var(--danger-color); }
+
+.snippet-view-body {
+    padding: 25px; overflow-y: auto; color: var(--text-primary); line-height: 1.6;
 }
 
-.category-dropdown-item:last-child {
-    border-bottom: none;
-}
+.snippet-view-body img { max-width: 100%; height: auto; border-radius: 6px; margin: 10px 0; }
+.snippet-view-body table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+.snippet-view-body th, .snippet-view-body td { border: 1px solid var(--border-color); padding: 8px; }
+.snippet-view-body th { background-color: var(--bg-tertiary); }
 
-.category-dropdown-item:hover {
-    background-color: var(--bg-tertiary);
-    color: var(--accent-color);
-}
-
-/* CKEditor in this modal needs to be tall */
-#snippet-modal-content-id .ck-editor__editable_inline {
-    min-height: 350px;
-    max-height: 500px;
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
+.snippet-view-footer {
+    padding: 15px 25px; border-top: 1px solid var(--border-color);
+    display: flex; justify-content: flex-end; gap: 10px; background-color: var(--bg-tertiary);
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
 }

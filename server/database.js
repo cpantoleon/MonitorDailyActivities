@@ -97,6 +97,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 content TEXT,
                 color TEXT DEFAULT 'yellow',
                 category TEXT DEFAULT 'General',
+                display_order INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )`, (err) => {
@@ -343,6 +344,15 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     const hasCategory = columns.some(c => c.name === 'category');
                     if (!hasCategory) {
                         db.run("ALTER TABLE sticky_notes ADD COLUMN category TEXT DEFAULT 'General'");
+                    }
+                }
+            });
+
+            db.all("PRAGMA table_info(sticky_notes)", (err, columns) => {
+                if (!err && columns) {
+                    const hasDisplayOrder = columns.some(c => c.name === 'display_order');
+                    if (!hasDisplayOrder) {
+                        db.run("ALTER TABLE sticky_notes ADD COLUMN display_order INTEGER DEFAULT 0");
                     }
                 }
             });
