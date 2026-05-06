@@ -93,7 +93,8 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
     return allProcessedRequirements.filter(r => {
       if (r.project !== globalProject) return false;
-      if (r.currentStatusDetails?.releaseId !== currentProjectActiveRelease.id) return false;
+      const rIds = r.currentStatusDetails?.releaseIds;
+      if (!rIds || !Array.isArray(rIds) || !rIds.includes(currentProjectActiveRelease.id)) return false;
       const isDone = r.currentStatusDetails?.status === 'Done';
       return chartFilter === 'Done' ? isDone : !isDone;
     });
@@ -106,11 +107,12 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       const activeRel = projReleases.length > 0 ? projReleases[0] : null;
       let pendingReqs = 0;
       if (activeRel && allProcessedRequirements) {
-        pendingReqs = allProcessedRequirements.filter(r => 
-          r.project === proj && 
-          r.currentStatusDetails?.releaseId === activeRel.id && 
-          r.currentStatusDetails?.status !== 'Done'
-        ).length;
+        pendingReqs = allProcessedRequirements.filter(r => {
+          const rIds = r.currentStatusDetails?.releaseIds;
+          return r.project === proj && 
+                 rIds && Array.isArray(rIds) && rIds.includes(activeRel.id) && 
+                 r.currentStatusDetails?.status !== 'Done';
+        }).length;
       }
       return { name: proj, activeDefects: activeDefs, pendingReqs: pendingReqs, totalIssues: activeDefs + pendingReqs };
     }).sort((a, b) => b.totalIssues - a.totalIssues);
@@ -125,9 +127,10 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const activeReleaseChartData = useMemo(() => {
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return null;
-    const releaseReqs = allProcessedRequirements.filter(r => 
-      r.project === globalProject && r.currentStatusDetails?.releaseId === currentProjectActiveRelease.id
-    );
+    const releaseReqs = allProcessedRequirements.filter(r => {
+      const rIds = r.currentStatusDetails?.releaseIds;
+      return r.project === globalProject && rIds && Array.isArray(rIds) && rIds.includes(currentProjectActiveRelease.id);
+    });
     if (releaseReqs.length === 0) return null;
 
     let done = 0;
