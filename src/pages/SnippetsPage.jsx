@@ -38,6 +38,7 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingNote, setEditingNote] = useState(null);
     const [formData, setFormData] = useState({ title: '', content: '', color: 'yellow', category: 'General' });
+    const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     
     // View Modal
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -181,6 +182,33 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
         setIsCategoryDropdownOpen(false);
         setIsEditModalOpen(true);
         setIsViewModalOpen(false); 
+    };
+
+    const hasUnsavedChanges = useMemo(() => {
+        if (!isEditModalOpen) return false;
+        
+        const cleanContent = (formData.content || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+        
+        if (editingNote) {
+            const cleanOriginalContent = (editingNote.content || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+            return formData.title !== editingNote.title ||
+                   cleanContent !== cleanOriginalContent ||
+                   formData.color !== (editingNote.color || 'yellow') ||
+                   formData.category !== (editingNote.category || 'General');
+        } else {
+            return formData.title !== '' ||
+                   cleanContent !== '' ||
+                   formData.color !== 'yellow' ||
+                   formData.category !== 'General';
+        }
+    }, [formData, editingNote, isEditModalOpen]);
+
+    const handleCloseEditModal = () => {
+        if (hasUnsavedChanges) {
+            setIsUnsavedModalOpen(true);
+        } else {
+            setIsEditModalOpen(false);
+        }
     };
 
     const handleSave = async () => {
@@ -507,7 +535,7 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
 
             {/* Editor Modal */}
             {isEditModalOpen && (
-                <div className="add-new-modal-overlay" onClick={() => setIsEditModalOpen(false)}>
+                <div className="add-new-modal-overlay" onClick={handleCloseEditModal}>
                     <div id="snippet-modal-content-id" className="add-new-modal-content" style={{ maxWidth: '800px', zIndex: 1061 }} onClick={e => e.stopPropagation()}>
                         <h2>{editingNote ? 'Edit Snippet' : 'New Snippet'}</h2>
                         
@@ -589,7 +617,7 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
                         </div>
 
                         <div className="modal-actions">
-                            <button className="modal-button-cancel" onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                            <button className="modal-button-cancel" onClick={handleCloseEditModal}>Cancel</button>
                             <button className="modal-button-save" onClick={handleSave}>Save Snippet</button>
                         </div>
                     </div>
@@ -602,6 +630,17 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
                 onConfirm={handleDelete} 
                 title="Delete Snippet" 
                 message={`Are you sure you want to delete "${noteToDelete?.title}"?`} 
+            />
+
+            <ConfirmationModal 
+                isOpen={isUnsavedModalOpen}
+                onClose={() => setIsUnsavedModalOpen(false)}
+                onConfirm={() => {
+                    setIsUnsavedModalOpen(false);
+                    setIsEditModalOpen(false);
+                }}
+                title="Unsaved Changes"
+                message="You have unsaved changes. Are you sure you want to close without saving?"
             />
         </div>
     );
