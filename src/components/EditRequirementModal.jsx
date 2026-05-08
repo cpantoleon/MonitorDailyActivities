@@ -178,7 +178,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
 
   const sprintNumberOptions = Array.from({ length: 20 }, (_, i) => ({ value: `${i + 1}`, label: `${i + 1}` }));
   const statusOptions = ['To Do', 'Scenarios created', 'Under testing', 'Done'].map(s => ({ value: s, label: s }));
-  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Sub-task'].map(t => ({ value: t, label: t }));
+  const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Known Error', 'Sub-task'].map(t => ({ value: t, label: t }));
   const releaseOptions = [
     { value: '', label: '-- None (Clear Release) --' },
     ...releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }))

@@ -64,6 +64,9 @@
   --type-incident-bg: #EDF2F7;
   --type-incident-text: #4A5568;
   --type-incident-border: #CBD5E0;
+  --type-known-error-bg: #E6FFFA;
+  --type-known-error-text: #2C7A7B;
+  --type-known-error-border: #B2F5EA;
 }
 
 [data-theme='dark'] {
@@ -130,6 +133,9 @@
   --type-incident-bg: rgba(160, 174, 192, 0.2);
   --type-incident-text: #A0AEC0;
   --type-incident-border: #718096;
+  --type-known-error-bg: rgba(49, 151, 149, 0.2);
+  --type-known-error-text: #4FD1C5;
+  --type-known-error-border: #319795;
 }
 
 body {
@@ -699,6 +705,7 @@ body {
 .type-badge.change-request { background-color: var(--type-cr-bg); color: var(--type-cr-text); border-color: var(--type-cr-border); }
 .type-badge.incident { background-color: var(--type-incident-bg); color: var(--type-incident-text); border-color: var(--type-incident-border); }
 .type-badge.sub-task { background-color: var(--type-subtask-bg); color: var(--type-subtask-text); border-color: var(--type-subtask-border); }
+.type-badge.known-error { background-color: var(--type-known-error-bg); color: var(--type-known-error-text); border-color: var(--type-known-error-border); }
 .type-badge.default { background-color: var(--tag-gray-bg); color: var(--tag-gray-text); border-color: var(--tag-gray-border); }
 
 /* ---------------------------------------------------
@@ -722,6 +729,9 @@ body {
 }
 [data-theme='dark'] .type-bubble.sub-task { 
   background-color: #1A202C !important; 
+}
+[data-theme='dark'] .type-bubble.known-error { 
+  background-color: #1A3636 !important; 
 }
 [data-theme='dark'] .type-bubble.default { 
   background-color: #1A202C !important; 

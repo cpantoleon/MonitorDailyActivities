@@ -477,35 +477,39 @@ const SprintActivitiesPage = ({
           <button onClick={handleSelectAll} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Select All</button>
           <button onClick={() => setSelectedIds([])} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} disabled={selectedIds.length === 0}>Deselect</button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto', minWidth: '150px' }}>
-            <CustomDropdown
-              id="bulk-sprint-dropdown"
-              name="bulkSprint"
-              value={bulkTargetSprint}
-              onChange={e => setBulkTargetSprint(e.target.value)}
-              options={sprintOptions}
-              placeholder="- Target Sprint -"
-              disabled={selectedIds.length === 0}
-              placement="bottom"
-            />
-            <button onClick={handleBulkMoveSprint} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetSprint} style={{ padding: '6px 12px' }}>Move</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+            <div style={{ width: '160px' }}>
+              <CustomDropdown
+                id="bulk-sprint-dropdown"
+                name="bulkSprint"
+                value={bulkTargetSprint}
+                onChange={e => setBulkTargetSprint(e.target.value)}
+                options={sprintOptions}
+                placeholder="- Target Sprint -"
+                disabled={selectedIds.length === 0}
+                placement="bottom"
+              />
+            </div>
+            <button onClick={handleBulkMoveSprint} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetSprint} style={{ padding: '6px 12px', flexShrink: 0 }}>Move</button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: '150px' }}>
-            <CustomDropdown
-              id="bulk-release-dropdown"
-              name="bulkRelease"
-              value={bulkTargetRelease}
-              onChange={e => setBulkTargetRelease(e.target.value)}
-              options={releaseOptions}
-              placeholder="- Target Release -"
-              disabled={selectedIds.length === 0}
-              placement="bottom"
-            />
-            <button onClick={handleBulkAddRelease} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetRelease} style={{ padding: '6px 12px' }}>Assign</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <div style={{ width: '180px' }}>
+              <CustomDropdown
+                id="bulk-release-dropdown"
+                name="bulkRelease"
+                value={bulkTargetRelease}
+                onChange={e => setBulkTargetRelease(e.target.value)}
+                options={releaseOptions}
+                placeholder="- Target Release -"
+                disabled={selectedIds.length === 0}
+                placement="bottom"
+              />
+            </div>
+            <button onClick={handleBulkAddRelease} className="btn-primary" disabled={selectedIds.length === 0 || !bulkTargetRelease} style={{ padding: '6px 12px', flexShrink: 0 }}>Assign</button>
           </div>
 
-          <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none' }} disabled={selectedIds.length === 0}>Delete</button>
+          <button onClick={handleBulkDelete} className="btn-primary" style={{ padding: '6px 12px', backgroundColor: '#e53e3e', color: 'white', border: 'none', flexShrink: 0 }} disabled={selectedIds.length === 0}>Delete</button>
         </div>
       )}
 

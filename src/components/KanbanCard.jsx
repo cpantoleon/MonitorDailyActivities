@@ -37,6 +37,7 @@ const getTypeClass = (type) => {
   if (lowerType.includes('sub-task') || lowerType.includes('subtask')) return 'sub-task';
   if (lowerType.includes('change') || lowerType.includes('cr')) return 'change-request';
   if (lowerType.includes('incident')) return 'incident';
+  if (lowerType.includes('known error')) return 'known-error';
   return 'default';
 };
 

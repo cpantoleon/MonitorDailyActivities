@@ -329,7 +329,7 @@ const calculateBusinessHours = (start, end) => {
 };
 
 const processExcelData = (fileBuffer) => {
-    const validTypes = ['Change Request', 'Task', 'Bug', 'Story', "Incident"];
+    const validTypes = ['Change Request', 'Task', 'Bug', 'Story', "Incident", 'Known Error'];
     const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
@@ -3369,7 +3369,7 @@ app.post('/api/jira/fetch', async (req, res) => {
         const orphanSubtasks = [];
 
         // Ορίζουμε ποια types επιτρέπονται στα Requirements
-        const VALID_REQUIREMENT_TYPES = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'];
+        const VALID_REQUIREMENT_TYPES = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Known Error'];
 
         issues.forEach(issue => {
             const type = issue.fields.issuetype.name ? issue.fields.issuetype.name.trim() : "Unknown";
@@ -3698,7 +3698,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
             const link = `${JIRA_BASE_URL}/browse/${key}`;
 
             const type = issue.fields.issuetype.name;
-            const validTypes = ['Change Request', 'Task', 'Bug', 'Story', 'Incident'];
+            const validTypes = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Known Error'];
             if (!validTypes.includes(type)) {
                 continue; // Εδώ κάνουμε continue γιατί το type δεν επιτρέπεται
             }

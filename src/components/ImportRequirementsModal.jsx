@@ -100,7 +100,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
     <div id="import-reqs-tooltip-content-id">
       <strong style={{ color: 'var(--text-primary)' }}>Excel File Format Guide:</strong>
       <ul style={{ paddingLeft: '20px', margin: '5px 0 0 0', color: 'var(--text-secondary)' }}>
-        <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story', 'Incident'.</li>
+        <li>Only rows with a valid type in the 'T' column will be imported. Valid types are: 'Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Known Error'.</li>
         <li>The 'Summary' column is required and will become the requirement's title.</li>
         <li>The 'Key' column (e.g., 'PROJ-123') is used for JIRA links and duplicate checking.</li>
         <li>If a requirement with the same 'Key' already exists, it will be imported with a modified title (e.g., "Title (1)").</li>
