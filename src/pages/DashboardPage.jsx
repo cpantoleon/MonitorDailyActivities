@@ -79,15 +79,22 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     return allDefects.filter(d => d.status !== 'Done' && d.status !== 'Closed');
   }, [allDefects]);
 
-  const currentProjectDefectList = useMemo(() => {
-    if (!globalProject) return [];
-    return activeDefectsAll.filter(d => d.project === globalProject);
-  }, [activeDefectsAll, globalProject]);
-
   const currentProjectActiveRelease = useMemo(() => {
     if (!globalProject) return null;
     return allReleases.find(r => r.project === globalProject && r.is_current);
   }, [allReleases, globalProject]);
+
+  const currentProjectDefectList = useMemo(() => {
+    if (!globalProject || !currentProjectActiveRelease) return [];
+    return activeDefectsAll.filter(d => {
+      if (d.project !== globalProject) return false;
+      return d.linkedRequirements && d.linkedRequirements.some(req => 
+        req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(currentProjectActiveRelease.id)
+      );
+    });
+  }, [activeDefectsAll, globalProject, currentProjectActiveRelease]);
+
+
 
   const currentProjectFilteredReqsList = useMemo(() => {
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
@@ -102,18 +109,30 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const projectSummaries = useMemo(() => {
     return projects.map(proj => {
-      const activeDefs = activeDefectsAll.filter(d => d.project === proj).length;
       const projReleases = allReleases.filter(r => r.project === proj && r.is_current);
       const activeRel = projReleases.length > 0 ? projReleases[0] : null;
+      
+      let activeDefs = 0;
       let pendingReqs = 0;
-      if (activeRel && allProcessedRequirements) {
-        pendingReqs = allProcessedRequirements.filter(r => {
-          const rIds = r.currentStatusDetails?.releaseIds;
-          return r.project === proj && 
-                 rIds && Array.isArray(rIds) && rIds.includes(activeRel.id) && 
-                 r.currentStatusDetails?.status !== 'Done';
+
+      if (activeRel) {
+        activeDefs = activeDefectsAll.filter(d => {
+          if (d.project !== proj) return false;
+          return d.linkedRequirements && d.linkedRequirements.some(req => 
+            req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(activeRel.id)
+          );
         }).length;
+
+        if (allProcessedRequirements) {
+          pendingReqs = allProcessedRequirements.filter(r => {
+            const rIds = r.currentStatusDetails?.releaseIds;
+            return r.project === proj && 
+                   rIds && Array.isArray(rIds) && rIds.includes(activeRel.id) && 
+                   r.currentStatusDetails?.status !== 'Done';
+          }).length;
+        }
       }
+
       return { name: proj, activeDefects: activeDefs, pendingReqs: pendingReqs, totalIssues: activeDefs + pendingReqs };
     }).sort((a, b) => b.totalIssues - a.totalIssues);
   }, [projects, activeDefectsAll, allReleases, allProcessedRequirements]);

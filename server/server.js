@@ -3092,17 +3092,8 @@ app.put("/api/defects/:id", async (req, res) => {
         // 3. Determine if links have changed
         let linksChanged = false;
         if (linkedRequirementGroupIds !== undefined) {
-                linksChanged = true;
-            } else {
-                const currentSet = new Set(currentLinks.map(String));
-                const newSet = new Set(newLinks.map(String));
-                for (let id of currentSet) {
-                    if (!newSet.has(id)) {
-                        linksChanged = true;
-                        break;
-                    }
-                }
-            }
+            linksChanged = true;
+        }
 
         // 4. Calculate Field Changes
         let updates = [];
