@@ -54,7 +54,8 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
     const { dashboardGridStyle, setDashboardGridStyle } = useGlobal();
     const [isDefaultExpanded, setIsDefaultExpanded] = useState(true);
     const [isGitCheckEnabled, setIsGitCheckEnabled] = useState(true);
-    const [isMultiReleaseModeLocal, setIsMultiReleaseModeLocal] = useState(false); // <-- ΔΗΛΩΣΗ ΕΔΩ
+    const [isMultiReleaseModeLocal, setIsMultiReleaseModeLocal] = useState(false);
+    const [isNotesAllProjectsDefault, setIsNotesAllProjectsDefault] = useState(false); // <-- NEW STATE
     const [localGridStyle, setLocalGridStyle] = useState(dashboardGridStyle);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -83,6 +84,12 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 .then(res => res.json())
                 .then(data => setIsMultiReleaseModeLocal(data.isEnabled))
                 .catch(() => { });
+
+            // <-- NEW FETCH
+            fetch('/api/settings/notes-all-projects')
+                .then(res => res.json())
+                .then(data => setIsNotesAllProjectsDefault(data.isEnabled))
+                .catch(() => { });
         }
     }, [isOpen, dashboardGridStyle]);
 
@@ -109,10 +116,16 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                 body: JSON.stringify({ isEnabled: isMultiReleaseModeLocal })
             });
 
+            // <-- NEW SAVE
+            await fetch('/api/settings/notes-all-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isEnabled: isNotesAllProjectsDefault })
+            });
+
             showMessage("Settings saved successfully!", "success");
             onClose();
 
-            // Κάνουμε reload για να εφαρμοστεί το Multi-Release Mode παντού
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
@@ -217,6 +230,25 @@ const SettingsModal = ({ isOpen, onClose, showMessage }) => {
                     id="multi-release-toggle"
                     checked={isMultiReleaseModeLocal}
                     onChange={(e) => setIsMultiReleaseModeLocal(e.target.checked)}
+                    option1="On"
+                    option2="Off"
+                />
+            </div>
+
+            <div className="settings-section-divider" style={{ margin: '15px 0' }}></div>
+
+            {/* --- NEW SECTION: Notes Default All Projects --- */}
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
+                <div>
+                    <label style={{ margin: 0, fontSize: '1.1em', color: 'var(--text-primary)' }}>Notes: Default to All Projects</label>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: 'var(--text-secondary)' }}>
+                        Automatically check the "All Projects" box when opening the Notes page.
+                    </p>
+                </div>
+                <ToggleSwitch
+                    id="notes-all-projects-toggle"
+                    checked={isNotesAllProjectsDefault}
+                    onChange={(e) => setIsNotesAllProjectsDefault(e.target.checked)}
                     option1="On"
                     option2="Off"
                 />

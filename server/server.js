@@ -1289,6 +1289,27 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
 });
 
 app.get("/api/notes/:project", async (req, res) => {
+    // NEW: Intercept 'all' to return a structured map of notes for all projects
+    if (req.params.project === 'all') {
+        const sql = `
+            SELECT n.noteDate, n.noteText, p.name as projectName 
+            FROM notes n
+            JOIN projects p ON n.project_id = p.id
+            ORDER BY n.noteDate DESC
+        `;
+        db.all(sql, [], (err, rows) => {
+            if (err) return res.status(400).json({ error: err.message });
+            const notesMap = {};
+            rows.forEach(row => {
+                if (!notesMap[row.noteDate]) notesMap[row.noteDate] = {};
+                notesMap[row.noteDate][row.projectName] = row.noteText;
+            });
+            res.json({ message: "success", data: notesMap });
+        });
+        return;
+    }
+
+    // Existing logic for a specific project
     try {
         const projectId = await getProjectId(req.params.project);
         const sql = "SELECT noteDate, noteText FROM notes WHERE project_id = ? ORDER BY noteDate DESC";
@@ -1301,6 +1322,23 @@ app.get("/api/notes/:project", async (req, res) => {
     } catch (error) {
         return res.status(400).json({ error: error.message });
     }
+});
+
+// --- Get Notes 'All Projects' Default Setting ---
+app.get("/api/settings/notes-all-projects", async (req, res) => {
+    try {
+        const row = await dbGet("SELECT value FROM app_settings WHERE key = 'notes_default_all_projects'");
+        res.json({ isEnabled: row ? row.value === '1' : false }); // Default is false
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Save Notes 'All Projects' Default Setting ---
+app.post("/api/settings/notes-all-projects", async (req, res) => {
+    try {
+        const val = req.body.isEnabled ? '1' : '0';
+        await dbRun("INSERT INTO app_settings (key, value) VALUES ('notes_default_all_projects', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [val]);
+        res.json({ message: "Settings saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post("/api/notes", async (req, res) => {

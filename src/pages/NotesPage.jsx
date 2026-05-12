@@ -62,18 +62,27 @@ function MyUploadAdapterPlugin(editor) {
 const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const navigate = useNavigate();
   const [selectedProject, setSelectedProject] = useState('');
+  const [showAllProjects, setShowAllProjects] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // States for single project mode
   const [noteText, setNoteText] = useState('');
+  const [editorInstance, setEditorInstance] = useState(null);
+
+  // States for All Projects mode
+  const [allProjectsTextMap, setAllProjectsTextMap] = useState({});
+  const [savingProject, setSavingProject] = useState(null);
+  const [projectToClear, setProjectToClear] = useState(null);
+
   const [projectNotesMap, setProjectNotesMap] = useState({});
   const [isLoadingNotes, setIsLoadingNotes] = useState(false);
   const [datesToHighlight, setDatesToHighlight] = useState([]);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
-  const [editorInstance, setEditorInstance] = useState(null);
   const [isGeneralMode, setIsGeneralMode] = useState(false);
   const [dateSelectionMode, setDateSelectionMode] = useState('month');
 
-  // --- Unsaved Changes State ---
+  // Unsaved Changes State
   const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -94,6 +103,18 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       sessionStorage.removeItem('notesPageSelectedProject');
     }
   }, [selectedProject]);
+
+  // --- NEW: Fetch default setting for "All Projects" on mount ---
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/settings/notes-all-projects`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.isEnabled) {
+          setShowAllProjects(true);
+        }
+      })
+      .catch(err => console.error("Error fetching notes default setting:", err));
+  }, [apiBaseUrl]);
 
   const isToday = (someDate) => {
     const today = new Date();
@@ -117,6 +138,11 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     return `${year}-${month}`;
   };
 
+  const getCurrentDateKey = useCallback(() => {
+    if (showAllProjects) return formatDateKey(selectedDate);
+    return isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
+  }, [showAllProjects, selectedDate, isGeneralMode, dateSelectionMode]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
 
@@ -128,32 +154,36 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const handleQueryChange = (q) => {
     setSearchQuery(q);
-    if (q.length < 3 || !selectedProject) {
+    if (q.length < 3 || (!selectedProject && !showAllProjects)) {
         setSearchSuggestions([]);
         return;
     }
     const lowerQ = q.toLowerCase();
     const suggestions = [];
     
-    // Ψάχνουμε μέσα στα κατεβασμένα notes του επιλεγμένου project
-    Object.entries(projectNotesMap).forEach(([dateKey, html]) => {
-        const plainText = stripHtml(html).toLowerCase();
+    Object.entries(projectNotesMap).forEach(([dateKey, data]) => {
+        let plainText = "";
+        if (typeof data === 'object' && data !== null) {
+            plainText = stripHtml(Object.values(data).join(' ')).toLowerCase();
+        } else if (typeof data === 'string') {
+            plainText = stripHtml(data).toLowerCase();
+        }
+        
         if (plainText.includes(lowerQ)) {
             suggestions.push({ 
                 id: dateKey, 
-                name: dateKey, // Δείχνουμε την ημερομηνία ως τίτλο
-                context: plainText.substring(0, 40) + '...' // Preview του κειμένου
+                name: dateKey,
+                context: plainText.substring(0, 40) + '...'
             });
         }
     });
-    setSearchSuggestions(suggestions.slice(0, 10)); // Δείχνουμε τα 10 πρώτα
+    setSearchSuggestions(suggestions.slice(0, 10));
   };
 
   const handleSearch = (q) => { handleQueryChange(q); };
   const handleClearSearch = () => { setSearchQuery(''); setSearchSuggestions([]); };
 
   const handleSuggestionSelect = (suggestion) => {
-    // Όταν επιλέξει μια πρόταση (μια ημερομηνία), αλλάζουμε το ημερολόγιο σε εκείνη την ημέρα!
     const parts = suggestion.id.split('-');
     let newDate;
     if (parts.length === 2) {
@@ -171,17 +201,30 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   };
 
   // --- Determine if there are unsaved changes ---
-  const currentDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
-  const originalNoteText = projectNotesMap[currentDateKey] || '';
+  const checkUnsavedChanges = useCallback(() => {
+    const dateKey = getCurrentDateKey();
+    if (showAllProjects) {
+        const originalMap = projectNotesMap[dateKey];
+        const safeOriginalMap = (originalMap && typeof originalMap === 'object') ? originalMap : {};
+        
+        for (const proj of Object.keys(allProjectsTextMap)) {
+            if (typeof allProjectsTextMap[proj] !== 'string') continue;
+            const cleanCurrent = (allProjectsTextMap[proj] || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+            const cleanOrig = (safeOriginalMap[proj] || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+            if (cleanCurrent !== cleanOrig) return true;
+        }
+        return false;
+    } else {
+        const originalNoteText = projectNotesMap[dateKey];
+        const safeOriginalText = (typeof originalNoteText === 'string') ? originalNoteText : '';
+        const cleanNoteText = (noteText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+        const cleanOriginalText = (safeOriginalText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+        return cleanNoteText !== cleanOriginalText;
+    }
+  }, [showAllProjects, getCurrentDateKey, projectNotesMap, allProjectsTextMap, noteText]);
 
-  // Clean up empty CKEditor paragraphs before comparing to prevent false unsaved warnings
-  const cleanNoteText = (noteText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
-  const cleanOriginalText = (originalNoteText || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
-  const hasUnsavedChanges = cleanNoteText !== cleanOriginalText;
-
-  // Intercept Actions that navigate away or change context
   const executeWithUnsavedCheck = (action) => {
-    if (hasUnsavedChanges) {
+    if (checkUnsavedChanges()) {
       setPendingAction(() => action);
       setIsUnsavedModalOpen(true);
     } else {
@@ -189,21 +232,19 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     }
   };
 
-  // Intercept clicks on routing links and browser refresh/close
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (hasUnsavedChanges) {
+      if (checkUnsavedChanges()) {
         e.preventDefault();
-        e.returnValue = ''; // Trigger browser's native leave confirmation
+        e.returnValue = ''; 
       }
     };
 
     const handleNavigationClick = (e) => {
-      if (!hasUnsavedChanges) return;
+      if (!checkUnsavedChanges()) return;
       const target = e.target.closest('a');
       if (target && target.tagName === 'A') {
         const href = target.getAttribute('href');
-        // If navigating internally to a different view away from Notes
         if (href && !href.startsWith('http') && !href.includes('/notes')) {
           e.preventDefault();
           e.stopPropagation();
@@ -220,14 +261,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('click', handleNavigationClick, true);
     };
-  }, [hasUnsavedChanges, navigate]);
+  }, [checkUnsavedChanges, navigate]);
 
-  // --- Navigation Handlers for Previous / Next Date ---
   const handlePrevDate = () => {
     executeWithUnsavedCheck(() => {
       setSelectedDate(prev => {
         const newDate = new Date(prev);
-        if (isGeneralMode && dateSelectionMode === 'month') {
+        if (isGeneralMode && dateSelectionMode === 'month' && !showAllProjects) {
           newDate.setMonth(newDate.getMonth() - 1);
         } else {
           newDate.setDate(newDate.getDate() - 1);
@@ -241,7 +281,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     executeWithUnsavedCheck(() => {
       setSelectedDate(prev => {
         const newDate = new Date(prev);
-        if (isGeneralMode && dateSelectionMode === 'month') {
+        if (isGeneralMode && dateSelectionMode === 'month' && !showAllProjects) {
           newDate.setMonth(newDate.getMonth() + 1);
         } else {
           newDate.setDate(newDate.getDate() + 1);
@@ -251,117 +291,195 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     });
   };
 
-  const handleSaveNote = useCallback(async (textToSave) => {
-    if (!selectedProject) {
+  const handleSaveNote = useCallback(async (textToSave, targetProject = null) => {
+    const proj = targetProject || selectedProject;
+    if (!proj) {
       if (showMessage) showMessage('Please select a project.', 'error');
       return;
     }
-    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
-    if (!dateKey) {
-      if (showMessage) showMessage('Invalid date selected for note.', 'error');
-      return;
-    }
-    setIsLoadingNotes(true);
+    const dateKey = getCurrentDateKey();
+    if (!dateKey) return;
+
+    setSavingProject(proj);
+    if (!showAllProjects) setIsLoadingNotes(true);
 
     try {
       const response = await fetch(`${apiBaseUrl}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: selectedProject, noteDate: dateKey, noteText: textToSave }),
+        body: JSON.stringify({ project: proj, noteDate: dateKey, noteText: textToSave }),
       });
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to process note: ${response.statusText}`);
-      }
-      const newNoteType = getNoteType(textToSave.trim());
-      if (result.action === "deleted" || (result.action === "none" && textToSave.trim() === "")) {
-        setNoteText('');
-        setProjectNotesMap(prev => {
-          const newMap = { ...prev };
-          delete newMap[dateKey];
-          return newMap;
-        });
-        setDatesToHighlight(prev => prev.filter(d => formatDateKey(d.date) !== dateKey));
-        if (showMessage) showMessage(result.action === "deleted" ? "Note deleted successfully!" : "Note cleared!", 'success');
-      } else if (result.action === "saved") {
-        setProjectNotesMap(prev => ({ ...prev, [dateKey]: result.data.noteText }));
-        setDatesToHighlight(prev => {
-          const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
-          const highlightType = isGeneralMode ? DEFAULT_NOTE_TYPE : newNoteType;
-          const newHighlight = { date: selectedDate, type: highlightType };
-          if (existingIndex > -1) {
-            const updated = [...prev];
-            updated[existingIndex] = newHighlight;
-            return updated;
+      if (!response.ok) throw new Error(result.error);
+
+      let updatedMap;
+      setProjectNotesMap(prev => {
+        updatedMap = { ...prev };
+        if (showAllProjects) {
+          if (!updatedMap[dateKey] || typeof updatedMap[dateKey] !== 'object') updatedMap[dateKey] = {};
+          if (result.action === "deleted" || (result.action === "none" && textToSave.trim() === "")) {
+            delete updatedMap[dateKey][proj];
+            if (Object.keys(updatedMap[dateKey]).length === 0) delete updatedMap[dateKey];
+          } else {
+            updatedMap[dateKey][proj] = result.data.noteText;
           }
-          return [...prev, newHighlight];
-        });
-        if (showMessage) showMessage('Note saved successfully!', 'success');
+        } else {
+          if (result.action === "deleted" || (result.action === "none" && textToSave.trim() === "")) {
+            delete updatedMap[dateKey];
+          } else {
+            updatedMap[dateKey] = result.data.noteText;
+          }
+        }
+        return updatedMap;
+      });
+
+      if (showAllProjects) {
+          setAllProjectsTextMap(prev => {
+              const newMap = { ...prev };
+              if (result.action === "deleted" || (result.action === "none" && textToSave.trim() === "")) {
+                  delete newMap[proj];
+              } else {
+                  newMap[proj] = result.data.noteText;
+              }
+              return newMap;
+          });
       } else {
-        if (showMessage) showMessage(result.message || 'Note processed.', 'success');
+          if (result.action === "deleted" || (result.action === "none" && textToSave.trim() === "")) {
+              setNoteText('');
+          }
+      }
+
+      setDatesToHighlight(prev => {
+        const existingIndex = prev.findIndex(d => formatDateKey(d.date) === dateKey);
+        let newHighlight = null;
+        
+        if (showAllProjects) {
+            const notesForDate = updatedMap[dateKey];
+            if (notesForDate && typeof notesForDate === 'object' && Object.keys(notesForDate).length > 0) {
+                const combinedText = Object.values(notesForDate).join(' ');
+                const noteType = getNoteType(combinedText) || DEFAULT_NOTE_TYPE;
+                newHighlight = { date: selectedDate, type: noteType };
+            }
+        } else {
+            if (result.action === "saved") {
+                const noteType = isGeneralMode ? DEFAULT_NOTE_TYPE : getNoteType(textToSave);
+                newHighlight = { date: selectedDate, type: noteType };
+            }
+        }
+
+        if (newHighlight) {
+            if (existingIndex > -1) {
+                const updated = [...prev];
+                updated[existingIndex] = newHighlight;
+                return updated;
+            }
+            return [...prev, newHighlight];
+        } else {
+            return prev.filter(d => formatDateKey(d.date) !== dateKey);
+        }
+      });
+
+      if (showMessage) {
+          showMessage(result.action === "deleted" ? "Note deleted successfully!" : (result.action === "saved" ? "Note saved successfully!" : "Note cleared!"), 'success');
       }
     } catch (error) {
       console.error("Error saving/deleting note:", error);
       if (showMessage) showMessage(`Error: ${error.message}`, 'error');
     } finally {
-      setIsLoadingNotes(false);
+      setSavingProject(null);
+      if (!showAllProjects) setIsLoadingNotes(false);
     }
-  }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode, dateSelectionMode]);
+  }, [selectedProject, selectedDate, apiBaseUrl, showMessage, isGeneralMode, showAllProjects, getCurrentDateKey]);
+
+  const handleSaveAllChangedNotes = async () => {
+      const dateKey = getCurrentDateKey();
+      const originalMap = projectNotesMap[dateKey];
+      const safeOriginalMap = (originalMap && typeof originalMap === 'object') ? originalMap : {};
+      
+      const promises = [];
+      for (const proj of Object.keys(allProjectsTextMap)) {
+          if (typeof allProjectsTextMap[proj] !== 'string') continue;
+          const cleanCurrent = (allProjectsTextMap[proj] || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+          const cleanOrig = (safeOriginalMap[proj] || '').replace(/^<p>(?:&nbsp;|<br\s*\/?>)?<\/p>$/i, '').trim();
+          if (cleanCurrent !== cleanOrig) {
+              promises.push(handleSaveNote(allProjectsTextMap[proj], proj));
+          }
+      }
+      await Promise.all(promises);
+  };
 
   useEffect(() => {
     const handleKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        if (selectedProject && editorInstance) {
-          const currentData = editorInstance.getData();
-          handleSaveNote(currentData);
+        if (showAllProjects) {
+           handleSaveAllChangedNotes();
+        } else if (selectedProject && editorInstance) {
+           const currentData = editorInstance.getData();
+           handleSaveNote(currentData);
         }
       }
     };
-
     document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editorInstance, handleSaveNote, selectedProject, showAllProjects, allProjectsTextMap, projectNotesMap]);
 
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [editorInstance, handleSaveNote, selectedProject]);
-
-  const fetchNotesForProject = useCallback(async (project) => {
-    if (!project) {
+  const fetchNotesForProject = useCallback(async (project, fetchAll = false) => {
+    if (!project && !fetchAll) {
       setProjectNotesMap({});
       setNoteText('');
+      setAllProjectsTextMap({});
       setDatesToHighlight([]);
       return;
     }
     setIsLoadingNotes(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/notes/${project}`);
+      const endpoint = fetchAll ? 'all' : project;
+      const response = await fetch(`${apiBaseUrl}/notes/${endpoint}`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch notes for ${project}: ${response.statusText}`);
+        throw new Error(`Failed to fetch notes: ${response.statusText}`);
       }
       const result = await response.json();
       const notesData = result.data || {};
       setProjectNotesMap(notesData);
 
       const highlights = Object.entries(notesData)
-        .map(([dateKey, text]) => {
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-            return null;
-          }
-
-          const noteType = isGeneralMode ? (text.trim() ? DEFAULT_NOTE_TYPE : null) : getNoteType(text);
-
-          if (noteType) {
-            const [year, month, day] = dateKey.split('-').map(Number);
-            return { date: new Date(year, month - 1, day), type: noteType };
+        .map(([dateKey, textOrObj]) => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+          
+          if (fetchAll) {
+              if (typeof textOrObj === 'object' && textOrObj !== null) {
+                  const combinedText = Object.values(textOrObj).join(' ');
+                  if (!combinedText.trim()) return null;
+                  const noteType = getNoteType(combinedText) || DEFAULT_NOTE_TYPE;
+                  const [year, month, day] = dateKey.split('-').map(Number);
+                  return { date: new Date(year, month - 1, day), type: noteType };
+              }
+          } else {
+              if (typeof textOrObj === 'string') {
+                  const noteType = isGeneralMode ? (textOrObj.trim() ? DEFAULT_NOTE_TYPE : null) : getNoteType(textOrObj);
+                  if (noteType) {
+                    const [year, month, day] = dateKey.split('-').map(Number);
+                    return { date: new Date(year, month - 1, day), type: noteType };
+                  }
+              }
           }
           return null;
         })
         .filter(item => item !== null);
       setDatesToHighlight(highlights);
 
-      const currentDataDateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
-      setNoteText(notesData[currentDataDateKey] || '');
+      const currentDataDateKey = fetchAll ? formatDateKey(selectedDate) : (isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate));
+      
+      const dataForDate = notesData[currentDataDateKey];
+      
+      if (fetchAll) {
+          setAllProjectsTextMap((dataForDate && typeof dataForDate === 'object') ? dataForDate : {});
+          setNoteText('');
+      } else {
+          setNoteText((dataForDate && typeof dataForDate === 'string') ? dataForDate : '');
+          setAllProjectsTextMap({});
+      }
     } catch (error) {
       console.error("Error fetching notes:", error);
       if (showMessage) showMessage(`Error fetching notes: ${error.message}`, 'error');
@@ -373,33 +491,55 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   }, [apiBaseUrl, selectedDate, showMessage, isGeneralMode, dateSelectionMode]);
 
   useEffect(() => {
-    fetchNotesForProject(selectedProject);
-  }, [selectedProject, fetchNotesForProject]);
+    fetchNotesForProject(selectedProject, showAllProjects);
+  }, [selectedProject, showAllProjects, fetchNotesForProject]);
 
   useEffect(() => {
-    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
-    if (selectedProject) {
-      setNoteText(projectNotesMap[dateKey] || '');
+    const dateKey = getCurrentDateKey();
+    const dataForDate = projectNotesMap[dateKey];
+
+    if (showAllProjects) {
+      setAllProjectsTextMap((dataForDate && typeof dataForDate === 'object') ? dataForDate : {});
+    } else if (selectedProject) {
+      setNoteText((dataForDate && typeof dataForDate === 'string') ? dataForDate : '');
     } else {
       setNoteText('');
     }
-  }, [selectedDate, projectNotesMap, selectedProject, isGeneralMode, dateSelectionMode]);
+  }, [selectedDate, projectNotesMap, selectedProject, showAllProjects, getCurrentDateKey]);
 
+  const handleAllProjectsTextChange = (proj, text) => {
+      setAllProjectsTextMap(prev => ({ ...prev, [proj]: text }));
+  };
 
-  const handleClearRequest = () => {
-    const dateKey = isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate);
-    if (projectNotesMap[dateKey] && projectNotesMap[dateKey].trim()) {
-      setIsConfirmClearOpen(true);
+  const handleClearRequest = (proj = null) => {
+    const dateKey = getCurrentDateKey();
+    const dataForDate = projectNotesMap[dateKey];
+
+    if (showAllProjects && proj) {
+       if (dataForDate && typeof dataForDate === 'object' && dataForDate[proj] && dataForDate[proj].trim()) {
+           setProjectToClear(proj);
+           setIsConfirmClearOpen(true);
+       }
+    } else {
+       if (dataForDate && typeof dataForDate === 'string' && dataForDate.trim()) {
+           setProjectToClear(null);
+           setIsConfirmClearOpen(true);
+       }
     }
   };
 
   const handleCancelClear = () => {
-    setIsConfirmClearOpen(false);
+      setIsConfirmClearOpen(false);
+      setProjectToClear(null);
   };
 
   const handleConfirmClear = async () => {
     handleCancelClear();
-    await handleSaveNote('');
+    if (showAllProjects && projectToClear) {
+        await handleSaveNote('', projectToClear);
+    } else {
+        await handleSaveNote('');
+    }
   };
 
   const renderDayContents = (dayOfMonth, date) => {
@@ -425,7 +565,13 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const toggleLegend = () => setIsLegendOpen(!isLegendOpen);
 
-  const hasSavedNoteForSelectedDate = !!(projectNotesMap[isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate)] && projectNotesMap[isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : formatDateKey(selectedDate)) : formatDateKey(selectedDate)].trim());
+  let hasSavedNoteForSelectedDate = false;
+  const currentData = projectNotesMap[getCurrentDateKey()];
+  if (showAllProjects) {
+      hasSavedNoteForSelectedDate = currentData && typeof currentData === 'object' && Object.keys(currentData).length > 0;
+  } else {
+      hasSavedNoteForSelectedDate = currentData && typeof currentData === 'string' && currentData.trim().length > 0;
+  }
 
   const editorConfiguration = {
     extraPlugins: [MyUploadAdapterPlugin],
@@ -578,7 +724,6 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             flex-shrink: 0;
           }
 
-          /* Specific styling for dots inside the calendar cells */
           .calendar-day-container .note-dot {
             height: 6px;
             width: 6px;
@@ -623,25 +768,46 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         `}</style>
 
       <div className="selection-controls" style={{ flexWrap: 'wrap' }}>
-        <div className="selection-group-container" style={{ width: '100%' }}>
+        <div className="selection-group-container" style={{ width: '100%', alignItems: 'center' }}>
           
-          {/* 1. Project Dropdown */}
-          <div className="selection-group" style={{ minWidth: '200px' }}>
-            <label className="dropdown-label" htmlFor="note-project">Project</label>
-            <CustomDropdown
-              id="note-project"
-              name="noteProject"
-              value={selectedProject}
-              onChange={handleProjectChange}
-              options={projectOptions}
-              placeholder="-- Select Project --"
-              disabled={projectOptions.length === 0}
-            />
+          {/* --- GROUP: Project Dropdown & All Projects Checkbox --- */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
+            
+            {/* 1. Project Dropdown */}
+            <div className="selection-group" style={{ minWidth: '200px', marginBottom: 0 }}>
+              <label className="dropdown-label" htmlFor="note-project">Project</label>
+              <CustomDropdown
+                id="note-project"
+                name="noteProject"
+                value={selectedProject}
+                onChange={handleProjectChange}
+                options={projectOptions}
+                placeholder="-- Select Project --"
+                disabled={projectOptions.length === 0 || showAllProjects}
+              />
+            </div>
+
+            {/* NEW: All Projects Checkbox */}
+            <div style={{ height: '42px', display: 'flex', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                <input 
+                  type="checkbox" 
+                  checked={showAllProjects}
+                  onChange={(e) => {
+                      const checked = e.target.checked;
+                      executeWithUnsavedCheck(() => setShowAllProjects(checked));
+                  }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent-color)', margin: 0 }}
+                />
+                All Projects
+              </label>
+            </div>
+
           </div>
 
-          {/* 2. NEW: Search Component (Ενεργό μόνο αν έχει επιλεγεί Project) */}
+          {/* 2. Search Component */}
           <div className="selection-group search-container" style={{ flexGrow: 1, minWidth: '250px' }}>
-             <label className="dropdown-label">Search in {selectedProject || 'Project'}</label>
+             <label className="dropdown-label">Search in {showAllProjects ? 'All Projects' : (selectedProject || 'Project')}</label>
              <SearchComponent
                 query={searchQuery}
                 onQueryChange={handleQueryChange}
@@ -654,25 +820,24 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
           </div>
 
           {/* 3. Date Selection & Toggles */}
-          <div className="selection-group" style={{ minWidth: isGeneralMode ? '380px' : '280px', flex: 'none' }}>
+          <div className="selection-group" style={{ minWidth: (isGeneralMode && !showAllProjects) ? '380px' : '280px', flex: 'none' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', width: '100%' }}>
 
-              
               <button type="button" className="date-nav-btn" onClick={handlePrevDate} title="Previous">
                  &lt;
               </button>
 
               <div style={{ flexGrow: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="dropdown-label" htmlFor="note-date">
-                  {isGeneralMode ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
+                  {(isGeneralMode && !showAllProjects) ? (dateSelectionMode === 'month' ? 'Month' : 'Date') : 'Date'}
                 </label>
                 <DatePicker
                   id="note-date"
                   name="noteDate"
                   selected={selectedDate}
                   onChange={(date) => executeWithUnsavedCheck(() => setSelectedDate(date))}
-                  dateFormat={isGeneralMode ? (dateSelectionMode === 'month' ? "MM/yyyy" : "MM/dd/yyyy") : "MM/dd/yyyy"}
-                  showMonthYearPicker={isGeneralMode && dateSelectionMode === 'month'}
+                  dateFormat={(isGeneralMode && !showAllProjects) ? (dateSelectionMode === 'month' ? "MM/yyyy" : "MM/dd/yyyy") : "MM/dd/yyyy"}
+                  showMonthYearPicker={(isGeneralMode && !showAllProjects) && dateSelectionMode === 'month'}
                   className="notes-datepicker"
                   renderDayContents={renderDayContents}
                   wrapperClassName="date-picker-wrapper"
@@ -687,7 +852,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                  &gt;
               </button>
 
-              {isGeneralMode ? (
+              {(isGeneralMode && !showAllProjects) ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '5px' }}>
                   <ToggleSwitch
                     id="date-selection-mode"
@@ -743,7 +908,58 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         )}
       </div>
 
-      {selectedProject ? (
+      {/* --- RENDER LOGIC --- */}
+      {showAllProjects ? (
+          Object.keys(allProjectsTextMap).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {Object.entries(allProjectsTextMap).map(([projName, text]) => {
+                      const isSaving = savingProject === projName;
+                      const hasSavedNote = !!(projectNotesMap[getCurrentDateKey()] && typeof projectNotesMap[getCurrentDateKey()] === 'object' && projectNotesMap[getCurrentDateKey()][projName]);
+                      
+                      return (
+                          <div key={projName} className="notes-editor-area" style={{
+                              backgroundColor: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '12px',
+                              padding: '20px',
+                              boxShadow: 'var(--card-shadow)'
+                          }}>
+                              <h3 style={{ marginTop: 0, borderBottom: '2px solid var(--border-color)', paddingBottom: '10px', color: 'var(--accent-color)' }}>
+                                  {projName}
+                              </h3>
+                              <div className="editor-wrapper">
+                                  <CKEditor
+                                      editor={ClassicEditor}
+                                      data={text}
+                                      config={editorConfiguration}
+                                      onChange={(event, editor) => handleAllProjectsTextChange(projName, editor.getData())}
+                                  />
+                              </div>
+                              <div className="notes-actions-container" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                  <button
+                                      onClick={() => handleSaveNote(allProjectsTextMap[projName], projName)}
+                                      className="btn-primary"
+                                      disabled={isSaving}
+                                  >
+                                      {isSaving ? <><span className="spinner"></span> Saving...</> : 'Save Note'}
+                                  </button>
+                                  <button
+                                      onClick={() => handleClearRequest(projName)}
+                                      className="delete-card-button"
+                                      style={{ height: '42px', display: 'flex', alignItems: 'center' }}
+                                      disabled={isSaving || !hasSavedNote}
+                                  >
+                                      Clear Note
+                                  </button>
+                              </div>
+                          </div>
+                      );
+                  })}
+              </div>
+          ) : (
+              <div className="empty-column-message">No notes found for any project on this date.</div>
+          )
+      ) : selectedProject ? (
         <div id="notes-editor-area-id" className="notes-editor-area" style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border-color)',
@@ -783,9 +999,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
                 const data = editor.getData();
                 setNoteText(data);
               }}
-              disabled={!selectedProject}
             />
           </div>
+          
           <div id="notes-actions-container-id" className="notes-actions-container" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
             <button
               id="save-note-button-id"
@@ -803,7 +1019,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
             </button>
             <button
               id="clear-note-button-id"
-              onClick={handleClearRequest}
+              onClick={() => handleClearRequest()}
               className="delete-card-button"
               style={{ height: '42px', display: 'flex', alignItems: 'center' }}
               disabled={isLoadingNotes || !selectedProject || !hasSavedNoteForSelectedDate}
@@ -821,7 +1037,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         onClose={handleCancelClear}
         onConfirm={handleConfirmClear}
         title="Confirm Clear Note"
-        message={`Are you sure you want to permanently delete the note for ${isGeneralMode ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
+        message={`Are you sure you want to permanently delete the note for ${projectToClear ? projectToClear + ' on ' : ''}${isGeneralMode && !showAllProjects ? (dateSelectionMode === 'month' ? formatMonthKey(selectedDate) : selectedDate.toLocaleDateString()) : selectedDate.toLocaleDateString()}? This action cannot be undone.`}
       />
 
       <ConfirmationModal
@@ -832,8 +1048,12 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
         }}
         onSecondaryConfirm={async () => {
           setIsUnsavedModalOpen(false);
-          const currentData = editorInstance ? editorInstance.getData() : noteText;
-          await handleSaveNote(currentData);
+          if (showAllProjects) {
+              await handleSaveAllChangedNotes();
+          } else {
+              const currentData = editorInstance ? editorInstance.getData() : noteText;
+              await handleSaveNote(currentData);
+          }
           if (pendingAction) pendingAction();
           setPendingAction(null);
         }}
