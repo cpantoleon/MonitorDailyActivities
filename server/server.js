@@ -3558,28 +3558,30 @@ app.post('/api/jira/import', async (req, res) => {
 
         try {
             for (const parentItem of itemsToImport) {
-                let parentDbId;
+                let parentDbId = null;
 
                 // ΑΛΛΑΓΗ: Αν υπάρχει ήδη, το παίρνουμε από το Map. ΔΕΝ κάνουμε continue;
-                if (existingLinksMap.has(parentItem.link)) {
-                    skipped++;
-                    parentDbId = existingLinksMap.get(parentItem.link);
-                    // FIX: Ensure the type and key are correct in case it was created manually without them
-                    await runQuery(`UPDATE activities SET type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentItem.type, parentItem.key, parentDbId]);
-                } else {
-                    let appStatus = 'To Do';
-                    if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
+                if (parentItem.isParentSelected !== false) {
+                    if (existingLinksMap.has(parentItem.link)) {
+                        skipped++;
+                        parentDbId = existingLinksMap.get(parentItem.link);
+                        // FIX: Ensure the type and key are correct in case it was created manually without them
+                        await runQuery(`UPDATE activities SET type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentItem.type, parentItem.key, parentDbId]);
+                    } else {
+                        let appStatus = 'To Do';
+                        if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
 
-                    parentDbId = await runQuery(insertSql, [
-                        projectId, parentItem.summary, parentItem.key, appStatus, statusDate,
-                        sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
-                    ]);
-                    await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
-                    importedParents++;
+                        parentDbId = await runQuery(insertSql, [
+                            projectId, parentItem.summary, parentItem.key, appStatus, statusDate,
+                            sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
+                        ]);
+                        await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
+                        importedParents++;
+                    }
+
+                    // Τρέχουμε πάντα το linkDefects (είτε ήταν νέο είτε υπήρχε ήδη)
+                    await linkDefects(parentItem.rawIssue, parentDbId);
                 }
-
-                // Τρέχουμε πάντα το linkDefects (είτε ήταν νέο είτε υπήρχε ήδη)
-                await linkDefects(parentItem.rawIssue, parentDbId);
 
                 // 3. Insert Sub-tasks
                 if (parentItem.selectedSubtasks && parentItem.selectedSubtasks.length > 0) {

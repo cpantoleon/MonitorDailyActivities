@@ -2982,6 +2982,13 @@
             "type": "integer",
             "nullable": true
           },
+          "release_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true
+          },
           "existingRequirementGroupId": {
             "type": "integer",
             "nullable": true
@@ -2992,6 +2999,22 @@
           },
           "display_order": {
             "type": "integer",
+            "nullable": true
+          },
+          "expected_time": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_tc_creation": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_testing": {
+            "type": "number",
+            "nullable": true
+          },
+          "release_time_tracking": {
+            "type": "object",
             "nullable": true
           }
         }
@@ -3057,6 +3080,29 @@
           "is_expanded": {
             "type": "integer",
             "nullable": true
+          },
+          "releaseIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true
+          },
+          "expected_time": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_tc_creation": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_testing": {
+            "type": "number",
+            "nullable": true
+          },
+          "release_time_tracking": {
+            "type": "object",
+            "nullable": true
           }
         }
       },
@@ -3112,6 +3158,37 @@
           "parent_id": {
             "type": "integer",
             "nullable": true
+          },
+          "release_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "is_expanded": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expected_time": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_tc_creation": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_testing": {
+            "type": "number",
+            "nullable": true
+          },
+          "release_time_tracking": {
+            "type": "object",
+            "nullable": true
           }
         }
       },
@@ -3151,6 +3228,33 @@
           },
           "is_expanded": {
             "type": "integer",
+            "nullable": true
+          },
+          "release_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expected_time": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_tc_creation": {
+            "type": "number",
+            "nullable": true
+          },
+          "real_time_testing": {
+            "type": "number",
+            "nullable": true
+          },
+          "release_time_tracking": {
+            "type": "object",
             "nullable": true
           }
         },
@@ -3351,6 +3455,18 @@
             "items": {
               "$ref": "#/components/schemas/LinkedRequirement"
             }
+          },
+          "is_expanded": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "real_time": {
+            "type": "number",
+            "nullable": true
           }
         }
       },
@@ -3430,6 +3546,18 @@
             "items": {
               "type": "integer"
             }
+          },
+          "is_expanded": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "real_time": {
+            "type": "number",
+            "nullable": true
           }
         }
       },
@@ -3496,6 +3624,18 @@
             "items": {
               "type": "integer"
             }
+          },
+          "is_expanded": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_order": {
+            "type": "integer",
+            "nullable": true
+          },
+          "real_time": {
+            "type": "number",
+            "nullable": true
           }
         },
         "minProperties": 1
@@ -3735,6 +3875,13 @@
           },
           "sprint": {
             "type": "string"
+          },
+          "release_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true
           }
         }
       },

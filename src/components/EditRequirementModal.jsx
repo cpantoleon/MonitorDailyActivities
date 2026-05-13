@@ -56,17 +56,20 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
       const rTc = parseTimeToObj(requirement.currentStatusDetails?.real_time_tc_creation);
       const rTest = parseTimeToObj(requirement.currentStatusDetails?.real_time_testing);
 
-      const initialData = {
-        name: requirement.requirementUserIdentifier || '',
-        comment: requirement.currentStatusDetails?.comment || '',
-        sprint: sprintNumber,
-        status: requirement.currentStatusDetails?.status || '',
-        link: requirement.currentStatusDetails?.link || '',
-        isBacklog: isBacklog,
-        type: requirement.currentStatusDetails?.type || '',
+        const rawType = requirement.currentStatusDetails?.type || '';
+        const mappedType = rawType.toLowerCase() === 'sub-task' ? 'Sub-task' : rawType;
+
+        const initialData = {
+          name: requirement.requirementUserIdentifier || '',
+          comment: requirement.currentStatusDetails?.comment || '',
+          sprint: sprintNumber,
+          status: requirement.currentStatusDetails?.status || '',
+          link: requirement.currentStatusDetails?.link || '',
+          isBacklog: isBacklog,
+          type: mappedType,
         tags: requirement.currentStatusDetails?.tags || '',
         release_ids: requirement.currentStatusDetails?.releaseIds || [],
-        parent_id: requirement.parentId || '',
+        parent_id: requirement.parentId ? requirement.parentId : (mappedType === 'Sub-task' ? 'orphan' : ''),
         expected_time: exp.val, expected_time_unit: exp.unit,
         real_time_tc_creation: rTc.val, real_time_tc_creation_unit: rTc.unit,
         real_time_testing: rTest.val, real_time_testing_unit: rTest.unit,
@@ -138,6 +141,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
 
     const finalPayload = {
       ...formData,
+      parent_id: formData.parent_id === 'orphan' ? null : formData.parent_id,
       expected_time: calcH(formData.expected_time, formData.expected_time_unit),
       real_time_tc_creation: calcH(formData.real_time_tc_creation, formData.real_time_tc_creation_unit),
       real_time_testing: calcH(formData.real_time_testing, formData.real_time_testing_unit),
@@ -169,9 +173,12 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const parentOptions = useMemo(() => {
     if (!requirement || !requirement.project || !allRequirements) return [];
     const targetSprint = selectedSprint || 'Sprint 1';
-    return allRequirements
+    const options = allRequirements
       .filter(r => r.project === requirement.project && r.currentStatusDetails?.sprint === targetSprint && !r.parentId && r.id !== requirement.id)
       .map(r => ({ value: r.id, label: r.requirementUserIdentifier }));
+      
+    options.unshift({ value: 'orphan', label: '-- Orphan (No Parent) --' });
+    return options;
   }, [requirement?.project, requirement?.id, selectedSprint, allRequirements]);
 
   if (!isOpen || !requirement) return null;
@@ -273,7 +280,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </div>
             )}
 
-            {!isOriginallySubtask && (
+            {(!formData.parent_id || formData.parent_id === 'orphan') && (
               <>
                 <div className="form-group">
                   <label>Sprint:</label>
@@ -286,7 +293,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
               </>
             )}
 
-            {!isOriginallySubtask && formData.type !== 'Sub-task' && (
+            {(!formData.parent_id || formData.parent_id === 'orphan') && (
               <div className="form-group">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <label className="optional-label" style={{ marginBottom: 0 }}>Release(s):</label>
@@ -561,7 +568,7 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
           </div>
         </form>
 
-        {!isOriginallySubtask && formData.type !== 'Sub-task' && (
+        {(!formData.parent_id || formData.parent_id === 'orphan') && (
           <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="modal-section-title" style={{ borderBottom: 'none', margin: 0, paddingBottom: 0 }}>Log Scope Change</h3>

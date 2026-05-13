@@ -724,7 +724,7 @@ function App() {
           sprint: targetSprint, comment: newReqFormState.comment, link: newReqFormState.link, type: newReqFormState.type,
           tags: newReqFormState.tags,
           release_ids: newReqFormState.release_ids || [], // ΔΙΟΡΘΩΣΗ
-          parent_id: newReqFormState.type === 'Sub-task' ? newReqFormState.parent_id : null,
+          parent_id: newReqFormState.type === 'Sub-task' ? (newReqFormState.parent_id === 'orphan' ? null : newReqFormState.parent_id) : null,
           statusDate: new Date().toISOString().split('T')[0],
           expected_time: calcHours(newReqFormState.expected_time, newReqFormState.expected_time_unit),
           real_time_tc_creation: calcHours(newReqFormState.real_time_tc_creation, newReqFormState.real_time_tc_creation_unit),

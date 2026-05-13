@@ -26,6 +26,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
     // State για το Step 2 (Hierarchy)
     const [hierarchyData, setHierarchyData] = useState([]);
     const [selectedSubtasks, setSelectedSubtasks] = useState(new Set());
+    const [selectedParents, setSelectedParents] = useState(new Set());
 
     useEffect(() => {
         if (isOpen) {
@@ -41,6 +42,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
             setIncludeSubtasks(importType === 'requirements'); // Default true μόνο για requirements
             setHierarchyData([]);
             setSelectedSubtasks(new Set());
+            setSelectedParents(new Set());
             checkTokenExistence();
         }
     }, [isOpen, currentProject, importType]);
@@ -154,6 +156,8 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
             if (!response.ok) throw new Error(result.error || "Fetch failed");
 
             setHierarchyData(result.data.hierarchy || []);
+            const allParentKeys = new Set((result.data.hierarchy || []).map(p => p.key));
+            setSelectedParents(allParentKeys);
             setStep(2); // Πάμε στο Step 2
         } catch (error) {
             showMessage(error.message, "error");
@@ -169,8 +173,9 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
 
         // Χτίζουμε το payload με τα parents και ΜΟΝΟ τα επιλεγμένα subtasks
         const itemsToImport = hierarchyData.map(parent => {
+            const isParentSelected = selectedParents.has(parent.key);
             const selectedSubs = parent.subtasks.filter(sub => selectedSubtasks.has(sub.key));
-            return { ...parent, selectedSubtasks: selectedSubs };
+            return { ...parent, isParentSelected, selectedSubtasks: selectedSubs };
         });
 
         try {
@@ -198,6 +203,13 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
         if (newSet.has(subtaskKey)) newSet.delete(subtaskKey);
         else newSet.add(subtaskKey);
         setSelectedSubtasks(newSet);
+    };
+
+    const toggleParent = (parentKey) => {
+        const newSet = new Set(selectedParents);
+        if (newSet.has(parentKey)) newSet.delete(parentKey);
+        else newSet.add(parentKey);
+        setSelectedParents(newSet);
     };
 
     const projectOptions = projects.map(p => ({ value: p, label: p }));
@@ -294,8 +306,14 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                                 ) : (
                                     hierarchyData.map(parent => (
                                         <div key={parent.key} style={{ marginBottom: '15px', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                                            <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                                                [{parent.key}] {parent.summary}
+                                            <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedParents.has(parent.key)}
+                                                    onChange={() => toggleParent(parent.key)}
+                                                    style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
+                                                />
+                                                <span>[{parent.key}] {parent.summary}</span>
                                             </div>
                                             
                                             {parent.subtasks && parent.subtasks.length > 0 ? (

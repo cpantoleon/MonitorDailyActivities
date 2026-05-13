@@ -81,7 +81,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
       setActiveTab('core');
       return;
     }
-    if (formData.type === 'Sub-task' && !formData.parent_id) {
+    if (formData.type === 'Sub-task' && (!formData.parent_id || formData.parent_id === '')) {
       alert("Parent Requirement is required for Sub-tasks.");
       setActiveTab('core');
       return;
@@ -100,9 +100,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
 
     const targetSprint = selectedSprint || 'Sprint 1';
 
-    return allRequirements
+    const options = allRequirements
       .filter(r => r.project === formData.project && r.currentStatusDetails?.sprint === targetSprint && !r.parentId)
       .map(r => ({ value: r.id, label: r.requirementUserIdentifier }));
+      
+    options.unshift({ value: 'orphan', label: '-- Orphan (No Parent) --' });
+    return options;
   }, [formData.project, selectedSprint, allRequirements]);
 
   const handleReleaseTimeChange = (releaseId, field, value) => {
@@ -226,7 +229,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 />
               </div>
 
-              {!isOpenedFromCard && (
+              {(!formData.parent_id || formData.parent_id === 'orphan') && (
                 <>
                   <div id="form-group-sprint-id" className="form-group">
                     <label id="newReqSprint-label" htmlFor="newReqSprint-button">Sprint:</label>
@@ -246,7 +249,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                 </>
               )}
 
-              {!isOpenedFromCard && formData.type !== 'Sub-task' && (
+              {(!formData.parent_id || formData.parent_id === 'orphan') && (
                 <div id="form-group-release-id" className="form-group">
                   <div id="release-label-tooltip-container-id" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <label id="newReqRelease-label" htmlFor="newReqRelease" className="optional-label" style={{ marginBottom: 0 }}>Release(s):</label>
