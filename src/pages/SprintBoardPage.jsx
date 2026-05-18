@@ -89,6 +89,7 @@ const SprintActivitiesPage = ({
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkTargetSprint, setBulkTargetSprint] = useState('');
   const [bulkTargetRelease, setBulkTargetRelease] = useState('');
+  const [releaseValidationError, setReleaseValidationError] = useState(null);
 
   const sprintOptions = [
     { value: 'Backlog', label: 'Backlog' },
@@ -159,11 +160,21 @@ const SprintActivitiesPage = ({
   };
 
   const handleBulkAddRelease = async () => {
-    if (selectedIds.length === 0 || bulkTargetReleaseIds.length === 0) return;
+    if (selectedIds.length === 0 || !bulkTargetRelease) return;
+
+    const linkedSubtasks = selectedIds
+      .map(id => displayableRequirements.find(r => r.id === id))
+      .filter(req => req && req.parentId);
+
+    if (linkedSubtasks.length > 0) {
+      setReleaseValidationError(linkedSubtasks);
+      return;
+    }
+
     for (const id of selectedIds) {
       const req = displayableRequirements.find(r => r.id === id);
       if (req) {
-        const releaseVals = bulkTargetReleaseIds.includes('remove') ? [] : bulkTargetReleaseIds;
+        const releaseVals = bulkTargetRelease === 'remove' ? [] : [bulkTargetRelease];
         const payload = {
           project: req.project,
           requirementName: req.requirementUserIdentifier,
@@ -173,21 +184,21 @@ const SprintActivitiesPage = ({
           link: req.currentStatusDetails.link || '',
           type: req.currentStatusDetails.type || '',
           tags: req.currentStatusDetails.tags || '',
-          release_ids: releaseVals, // Αυτό ήταν σωστό
+          release_ids: releaseVals,
           parent_id: req.parentId || null,
           statusDate: new Date().toISOString().split('T')[0],
           existingRequirementGroupId: req.id,
           expected_time: req.currentStatusDetails.expected_time,
           real_time_tc_creation: req.currentStatusDetails.real_time_tc_creation,
           real_time_testing: req.currentStatusDetails.real_time_testing,
-          release_time_tracking: req.currentStatusDetails.release_time_tracking || {} // ΔΙΟΡΘΩΣΗ ΕΔΩ
+          release_time_tracking: req.currentStatusDetails.release_time_tracking || {}
         };
         await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(console.error);
       }
     }
     setSelectedIds([]);
     setIsSelectionMode(false);
-    setBulkTargetReleaseIds([]);
+    setBulkTargetRelease('');
     onDataRefresh();
   };
 
@@ -465,6 +476,52 @@ const SprintActivitiesPage = ({
           />
         </div>
       </div>
+
+      {releaseValidationError && (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+            borderRadius: '16px', padding: '32px', maxWidth: '520px', width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+              <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.1rem' }}>Cannot Assign Release</h3>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.6' }}>
+              The following item(s) are <strong>linked subtasks</strong> and inherit their release from their parent requirement.
+              They cannot be assigned a release directly:
+            </p>
+            <ul style={{
+              margin: '0 0 20px 0', padding: '0 0 0 20px',
+              color: 'var(--text-primary)', lineHeight: '1.8'
+            }}>
+              {releaseValidationError.map(req => (
+                <li key={req.id}>
+                  <strong>{req.requirementUserIdentifier}</strong>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em', marginLeft: '8px' }}>
+                    — linked to parent ID: {req.parentId}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9em', marginBottom: '20px' }}>
+              To assign a release to a linked subtask, update its parent requirement instead.
+              Only <em>orphan subtasks</em> (independent, with no parent) can be assigned a release directly.
+            </p>
+            <button
+              onClick={() => setReleaseValidationError(null)}
+              className="btn-primary"
+              style={{ width: '100%', padding: '10px', backgroundColor: 'var(--accent-color)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       {isSelectionMode && (
         <div style={{

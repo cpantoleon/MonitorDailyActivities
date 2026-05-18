@@ -618,7 +618,7 @@ app.get("/api/requirements", (req, res) => {
                 reqGroupEntry.history.push({
                     activityId: row.activityDbId, status: row.status, date: row.statusDate,
                     comment: row.comment, sprint: row.sprint ? row.sprint.trim() : row.sprint,
-                    link: row.link, type: row.type, tags: row.tags, isCurrent: row.isCurrent === 1,
+                    link: row.link, type: row.type && row.type.trim().toLowerCase() === 'sub-task' ? 'Sub-task' : (row.type ? row.type.trim() : row.type), tags: row.tags, isCurrent: row.isCurrent === 1,
                     createdAt: row.created_at,
                     releaseIds: parsedReleaseIds, // Χρησιμοποιούμε το parsed array
                     parentId: row.parent_id,
@@ -684,6 +684,7 @@ app.post("/api/activities", async (req, res) => {
         comment = comment ? comment.trim() : null;
         link = link ? link.trim() : null;
         type = type ? type.trim() : null;
+        if (type && type.toLowerCase() === 'sub-task') type = 'Sub-task';
         tags = tags ? tags.trim() : null;
         const itemKey = key ? key.trim() : null;
         const finalReleaseIds = release_ids ? JSON.stringify(release_ids) : '[]';
