@@ -3468,7 +3468,15 @@ app.post('/api/jira/fetch', async (req, res) => {
         });
 
         // Φιλτράρουμε τα placeholders (parents που δεν ήρθαν στο JQL αλλά ήρθαν τα subtasks τους)
+        const placeholders = Array.from(parentsMap.values()).filter(p => p.isPlaceholder);
         const finalHierarchy = Array.from(parentsMap.values()).filter(p => !p.isPlaceholder);
+
+        // Προσθέτουμε τα subtasks των placeholders στα orphans
+        placeholders.forEach(p => {
+            if (p.subtasks && p.subtasks.length > 0) {
+                orphanSubtasks.push(...p.subtasks);
+            }
+        });
 
         res.json({
             message: "Fetched successfully",
@@ -3562,7 +3570,7 @@ app.post('/api/jira/import', async (req, res) => {
                 let parentDbId = null;
 
                 // ΑΛΛΑΓΗ: Αν υπάρχει ήδη, το παίρνουμε από το Map. ΔΕΝ κάνουμε continue;
-                if (parentItem.isParentSelected !== false) {
+                if (parentItem.isParentSelected !== false && !parentItem.isOrphanGroup) {
                     if (existingLinksMap.has(parentItem.link)) {
                         skipped++;
                         parentDbId = existingLinksMap.get(parentItem.link);

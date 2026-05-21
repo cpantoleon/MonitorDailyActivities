@@ -155,8 +155,18 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || "Fetch failed");
 
-            setHierarchyData(result.data.hierarchy || []);
-            const allParentKeys = new Set((result.data.hierarchy || []).map(p => p.key));
+            let fetchedHierarchy = result.data.hierarchy || [];
+            if (result.data.orphans && result.data.orphans.length > 0) {
+                fetchedHierarchy.push({
+                    key: 'ORPHAN_SUBTASKS',
+                    summary: 'Orphan Sub-tasks (No parent in query)',
+                    isOrphanGroup: true,
+                    subtasks: result.data.orphans
+                });
+            }
+
+            setHierarchyData(fetchedHierarchy);
+            const allParentKeys = new Set(fetchedHierarchy.map(p => p.key));
             setSelectedParents(allParentKeys);
             setStep(2); // Πάμε στο Step 2
         } catch (error) {
@@ -307,12 +317,14 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                                     hierarchyData.map(parent => (
                                         <div key={parent.key} style={{ marginBottom: '15px', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                                             <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={selectedParents.has(parent.key)}
-                                                    onChange={() => toggleParent(parent.key)}
-                                                    style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
-                                                />
+                                                {!parent.isOrphanGroup && (
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={selectedParents.has(parent.key)}
+                                                        onChange={() => toggleParent(parent.key)}
+                                                        style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
+                                                    />
+                                                )}
                                                 <span>[{parent.key}] {parent.summary}</span>
                                             </div>
                                             
