@@ -61,6 +61,26 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
     const [draggedCatName, setDraggedCatName] = useState(null);
     const [catDropIndicator, setCatDropIndicator] = useState({ name: null, position: null });
 
+    // Scroll during Drag
+    const scrollInterval = useRef(null);
+    const scrollSpeed = useRef(0);
+
+    const startScrolling = () => {
+        if (!scrollInterval.current) {
+            scrollInterval.current = setInterval(() => {
+                if (scrollSpeed.current !== 0) window.scrollBy(0, scrollSpeed.current);
+            }, 16);
+        }
+    };
+
+    const stopScrolling = () => {
+        if (scrollInterval.current) {
+            clearInterval(scrollInterval.current);
+            scrollInterval.current = null;
+        }
+        scrollSpeed.current = 0;
+    };
+
     // Collapsed Categories State
     const [collapsedCats, setCollapsedCats] = useState(() => {
         const saved = localStorage.getItem('snippetsCollapsedCats');
@@ -252,10 +272,27 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
         setDraggedNoteId(null);
         setDragOverCategory(null);
         setDropIndicator({ id: null, position: null });
+        stopScrolling();
     };
 
     const handleNoteDragOver = (e, targetNoteId, category) => {
         e.preventDefault();
+
+        // Scroll logic
+        const threshold = 250; 
+        const mouseY = e.clientY;
+        const windowHeight = window.innerHeight;
+
+        if (mouseY < threshold) {
+            scrollSpeed.current = -(((threshold - mouseY) / threshold) * 28 + 2); 
+            startScrolling();
+        } else if (windowHeight - mouseY < threshold) {
+            scrollSpeed.current = (((threshold - (windowHeight - mouseY)) / threshold) * 28 + 2);
+            startScrolling();
+        } else {
+            stopScrolling();
+        }
+
         if (draggedCatName) return; // Prevent conflicts if dragging a category
         setDragOverCategory(category);
 
@@ -275,6 +312,7 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
     const handleNoteDrop = async (e, targetCategory) => {
         e.preventDefault();
         e.stopPropagation();
+        stopScrolling();
         const draggedId = e.dataTransfer.getData("noteId");
         
         const finalIndicator = { ...dropIndicator };
@@ -338,10 +376,27 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
         e.target.classList.remove('dragging');
         setDraggedCatName(null);
         setCatDropIndicator({ name: null, position: null });
+        stopScrolling();
     };
 
     const handleCategoryDragOver = (e, targetCat) => {
         e.preventDefault();
+
+        // Scroll logic
+        const threshold = 250; 
+        const mouseY = e.clientY;
+        const windowHeight = window.innerHeight;
+
+        if (mouseY < threshold) {
+            scrollSpeed.current = -(((threshold - mouseY) / threshold) * 28 + 2); 
+            startScrolling();
+        } else if (windowHeight - mouseY < threshold) {
+            scrollSpeed.current = (((threshold - (windowHeight - mouseY)) / threshold) * 28 + 2);
+            startScrolling();
+        } else {
+            stopScrolling();
+        }
+
         if (!draggedCatName || draggedCatName === targetCat) return; // Only process if dragging a category
         
         const rect = e.currentTarget.getBoundingClientRect();
@@ -355,6 +410,7 @@ const SnippetsPage = ({ apiBaseUrl, showMessage }) => {
 
     const handleCategoryDrop = async (e, targetCat) => {
         e.preventDefault();
+        stopScrolling();
         const catName = e.dataTransfer.getData("catName");
         
         const finalIndicator = { ...catDropIndicator };
