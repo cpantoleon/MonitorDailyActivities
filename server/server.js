@@ -1469,10 +1469,12 @@ app.delete("/api/retrospective/:id", (req, res) => {
 
 app.get("/api/releases/:project", async (req, res) => {
     try {
+        const includeClosed = req.query.includeClosed === 'true';
         const projectId = await getProjectId(req.params.project);
+        const statusCondition = includeClosed ? "r.status IN ('active', 'closed')" : "r.status = 'active'";
         const sql = `
             SELECT
-                r.id, r.name, r.release_date, r.is_current,
+                r.id, r.name, r.release_date, r.is_current, r.status,
                 fr.passed, fr.failed, fr.blocked, fr.caution, fr.not_run
             FROM releases r
             LEFT JOIN (
@@ -1486,7 +1488,7 @@ app.get("/api/releases/:project", async (req, res) => {
             ) latest_fat ON r.id = latest_fat.release_id
             LEFT JOIN fat_periods fp ON latest_fat.max_date = fp.completion_date
             LEFT JOIN fat_reports fr ON fp.id = fr.fat_period_id
-            WHERE r.project_id = ? AND r.status = 'active'
+            WHERE r.project_id = ? AND ${statusCondition}
             ORDER BY r.release_date DESC
         `;
 
@@ -1509,6 +1511,7 @@ app.get("/api/releases/:project", async (req, res) => {
                     name: row.name,
                     release_date: row.release_date,
                     is_current: row.is_current,
+                    status: row.status,
                     project: req.params.project,
                     fat_execution_report: fat_execution_report
                 };
@@ -1814,37 +1817,55 @@ app.post("/api/releases/:id/close", async (req, res) => {
                                     return;
                                 }
 
-                                if (closeAction === 'archive_only') {
-                                    commitTransaction();
-                                } else if (closeAction === 'archive_and_complete') {
+                                if (closeAction === 'archive_only' || closeAction === 'archive_and_complete') {
                                     const now = new Date().toISOString();
                                     const statusDate = now.split('T')[0];
                                     const newSprintName = `Archived_from_${release.name.replace(/\s/g, '_')}`;
 
-                                    const insertActivitySql = `INSERT INTO activities (requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, comment, sprint, link, type, tags, isCurrent, created_at, updated_at, release_id, parent_id)
-                                                               VALUES (?, ?, ?, 'Done', ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, ?)`;
+                                    const insertActivitySql = `
+                                        INSERT INTO activities (
+                                            requirementGroupId, project_id, requirementUserIdentifier, status, statusDate, 
+                                            comment, sprint, link, type, tags, isCurrent, created_at, updated_at, 
+                                            release_ids, parent_id, expected_time, real_time_tc_creation, real_time_testing, release_time_tracking
+                                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                                    
                                     const updateOldSql = `UPDATE activities SET isCurrent = 0 WHERE requirementGroupId = ?`;
 
-                                    let activitiesProcessed = 0;
-                                    if (allItems.length === 0) {
+                                    let itemsToProcess = allItems;
+                                    if (closeAction === 'archive_only') {
+                                        // For archive_only, only process items that are already 'Done'
+                                        itemsToProcess = allItems.filter(req => req.status === 'Done');
+                                    }
+
+                                    if (itemsToProcess.length === 0) {
                                         commitTransaction();
                                     } else {
-                                        allItems.forEach(req => {
+                                        let activitiesProcessed = 0;
+                                        itemsToProcess.forEach(req => {
                                             db.run(updateOldSql, [req.requirementGroupId], function (err) {
                                                 if (err) {
                                                     db.run("ROLLBACK");
                                                     if (!res.headersSent) res.status(500).json({ error: "Failed to update old activities." });
                                                     return;
                                                 }
-                                                const comment = `Item completed as part of finalizing release '${release.name}'`;
-                                                db.run(insertActivitySql, [req.requirementGroupId, release.project_id, req.requirementUserIdentifier, statusDate, comment, newSprintName, req.link, req.type, req.tags, now, now, req.parent_id], function (err) {
+                                                const comment = closeAction === 'archive_and_complete' 
+                                                    ? `Item completed as part of finalizing release '${release.name}'`
+                                                    : `Item moved to archive sprint as part of archiving release '${release.name}'`;
+                                                const finalStatus = closeAction === 'archive_and_complete' ? 'Done' : req.status; // For archive_only it is already 'Done'
+                                                
+                                                db.run(insertActivitySql, [
+                                                    req.requirementGroupId, release.project_id, req.requirementUserIdentifier, 
+                                                    finalStatus, statusDate, comment, newSprintName, req.link, req.type, req.tags, 
+                                                    now, now, req.release_ids, req.parent_id, req.expected_time, 
+                                                    req.real_time_tc_creation, req.real_time_testing, req.release_time_tracking
+                                                ], function (err) {
                                                     if (err) {
                                                         db.run("ROLLBACK");
                                                         if (!res.headersSent) res.status(500).json({ error: "Failed to create archived activity record." });
                                                         return;
                                                     }
                                                     activitiesProcessed++;
-                                                    if (activitiesProcessed === allItems.length) {
+                                                    if (activitiesProcessed === itemsToProcess.length) {
                                                         commitTransaction();
                                                     }
                                                 });

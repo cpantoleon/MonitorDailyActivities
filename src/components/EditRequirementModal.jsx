@@ -188,7 +188,9 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
   const typeOptions = ['Change Request', 'Task', 'Bug', 'Story', 'Incident', 'Known Error', 'Sub-task'].map(t => ({ value: t, label: t }));
   const releaseOptions = [
     { value: '', label: '-- None (Clear Release) --' },
-    ...releases.map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}` }))
+    ...releases
+      .filter(r => r.status !== 'closed' || (formData.release_ids && formData.release_ids.includes(r.id)))
+      .map(r => ({ value: r.id, label: `${r.name} ${r.is_current ? '(Current)' : ''}${r.status === 'closed' ? ' (Archived)' : ''}`.trim() }))
   ];
 
   const releaseTooltipContent = (
@@ -322,7 +324,9 @@ const EditRequirementModal = ({ isOpen, onClose, onSave, requirement, releases, 
                         fontFamily: 'inherit'
                       }}
                     >
-                      {releases.map(opt => <option key={opt.id} value={opt.id} style={{ padding: '5px' }}>{opt.name} {opt.is_current ? '(Current)' : ''}</option>)}
+                      {releases
+                        .filter(r => r.status !== 'closed' || (formData.release_ids && formData.release_ids.includes(r.id)))
+                        .map(opt => <option key={opt.id} value={opt.id} style={{ padding: '5px' }}>{opt.name} {opt.is_current ? '(Current)' : ''}{opt.status === 'closed' ? ' (Archived)' : ''}</option>)}
                     </select>
                     <small style={{ display: 'block', marginTop: '5px', color: 'var(--text-secondary)', fontSize: '0.85em' }}>Hold Ctrl/Cmd to select multiple releases.</small>
                   </>

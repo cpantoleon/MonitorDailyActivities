@@ -56,7 +56,7 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
   const releaseOptions = useMemo(() => {
     if (!formData.project) return [];
     return releases
-      .filter(r => r.project === formData.project)
+      .filter(r => r.project === formData.project && r.status !== 'closed')
       .map(r => ({
         value: r.id,
         label: `${r.name} ${r.is_current ? '(Current)' : ''}`

@@ -288,7 +288,7 @@ function App() {
   const fetchAllProjectData = useCallback(async () => {
     if (projects.length === 0) { setAllReleases([]); return; }
     try {
-      const releasePromises = projects.map(p => fetch(`${API_BASE_URL}/releases/${p}`).then(res => res.json()));
+      const releasePromises = projects.map(p => fetch(`${API_BASE_URL}/releases/${p}?includeClosed=true`).then(res => res.json()));
       const results = await Promise.all(releasePromises);
       const all = results.flatMap(result => result.data || []);
       setAllReleases(all);

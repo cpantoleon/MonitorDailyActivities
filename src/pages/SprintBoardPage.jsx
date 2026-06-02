@@ -98,7 +98,7 @@ const SprintActivitiesPage = ({
 
   const releaseOptions = [
     { value: 'remove', label: 'Remove Release' },
-    ...projectReleases.map(r => ({ value: r.id, label: r.name }))
+    ...projectReleases.filter(r => r.status !== 'closed').map(r => ({ value: r.id, label: r.name }))
   ];
 
   const handleToggleSelect = (id) => {
