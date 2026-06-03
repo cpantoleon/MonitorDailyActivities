@@ -81,7 +81,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const currentProjectActiveRelease = useMemo(() => {
     if (!globalProject) return null;
-    return allReleases.find(r => r.project === globalProject && r.is_current);
+    return allReleases.find(r => r.project === globalProject && r.is_current && r.status !== 'closed');
   }, [allReleases, globalProject]);
 
   const currentProjectDefectList = useMemo(() => {
@@ -109,7 +109,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const projectSummaries = useMemo(() => {
     return projects.map(proj => {
-      const projReleases = allReleases.filter(r => r.project === proj && r.is_current);
+      const projReleases = allReleases.filter(r => r.project === proj && r.is_current && r.status !== 'closed');
       const activeRel = projReleases.length > 0 ? projReleases[0] : null;
       
       let activeDefs = 0;
@@ -139,8 +139,8 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
 
   const upcomingRoadmaps = useMemo(() => {
     const filteredReleases = globalProject
-      ? allReleases.filter(r => r.project === globalProject && r.is_current)
-      : allReleases.filter(r => r.is_current);
+      ? allReleases.filter(r => r.project === globalProject && r.is_current && r.status !== 'closed')
+      : allReleases.filter(r => r.is_current && r.status !== 'closed');
     return filteredReleases.sort((a, b) => new Date(a.release_date) - new Date(b.release_date)).slice(0, 5);
   }, [allReleases, globalProject]);
 
