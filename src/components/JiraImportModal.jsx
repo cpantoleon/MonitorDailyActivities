@@ -84,7 +84,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
     const releaseOptions = useMemo(() => {
         if (!selectedProject) return [];
         return releases
-            .filter(r => r.project === selectedProject)
+            .filter(r => r.project === selectedProject && r.status === 'active')
             .map(r => ({
                 value: r.id,
                 label: `${r.name} ${r.is_current ? '(Current)' : ''}`

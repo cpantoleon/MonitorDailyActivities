@@ -34,7 +34,7 @@ const ImportRequirementsModal = ({ isOpen, onClose, onImport, projects, releases
   const releaseOptions = useMemo(() => {
     if (!state.targetProject) return [];
     return releases
-      .filter(r => r.project === state.targetProject)
+      .filter(r => r.project === state.targetProject && r.status === 'active')
       .map(r => ({
         value: r.id,
         label: `${r.name} ${r.is_current ? '(Current)' : ''}`
