@@ -103,6 +103,15 @@ const fetchAndParseMeetings = () => {
                     if (ev.start >= today && ev.start < tomorrow) {
                         meetings.push(ev);
                     }
+                    // Σε περίπτωση που το ICS έχει exceptions αλλά όχι το βασικό RRULE event
+                    if (ev.recurrences) {
+                        for (let rKey in ev.recurrences) {
+                            const overrideEv = ev.recurrences[rKey];
+                            if (overrideEv.start >= today && overrideEv.start < tomorrow) {
+                                meetings.push(overrideEv);
+                            }
+                        }
+                    }
                 }
                 // 2. RECURRING EVENTS
                 else {

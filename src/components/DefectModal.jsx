@@ -5,12 +5,13 @@ import "react-datepicker/dist/react-datepicker.css";
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 import ToggleSwitch from './ToggleSwitch';
-import { useGlobal } from '../context/GlobalContext'; // <-- ADDED
+import { useGlobal } from '../context/GlobalContext';
+import TimeInputGroup from './TimeInputGroup';
 
 const DEFECT_STATUSES = ['Assigned to Developer', 'Assigned to Tester', 'Done'];
 
 const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelectedProject, allRequirements = [], allDefects = [], allReleases = [], archivedReleases = [] }) => {
-  const { isMultiReleaseMode } = useGlobal(); // <-- ADDED
+  const { isMultiReleaseMode } = useGlobal();
 
   const getInitialFormState = (project) => ({
     project: project || '',
@@ -587,13 +588,13 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
 
               <div id="form-group-real-time-id" className="form-group" style={{ marginTop: '10px' }}>
                 <label style={{ fontSize: '0.85em' }} className="optional-label">Real Time Spent</label>
-                <div style={{ display: 'flex', gap: '5px', maxWidth: '200px' }}>
-                  <input type="number" name="real_time" value={formData.real_time} onChange={handleChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
-                  <select name="real_time_unit" value={formData.real_time_unit} onChange={handleChange} style={{ padding: '6px', flexGrow: 1 }}>
-                    <option value="h">hours</option>
-                    <option value="d">days</option>
-                  </select>
-                </div>
+                <TimeInputGroup
+                  value={formData.real_time}
+                  unit={formData.real_time_unit || 'h'}
+                  onValueChange={(val) => handleChange({ target: { name: 'real_time', value: val }})}
+                  onUnitChange={(u) => handleChange({ target: { name: 'real_time_unit', value: u }})}
+                  style={{ maxWidth: '200px' }}
+                />
               </div>
 
             </div>

@@ -144,7 +144,9 @@ const DefectColumn = ({ title, defects, onEditDefect, onShowHistory, onDeleteReq
       onDrop={handleDrop}
     >
       <div className="column-title-section">
-        <h3 className="column-title">{title}</h3>
+        <h3 className="column-title">
+          {title} <span className="column-counter">{sortedDefects.length}</span>
+        </h3>
       </div>
       <div ref={containerRef} className="defect-cards-container">
         {sortedDefects.length === 0 && <p className="empty-column-message">No defects in this status.</p>}

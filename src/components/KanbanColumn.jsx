@@ -171,7 +171,9 @@ const KanbanColumn = ({
       onDrop={handleDrop}
     >
       <div className="column-title-section">
-        <h3 className="column-title">{title}</h3>
+        <h3 className="column-title">
+          {title} <span className="column-counter">{sortedRequirements.length}</span>
+        </h3>
       </div>
 
       <div ref={containerRef} className="cards-container">

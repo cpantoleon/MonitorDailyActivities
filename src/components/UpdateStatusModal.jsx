@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import Tooltip from './Tooltip';
 import { useGlobal } from '../context/GlobalContext';
+import TimeInputGroup from './TimeInputGroup';
 
 // Το modal πλέον δέχεται 'item' (το πλήρες αντικείμενο) και 'itemType' ('requirement' ή 'defect')
 const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus, showMessage, releases = [] }) => {
@@ -222,25 +224,17 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                                                     </span>
                                                 </label>
                                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                                    <input
-                                                        type="number"
-                                                        value={tcDisplayVal}
-                                                        onChange={(e) => {
-                                                            const raw = e.target.value;
-                                                            const inHours = raw !== '' ? parseFloat(raw) * (relData.tc_unit === 'd' ? 8 : 1) : '';
-                                                            handleReleaseTimeChange(relId, 'tc', inHours);
-                                                        }}
-                                                        min="0" step="0.5"
-                                                        style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                                                    />
-                                                    <select
-                                                        value={relData.tc_unit || 'h'}
-                                                        onChange={(e) => handleReleaseTimeChange(relId, 'tc_unit', e.target.value)}
-                                                        style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                                                    >
-                                                        <option value="h">hours</option>
-                                                        <option value="d">days</option>
-                                                    </select>
+                                                        <TimeInputGroup
+                                                            value={tcDisplayVal}
+                                                            unit={relData.tc_unit || 'h'}
+                                                            onValueChange={(val) => {
+                                                                const inHours = val !== '' ? val * (relData.tc_unit === 'd' ? 8 : 1) : '';
+                                                                handleReleaseTimeChange(relId, 'tc', inHours);
+                                                            }}
+                                                            onUnitChange={(u) => handleReleaseTimeChange(relId, 'tc_unit', u)}
+                                                            inputStyle={{ padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                            selectStyle={{ padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                        />
                                                 </div>
                                             </div>
                                             <div>
@@ -250,27 +244,17 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                                                         {formatTimeHelper(testDisplayVal, relData.test_unit)}
                                                     </span>
                                                 </label>
-                                                <div style={{ display: 'flex', gap: '5px' }}>
-                                                    <input
-                                                        type="number"
+                                                    <TimeInputGroup
                                                         value={testDisplayVal}
-                                                        onChange={(e) => {
-                                                            const raw = e.target.value;
-                                                            const inHours = raw !== '' ? parseFloat(raw) * (relData.test_unit === 'd' ? 8 : 1) : '';
+                                                        unit={relData.test_unit || 'h'}
+                                                        onValueChange={(val) => {
+                                                            const inHours = val !== '' ? val * (relData.test_unit === 'd' ? 8 : 1) : '';
                                                             handleReleaseTimeChange(relId, 'test', inHours);
                                                         }}
-                                                        min="0" step="0.5"
-                                                        style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                        onUnitChange={(u) => handleReleaseTimeChange(relId, 'test_unit', u)}
+                                                        inputStyle={{ padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                        selectStyle={{ padding: '6px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
                                                     />
-                                                    <select
-                                                        value={relData.test_unit || 'h'}
-                                                        onChange={(e) => handleReleaseTimeChange(relId, 'test_unit', e.target.value)}
-                                                        style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                                                    >
-                                                        <option value="h">hours</option>
-                                                        <option value="d">days</option>
-                                                    </select>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -281,36 +265,40 @@ const UpdateStatusModal = ({ isOpen, onClose, onSave, item, itemType, newStatus,
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                         <div>
                             <label style={{ fontSize: '0.85em' }}>Test Cases Creation</label>
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <input type="number" value={realTimeTc} onChange={(e) => setRealTimeTc(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
-                                <select value={realTimeTcUnit} onChange={(e) => setRealTimeTcUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
-                                    <option value="h">hours</option>
-                                    <option value="d">days</option>
-                                </select>
-                            </div>
+                            <TimeInputGroup
+                                value={realTimeTc}
+                                unit={realTimeTcUnit || 'h'}
+                                onValueChange={setRealTimeTc}
+                                onUnitChange={setRealTimeTcUnit}
+                                inputStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                selectStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                            />
                         </div>
                         <div>
                             <label style={{ fontSize: '0.85em' }}>Testing Execution</label>
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <input type="number" value={realTimeTesting} onChange={(e) => setRealTimeTesting(e.target.value)} min="0" step="0.5" style={{ width: '60px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
-                                <select value={realTimeTestingUnit} onChange={(e) => setRealTimeTestingUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
-                                    <option value="h">hours</option>
-                                    <option value="d">days</option>
-                                </select>
-                            </div>
+                            <TimeInputGroup
+                                value={realTimeTesting}
+                                unit={realTimeTestingUnit || 'h'}
+                                onValueChange={setRealTimeTesting}
+                                onUnitChange={setRealTimeTestingUnit}
+                                inputStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                selectStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                            />
                         </div>
                     </div>
                     )
                 ) : (
                     <div>
                         <label style={{ fontSize: '0.85em' }}>Real Time Spent (Defect Fix/Test)</label>
-                        <div style={{ display: 'flex', gap: '5px', maxWidth: '250px' }}>
-                            <input type="number" value={realTimeDefect} onChange={(e) => setRealTimeDefect(e.target.value)} min="0" step="0.5" style={{ width: '80px', padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }} />
-                            <select value={realTimeDefectUnit} onChange={(e) => setRealTimeDefectUnit(e.target.value)} style={{ padding: '6px', flexGrow: 1, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}>
-                                <option value="h">hours</option>
-                                <option value="d">days</option>
-                            </select>
-                        </div>
+                        <TimeInputGroup
+                            value={realTimeDefect}
+                            unit={realTimeDefectUnit || 'h'}
+                            onValueChange={setRealTimeDefect}
+                            onUnitChange={setRealTimeDefectUnit}
+                            style={{ maxWidth: '250px' }}
+                            inputStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                            selectStyle={{ padding: '6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                        />
                     </div>
                 )}
 

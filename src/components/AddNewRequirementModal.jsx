@@ -5,6 +5,7 @@ import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 import SearchableDropdown from './SearchableDropdown';
 import { useGlobal } from '../context/GlobalContext';
+import TimeInputGroup from './TimeInputGroup';
 
 const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSubmit, projects, releases, allRequirements = [], selectedSprint }) => {
   const { isMultiReleaseMode } = useGlobal();
@@ -345,27 +346,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                                   {formatTimeHelper(tcDisplayVal, relData.tc_unit)}
                                 </span>
                               </label>
-                              <div style={{ display: 'flex', gap: '5px' }}>
-                                <input
-                                  type="number"
-                                  value={tcDisplayVal}
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    const inHours = raw !== '' ? parseFloat(raw) * (relData.tc_unit === 'd' ? 8 : 1) : '';
-                                    handleReleaseTimeChange(relId, 'tc', inHours);
-                                  }}
-                                  min="0" step="0.5"
-                                  style={{ width: '60px', padding: '4px' }}
-                                />
-                                <select
-                                  value={relData.tc_unit || 'h'}
-                                  onChange={(e) => handleReleaseTimeChange(relId, 'tc_unit', e.target.value)}
-                                  style={{ padding: '4px', flexGrow: 1 }}
-                                >
-                                  <option value="h">hours</option>
-                                  <option value="d">days</option>
-                                </select>
-                              </div>
+                              <TimeInputGroup
+                                value={tcDisplayVal}
+                                unit={relData.tc_unit || 'h'}
+                                onValueChange={(val) => {
+                                  const inHours = val !== '' ? val * (relData.tc_unit === 'd' ? 8 : 1) : '';
+                                  handleReleaseTimeChange(relId, 'tc', inHours);
+                                }}
+                                onUnitChange={(u) => handleReleaseTimeChange(relId, 'tc_unit', u)}
+                                inputStyle={{ padding: '4px' }}
+                                selectStyle={{ padding: '4px' }}
+                              />
                             </div>
                             <div>
                               <label style={{ fontSize: '0.8em', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
@@ -374,27 +365,17 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                                   {formatTimeHelper(testDisplayVal, relData.test_unit)}
                                 </span>
                               </label>
-                              <div style={{ display: 'flex', gap: '5px' }}>
-                                <input
-                                  type="number"
-                                  value={testDisplayVal}
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    const inHours = raw !== '' ? parseFloat(raw) * (relData.test_unit === 'd' ? 8 : 1) : '';
-                                    handleReleaseTimeChange(relId, 'test', inHours);
-                                  }}
-                                  min="0" step="0.5"
-                                  style={{ width: '60px', padding: '4px' }}
-                                />
-                                <select
-                                  value={relData.test_unit || 'h'}
-                                  onChange={(e) => handleReleaseTimeChange(relId, 'test_unit', e.target.value)}
-                                  style={{ padding: '4px', flexGrow: 1 }}
-                                >
-                                  <option value="h">hours</option>
-                                  <option value="d">days</option>
-                                </select>
-                              </div>
+                              <TimeInputGroup
+                                value={testDisplayVal}
+                                unit={relData.test_unit || 'h'}
+                                onValueChange={(val) => {
+                                  const inHours = val !== '' ? val * (relData.test_unit === 'd' ? 8 : 1) : '';
+                                  handleReleaseTimeChange(relId, 'test', inHours);
+                                }}
+                                onUnitChange={(u) => handleReleaseTimeChange(relId, 'test_unit', u)}
+                                inputStyle={{ padding: '4px' }}
+                                selectStyle={{ padding: '4px' }}
+                              />
                             </div>
                           </div>
                         </div>
@@ -410,13 +391,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                           {formatTimeHelper(formData.real_time_tc_creation, formData.real_time_tc_creation_unit)}
                         </span>
                       </label>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <input type="number" name="real_time_tc_creation" value={formData.real_time_tc_creation} onChange={onFormChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
-                        <select name="real_time_tc_creation_unit" value={formData.real_time_tc_creation_unit} onChange={onFormChange} style={{ padding: '6px', flexGrow: 1 }}>
-                          <option value="h">hours</option>
-                          <option value="d">days</option>
-                        </select>
-                      </div>
+                      <TimeInputGroup
+                        value={formData.real_time_tc_creation}
+                        unit={formData.real_time_tc_creation_unit || 'h'}
+                        onValueChange={(val) => onFormChange({ target: { name: 'real_time_tc_creation', value: val }})}
+                        onUnitChange={(u) => onFormChange({ target: { name: 'real_time_tc_creation_unit', value: u }})}
+                      />
                     </div>
                     <div>
                       <label style={{ fontSize: '0.85em' }}>
@@ -425,13 +405,12 @@ const AddNewRequirementModal = ({ isOpen, onClose, formData, onFormChange, onSub
                           {formatTimeHelper(formData.real_time_testing, formData.real_time_testing_unit)}
                         </span>
                       </label>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <input type="number" name="real_time_testing" value={formData.real_time_testing} onChange={onFormChange} min="0" step="0.5" style={{ width: '60px', padding: '6px' }} />
-                        <select name="real_time_testing_unit" value={formData.real_time_testing_unit} onChange={onFormChange} style={{ padding: '6px', flexGrow: 1 }}>
-                          <option value="h">hours</option>
-                          <option value="d">days</option>
-                        </select>
-                      </div>
+                      <TimeInputGroup
+                        value={formData.real_time_testing}
+                        unit={formData.real_time_testing_unit || 'h'}
+                        onValueChange={(val) => onFormChange({ target: { name: 'real_time_testing', value: val }})}
+                        onUnitChange={(u) => onFormChange({ target: { name: 'real_time_testing_unit', value: u }})}
+                      />
                     </div>
                   </div>
                 )}

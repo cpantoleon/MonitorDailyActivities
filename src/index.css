@@ -254,6 +254,18 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.column-counter {
+  background-color: var(--accent-color);
+  color: white;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: bold;
 }
 
 .cards-container,
