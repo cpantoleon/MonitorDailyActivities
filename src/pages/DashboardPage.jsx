@@ -88,24 +88,71 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     if (!globalProject || !currentProjectActiveRelease) return [];
     return activeDefectsAll.filter(d => {
       if (d.project !== globalProject) return false;
-      return d.linkedRequirements && d.linkedRequirements.some(req => 
-        req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(currentProjectActiveRelease.id)
-      );
+      return d.linkedRequirements && d.linkedRequirements.some(req => {
+        if (req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(currentProjectActiveRelease.id)) {
+          return true;
+        }
+        if (allProcessedRequirements) {
+          const matchedReq = allProcessedRequirements.find(pr => pr.id === req.groupId);
+          if (matchedReq && matchedReq.parentId) {
+            const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
+            if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(currentProjectActiveRelease.id)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
     });
-  }, [activeDefectsAll, globalProject, currentProjectActiveRelease]);
+  }, [activeDefectsAll, globalProject, currentProjectActiveRelease, allProcessedRequirements]);
 
 
 
-  const currentProjectFilteredReqsList = useMemo(() => {
+  const requirementsForActiveRelease = useMemo(() => {
     if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
     return allProcessedRequirements.filter(r => {
       if (r.project !== globalProject) return false;
       const rIds = r.currentStatusDetails?.releaseIds;
-      if (!rIds || !Array.isArray(rIds) || !rIds.includes(currentProjectActiveRelease.id)) return false;
+      if (rIds && Array.isArray(rIds) && rIds.includes(currentProjectActiveRelease.id)) return true;
+      if (r.parentId) {
+        const parentReq = allProcessedRequirements.find(pr => pr.id === r.parentId);
+        if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(currentProjectActiveRelease.id)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [globalProject, currentProjectActiveRelease, allProcessedRequirements]);
+
+  const currentProjectFilteredReqsList = useMemo(() => {
+    return requirementsForActiveRelease.filter(r => {
       const isDone = r.currentStatusDetails?.status === 'Done';
       return chartFilter === 'Done' ? isDone : !isDone;
     });
-  }, [globalProject, currentProjectActiveRelease, allProcessedRequirements, chartFilter]);
+  }, [requirementsForActiveRelease, chartFilter]);
+
+  const requirementsToDisplay = useMemo(() => {
+    const parents = [];
+    const subs = {};
+    const orphans = [];
+
+    const map = new Map(currentProjectFilteredReqsList.map(r => [r.id, r]));
+
+    currentProjectFilteredReqsList.forEach(r => {
+      if (!r.parentId) {
+        parents.push(r);
+      } else {
+        if (map.has(r.parentId)) {
+           if (!subs[r.parentId]) subs[r.parentId] = [];
+           subs[r.parentId].push(r);
+        } else {
+           orphans.push(r);
+        }
+      }
+    });
+
+    return { parents, subtasksByParent: subs, orphans };
+  }, [currentProjectFilteredReqsList]);
 
   const projectSummaries = useMemo(() => {
     return projects.map(proj => {
@@ -118,17 +165,33 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       if (activeRel) {
         activeDefs = activeDefectsAll.filter(d => {
           if (d.project !== proj) return false;
-          return d.linkedRequirements && d.linkedRequirements.some(req => 
-            req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(activeRel.id)
-          );
+          return d.linkedRequirements && d.linkedRequirements.some(req => {
+            if (req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(activeRel.id)) return true;
+            if (allProcessedRequirements) {
+               const matchedReq = allProcessedRequirements.find(pr => pr.id === req.groupId);
+               if (matchedReq && matchedReq.parentId) {
+                   const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
+                   if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(activeRel.id)) {
+                       return true;
+                   }
+               }
+            }
+            return false;
+          });
         }).length;
 
         if (allProcessedRequirements) {
           pendingReqs = allProcessedRequirements.filter(r => {
+            if (r.project !== proj || r.currentStatusDetails?.status === 'Done') return false;
             const rIds = r.currentStatusDetails?.releaseIds;
-            return r.project === proj && 
-                   rIds && Array.isArray(rIds) && rIds.includes(activeRel.id) && 
-                   r.currentStatusDetails?.status !== 'Done';
+            if (rIds && Array.isArray(rIds) && rIds.includes(activeRel.id)) return true;
+            if (r.parentId) {
+              const parentReq = allProcessedRequirements.find(pr => pr.id === r.parentId);
+              if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(activeRel.id)) {
+                return true;
+              }
+            }
+            return false;
           }).length;
         }
       }
@@ -145,16 +208,11 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   }, [allReleases, globalProject]);
 
   const activeReleaseChartData = useMemo(() => {
-    if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return null;
-    const releaseReqs = allProcessedRequirements.filter(r => {
-      const rIds = r.currentStatusDetails?.releaseIds;
-      return r.project === globalProject && rIds && Array.isArray(rIds) && rIds.includes(currentProjectActiveRelease.id);
-    });
-    if (releaseReqs.length === 0) return null;
+    if (!requirementsForActiveRelease || requirementsForActiveRelease.length === 0) return null;
 
     let done = 0;
     let notDone = 0;
-    releaseReqs.forEach(req => {
+    requirementsForActiveRelease.forEach(req => {
       if (req.currentStatusDetails?.status === 'Done') done++;
       else notDone++;
     });
@@ -391,7 +449,31 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                       </h4>
                       {currentProjectFilteredReqsList.length > 0 ? (
                         <ul className="detail-list req-list-dash">
-                          {currentProjectFilteredReqsList.map(r => (
+                          {requirementsToDisplay.parents.map(r => (
+                            <React.Fragment key={r.id}>
+                              <li>
+                                <button type="button" className="link-button item-title" onClick={() => onNavigateToRequirement(r)} title={`Go to ${r.requirementUserIdentifier} on the Sprint Board`}>
+                                  {r.requirementUserIdentifier}
+                                </button>
+                                <span className="item-status" style={getStatusBadgeStyle(r.currentStatusDetails?.status)}>{r.currentStatusDetails?.status}</span>
+                              </li>
+                              {requirementsToDisplay.subtasksByParent[r.id] && requirementsToDisplay.subtasksByParent[r.id].map(sub => (
+                                <li key={sub.id} style={{ paddingLeft: '24px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, flexShrink: 0 }}>
+                                      <polyline points="15 10 20 15 15 20"></polyline>
+                                      <path d="M4 4v7a4 4 0 0 0 4 4h12"></path>
+                                    </svg>
+                                    <button type="button" className="link-button item-title" onClick={() => onNavigateToRequirement(sub)} title={`Go to ${sub.requirementUserIdentifier} on the Sprint Board`} style={{ fontSize: '0.95em' }}>
+                                      {sub.requirementUserIdentifier}
+                                    </button>
+                                  </div>
+                                  <span className="item-status" style={getStatusBadgeStyle(sub.currentStatusDetails?.status)}>{sub.currentStatusDetails?.status}</span>
+                                </li>
+                              ))}
+                            </React.Fragment>
+                          ))}
+                          {requirementsToDisplay.orphans.map(r => (
                             <li key={r.id}>
                               <button type="button" className="link-button item-title" onClick={() => onNavigateToRequirement(r)} title={`Go to ${r.requirementUserIdentifier} on the Sprint Board`}>
                                 {r.requirementUserIdentifier}

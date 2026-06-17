@@ -522,6 +522,8 @@
   position: relative; 
   width: 100%;
   min-height: 220px; 
+  max-height: 280px;
+  margin: 0 auto;
 }
 
 .dashboard-release-chart-container canvas {
