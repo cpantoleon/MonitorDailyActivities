@@ -122,9 +122,9 @@ const fetchAndParseMeetings = () => {
 
                         // Εξαιρείται εντελώς; (ακυρώθηκε)
                         let isExcluded = false;
-                        if (ev.exdates) {
-                            for (let ex in ev.exdates) {
-                                if (new Date(ex).toDateString() === originalDateStr) {
+                        if (ev.exdate) {
+                            for (let ex in ev.exdate) {
+                                if (new Date(ev.exdate[ex]).toDateString() === originalDateStr) {
                                     isExcluded = true;
                                     break;
                                 }
@@ -136,7 +136,8 @@ const fetchAndParseMeetings = () => {
                         let hasOverride = false;
                         if (ev.recurrences) {
                             for (let rKey in ev.recurrences) {
-                                if (new Date(rKey).toDateString() === originalDateStr) {
+                                const recurrenceId = ev.recurrences[rKey].recurrenceid || rKey;
+                                if (new Date(recurrenceId).toDateString() === originalDateStr) {
                                     hasOverride = true;
                                     break;
                                 }
