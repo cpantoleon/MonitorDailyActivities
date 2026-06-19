@@ -197,7 +197,10 @@ const fetchAndParseMeetings = () => {
                 const titleUpper = m.title.toUpperCase();
                 const isCanceled = titleUpper.includes('CANCELED:') ||
                     titleUpper.includes('CANCELLED:') ||
-                    m.status === 'CANCELLED';
+                    titleUpper.includes('ΑΚΥΡΏΘΗΚΕ:') ||
+                    titleUpper.includes('ΑΚΥΡΩΘΗΚΕ:') ||
+                    titleUpper.includes('ΑΚΥΡΩΜΕΝΟ:') ||
+                    (m.status && m.status.toUpperCase() === 'CANCELLED');
 
                 if (isCanceled) {
                     canceledCount++;
