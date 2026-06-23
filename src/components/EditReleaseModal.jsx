@@ -45,7 +45,7 @@ const EditReleaseModal = ({ isOpen, onClose, onSave, onDelete, releases, project
   const releaseOptions = useMemo(() => {
     if (!selectedModalProject) return [];
     return releases
-      .filter(r => r.project === selectedModalProject)
+      .filter(r => r.project === selectedModalProject && r.status === 'active')
       .map(r => ({ value: r.id, label: r.name }));
   }, [selectedModalProject, releases]);
 

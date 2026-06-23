@@ -164,18 +164,15 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     setSearchSuggestions([]);
     setSelectedReleases([]);
 
+    // Update global storage safely here
     if (project) {
+      sessionStorage.setItem('globalProject', project);
       navigate(`/defects?d_project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
     } else {
+      sessionStorage.removeItem('globalProject');
       navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
     }
   }, [navigate, showClosedView]);
-
-  useEffect(() => {
-    if (selectedProject) {
-      sessionStorage.setItem('defectsPageSelectedProject', selectedProject);
-    }
-  }, [selectedProject]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -185,7 +182,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     let needsReplace = false;
 
     if (!projectParam) {
-      const storedProject = sessionStorage.getItem('defectsPageSelectedProject');
+      const storedProject = sessionStorage.getItem('globalProject');
       if (storedProject) {
         projectParam = storedProject;
         params.set('d_project', storedProject);

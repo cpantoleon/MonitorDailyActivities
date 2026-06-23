@@ -53,6 +53,29 @@ export const GlobalProvider = ({ children }) => {
   }, [globalProject]);
 
   useEffect(() => {
+    const originalSetItem = sessionStorage.setItem;
+    sessionStorage.setItem = function(key, value) {
+      originalSetItem.apply(this, arguments);
+      if (key === 'globalProject') {
+        setGlobalProject(value || '');
+      }
+    };
+    
+    const originalRemoveItem = sessionStorage.removeItem;
+    sessionStorage.removeItem = function(key) {
+      originalRemoveItem.apply(this, arguments);
+      if (key === 'globalProject') {
+        setGlobalProject('');
+      }
+    };
+
+    return () => {
+      sessionStorage.setItem = originalSetItem;
+      sessionStorage.removeItem = originalRemoveItem;
+    };
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('dashboardLayout', JSON.stringify(dashboardLayout));
   }, [dashboardLayout]);
 

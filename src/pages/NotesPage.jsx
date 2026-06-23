@@ -87,7 +87,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
-    const savedProject = sessionStorage.getItem('notesPageSelectedProject');
+    const savedProject = sessionStorage.getItem('globalProject');
     if (savedProject) {
       setSelectedProject(savedProject);
       if (savedProject === 'General') {
@@ -96,13 +96,19 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
     }
   }, []);
 
-  useEffect(() => {
-    if (selectedProject) {
-      sessionStorage.setItem('notesPageSelectedProject', selectedProject);
-    } else {
-      sessionStorage.removeItem('notesPageSelectedProject');
-    }
-  }, [selectedProject]);
+  const handleProjectChange = (e) => {
+     const project = e.target.value;
+     executeWithUnsavedCheck(() => {
+       setSelectedProject(project);
+       setIsGeneralMode(project === 'General');
+      
+      if (project) {
+          sessionStorage.setItem('globalProject', project);
+      } else {
+          sessionStorage.removeItem('globalProject');
+      }
+     });
+   };
 
   // --- NEW: Fetch default setting for "All Projects" on mount ---
   useEffect(() => {
@@ -575,14 +581,6 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
 
   const editorConfiguration = {
     extraPlugins: [MyUploadAdapterPlugin],
-  };
-
-  const handleProjectChange = (e) => {
-    const project = e.target.value;
-    executeWithUnsavedCheck(() => {
-      setSelectedProject(project);
-      setIsGeneralMode(project === 'General');
-    });
   };
 
   const projectOptions = [{ value: 'General', label: 'General' }, ...projects.map(p => ({ value: p, label: p }))];

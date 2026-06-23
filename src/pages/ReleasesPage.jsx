@@ -2160,7 +2160,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         let needsReplace = false;
 
         if (!projectParam) {
-            const storedProject = sessionStorage.getItem('releasePageSelectedProject');
+            const storedProject = sessionStorage.getItem('globalProject');
             if (storedProject) {
                 projectParam = storedProject;
                 params.set('project', storedProject);
@@ -2170,10 +2170,10 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
 
         setSelectedProject(prev => {
             if (projectParam && projectParam !== prev) {
-                sessionStorage.setItem('releasePageSelectedProject', projectParam);
+                sessionStorage.setItem('globalProject', projectParam);
                 return projectParam;
             } else if (!projectParam && prev) {
-                sessionStorage.removeItem('releasePageSelectedProject');
+                sessionStorage.removeItem('globalProject');
                 return '';
             }
             return prev;
@@ -2339,10 +2339,10 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         const params = new URLSearchParams(location.search);
         if (project) {
             params.set('project', project);
-            sessionStorage.setItem('releasePageSelectedProject', project);
+            sessionStorage.setItem('globalProject', project);
         } else {
             params.delete('project');
-            sessionStorage.removeItem('releasePageSelectedProject');
+            sessionStorage.removeItem('globalProject');
         }
         params.delete('archiveId');
         params.set('view', 'active');

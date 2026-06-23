@@ -124,7 +124,7 @@ function App() {
 
     if (location.pathname === '/sprint-board') {
       if (!projectParam) {
-        const storedProject = sessionStorage.getItem('sprintBoardProject');
+        const storedProject = sessionStorage.getItem('globalProject');
         const storedSprint = sessionStorage.getItem('sprintBoardSprint');
         if (storedProject) {
           projectParam = storedProject;
@@ -140,8 +140,8 @@ function App() {
 
       if ((projectParam || '') !== selectedProject) {
         setSelectedProject(projectParam || '');
-        if (projectParam) sessionStorage.setItem('sprintBoardProject', projectParam);
-        else sessionStorage.removeItem('sprintBoardProject');
+        if (projectParam) sessionStorage.setItem('globalProject', projectParam);
+        else sessionStorage.removeItem('globalProject');
       }
 
       if ((sprintParam || '') !== selectedSprint) {
@@ -211,13 +211,13 @@ function App() {
     // ΑΦΑΙΡΕΘΗΚΕ ΤΟ setSelectedProject(project) από εδώ!
 
     if (!project) {
-      sessionStorage.removeItem('sprintBoardProject');
+      sessionStorage.removeItem('globalProject');
       sessionStorage.removeItem('sprintBoardSprint');
       navigate(`/sprint-board`, { replace: true });
       return;
     }
 
-    sessionStorage.setItem('sprintBoardProject', project);
+    sessionStorage.setItem('globalProject', project);
 
     const sprintsForProject = getSprintsForProject(allProcessedRequirements, project);
     const visibleSprints = showArchivedSprints
@@ -441,7 +441,7 @@ function App() {
       if (uniqueProjects.length === 1) {
         const proj = uniqueProjects[0];
         setSelectedProject(proj);
-        sessionStorage.setItem('sprintBoardProject', proj);
+        sessionStorage.setItem('globalProject', proj);
 
         const uniqueSprints = [...new Set(results.map(r => r.currentStatusDetails.sprint))];
         if (uniqueSprints.length === 1) {
@@ -458,14 +458,14 @@ function App() {
       } else {
         setSelectedProject('');
         setSelectedSprint('');
-        sessionStorage.removeItem('sprintBoardProject');
+        sessionStorage.removeItem('globalProject');
         sessionStorage.removeItem('sprintBoardSprint');
         navigate(`/sprint-board`, { replace: true });
       }
     } else {
       setSelectedProject('');
       setSelectedSprint('');
-      sessionStorage.removeItem('sprintBoardProject');
+      sessionStorage.removeItem('globalProject');
       sessionStorage.removeItem('sprintBoardSprint');
       navigate(`/sprint-board`, { replace: true });
     }
@@ -485,7 +485,7 @@ function App() {
     setDateFrom('');
     setDateTo('');
 
-    sessionStorage.removeItem('sprintBoardProject');
+    sessionStorage.removeItem('globalProject');
     sessionStorage.removeItem('sprintBoardSprint');
 
     navigate('/sprint-board', { replace: true });
@@ -516,7 +516,7 @@ function App() {
 
       setSelectedProject(proj);
       setSelectedSprint(sp);
-      sessionStorage.setItem('sprintBoardProject', proj);
+      sessionStorage.setItem('globalProject', proj);
       sessionStorage.setItem('sprintBoardSprint', sp);
 
       setIsSearching(true);

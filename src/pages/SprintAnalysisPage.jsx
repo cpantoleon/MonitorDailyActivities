@@ -48,7 +48,7 @@ const SprintAnalysisPage = ({ showMessage }) => {
   // 4. Persistence Effect (Save to Session Storage)
   useEffect(() => {
       if (selectedProject) {
-          sessionStorage.setItem('sprintAnalysisPageSelectedProject', selectedProject);
+          sessionStorage.setItem('globalProject', selectedProject);
       }
   }, [selectedProject]);
 
@@ -62,7 +62,7 @@ const SprintAnalysisPage = ({ showMessage }) => {
 
     // If no URL param, check storage
     if (!projectParam) {
-      const storedProject = sessionStorage.getItem('sprintAnalysisPageSelectedProject');
+      const storedProject = sessionStorage.getItem('globalProject');
       if (storedProject) {
         projectParam = storedProject;
         // Update URL to match storage
@@ -86,6 +86,12 @@ const SprintAnalysisPage = ({ showMessage }) => {
   // 6. Handle Manual Project Selection
   const handleManualProjectSelect = (project) => {
     setSelectedProject(project);
+
+    if (project) {
+          sessionStorage.setItem('globalProject', project);
+     } else {
+         sessionStorage.removeItem('globalProject');
+     }
     
     // Update URL with 'sa_project'
     const params = new URLSearchParams(location.search);
