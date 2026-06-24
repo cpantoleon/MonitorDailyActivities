@@ -26,6 +26,9 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverItem, setDragOverItem] = useState(null);
 
+  // Derive the active project strictly from the URL parameter instead of global context
+  const activeProject = projectName ? decodeURIComponent(projectName) : '';
+
   useEffect(() => {
     const checkTheme = () => {
       const theme = document.documentElement.getAttribute('data-theme');
@@ -48,24 +51,11 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   }, []);
 
   useEffect(() => {
-    if (projectName) {
-        const decoded = decodeURIComponent(projectName);
-        if (decoded !== globalProject) {
-            setGlobalProject(decoded);
-        }
-    } else {
-        if (globalProject !== '') {
-            setGlobalProject('');
-        }
-    }
-  }, [projectName, globalProject, setGlobalProject]); 
-
-  useEffect(() => {
     setChartFilter(null);
-    if (globalProject) {
+    if (activeProject) {
       setIsEditMode(false);
     }
-  }, [globalProject]);
+  }, [activeProject]);
 
   const handleProjectSelect = (projName) => {
       if (projName) {
@@ -80,14 +70,14 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   }, [allDefects]);
 
   const currentProjectActiveRelease = useMemo(() => {
-    if (!globalProject) return null;
-    return allReleases.find(r => r.project === globalProject && r.is_current && r.status !== 'closed');
-  }, [allReleases, globalProject]);
+    if (!activeProject) return null;
+    return allReleases.find(r => r.project === activeProject && r.is_current && r.status !== 'closed');
+  }, [allReleases, activeProject]);
 
   const currentProjectDefectList = useMemo(() => {
-    if (!globalProject || !currentProjectActiveRelease) return [];
+    if (!activeProject || !currentProjectActiveRelease) return [];
     return activeDefectsAll.filter(d => {
-      if (d.project !== globalProject) return false;
+      if (d.project !== activeProject) return false;
       return d.linkedRequirements && d.linkedRequirements.some(req => {
         if (req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(currentProjectActiveRelease.id)) {
           return true;
@@ -104,14 +94,12 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
         return false;
       });
     });
-  }, [activeDefectsAll, globalProject, currentProjectActiveRelease, allProcessedRequirements]);
-
-
+  }, [activeDefectsAll, activeProject, currentProjectActiveRelease, allProcessedRequirements]);
 
   const requirementsForActiveRelease = useMemo(() => {
-    if (!globalProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
+    if (!activeProject || !currentProjectActiveRelease || !allProcessedRequirements) return [];
     return allProcessedRequirements.filter(r => {
-      if (r.project !== globalProject) return false;
+      if (r.project !== activeProject) return false;
       const rIds = r.currentStatusDetails?.releaseIds;
       if (rIds && Array.isArray(rIds) && rIds.includes(currentProjectActiveRelease.id)) return true;
       if (r.parentId) {
@@ -122,7 +110,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       }
       return false;
     });
-  }, [globalProject, currentProjectActiveRelease, allProcessedRequirements]);
+  }, [activeProject, currentProjectActiveRelease, allProcessedRequirements]);
 
   const currentProjectFilteredReqsList = useMemo(() => {
     return requirementsForActiveRelease.filter(r => {
@@ -201,11 +189,11 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
   }, [projects, activeDefectsAll, allReleases, allProcessedRequirements]);
 
   const upcomingRoadmaps = useMemo(() => {
-    const filteredReleases = globalProject
-      ? allReleases.filter(r => r.project === globalProject && r.is_current && r.status !== 'closed')
+    const filteredReleases = activeProject
+      ? allReleases.filter(r => r.project === activeProject && r.is_current && r.status !== 'closed')
       : allReleases.filter(r => r.is_current && r.status !== 'closed');
     return filteredReleases.sort((a, b) => new Date(a.release_date) - new Date(b.release_date)).slice(0, 5);
-  }, [allReleases, globalProject]);
+  }, [allReleases, activeProject]);
 
   const activeReleaseChartData = useMemo(() => {
     if (!requirementsForActiveRelease || requirementsForActiveRelease.length === 0) return null;
@@ -228,7 +216,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
         borderWidth: 2
       }]
     };
-  }, [globalProject, currentProjectActiveRelease, allProcessedRequirements, chartBorderColor]);
+  }, [activeProject, currentProjectActiveRelease, allProcessedRequirements, chartBorderColor]);
 
   const getStatusBadgeStyle = (status) => {
     const isDone = status === 'Done' || status === 'Closed';
@@ -324,7 +312,7 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
                 </div>
                 <span className="due-badge">
                   {new Date(r.release_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
-                </span>
+                 </span>
               </li>
             ))}
           </ul>
@@ -340,10 +328,10 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
       </div>
     ),
     weather: (
-      <div className="card widget-card weather-card">
-        <h3>Local Weather</h3>
-        <WeatherWidget showMessage={() => {}} /> 
-      </div>
+       <div className="card widget-card weather-card">
+         <h3>Local Weather</h3>
+         <WeatherWidget showMessage={() => {}} /> 
+       </div>
     ),
     meetings: (
       <div className="card widget-card meetings-card">
@@ -365,18 +353,18 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
     <div className="dashboard-container">
       <div className="dashboard-header-toolbar">
         <div className="header-left-section">
-            {globalProject && (
+            {activeProject && (
                 <button className="back-nav-btn" onClick={() => handleProjectSelect('')} title="Back to Global Overview">
                     ←
                 </button>
             )}
             <h2 className="dashboard-title">
-            {globalProject ? `Project Hub: ${globalProject}` : 'Global Overview'}
+            {activeProject ? `Project Hub: ${activeProject}` : 'Global Overview'}
             </h2>
         </div>
         
         <div className="header-project-selector" style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
-          {!globalProject && (
+          {!activeProject && (
             <button 
               className={`dashboard-edit-btn ${isEditMode ? 'active' : ''}`}
               onClick={() => setIsEditMode(!isEditMode)}
@@ -386,14 +374,14 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
           )}
           <ProjectSelector
             projects={projects}
-            selectedProject={globalProject}
+            selectedProject={activeProject}
             onSelectProject={handleProjectSelect}
           />
         </div>
       </div>
 
-      <div className={`bento-grid ${globalProject ? 'project-focused' : `global-view ${dashboardGridStyle}`} ${isEditMode ? 'edit-mode-active' : ''}`}>
-        {globalProject ? (
+      <div className={`bento-grid ${activeProject ? 'project-focused' : `global-view ${dashboardGridStyle}`} ${isEditMode ? 'edit-mode-active' : ''}`}>
+        {activeProject ? (
           <>
             <div className="grid-main-area">
               <div className="card overview-card">

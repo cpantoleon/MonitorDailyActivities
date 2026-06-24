@@ -39,7 +39,7 @@ const Sidebar = () => {
         
         {/* Custom Dashboard Link logic to handle the dynamic /:project route */}
         <NavLink 
-          to={globalProject ? `/${encodeURIComponent(globalProject)}` : "/"}
+          to="/"
           className={() => (location.pathname === '/' || (globalProject && location.pathname === `/${encodeURIComponent(globalProject)}`)) ? "nav-item active" : "nav-item"}
           style={({ isActive }) => (location.pathname === '/' || (globalProject && location.pathname === `/${encodeURIComponent(globalProject)}`)) ? getActiveStyle({ isActive: true }) : {}}
         >
