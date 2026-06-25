@@ -600,7 +600,8 @@ body {
     .toast,
     .custom-dropdown-options,
     .react-datepicker-popper,
-    .options-menu-dropdown {
+    .options-menu-dropdown,
+    .scroll-to-top-btn {
         zoom: 1.13636 !important;
     }
 
@@ -774,7 +775,8 @@ body {
     .toast,
     .custom-dropdown-options,
     .react-datepicker-popper,
-    .options-menu-dropdown {
+    .options-menu-dropdown,
+    .scroll-to-top-btn {
         zoom: 1.42857 !important;
     }
 

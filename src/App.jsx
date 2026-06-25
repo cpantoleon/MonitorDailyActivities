@@ -35,6 +35,7 @@ import './components/FilterSidebar.css';
 import SprintActivitiesPage from './pages/SprintBoardPage';
 import SettingsModal from './components/SettingsModal';
 import SnippetsPage from './pages/SnippetsPage';
+import ScrollToTopButton from './components/ScrollToTopButton';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale);
 
@@ -1085,6 +1086,7 @@ function App() {
         <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={handleCancelDelete} onConfirm={handleConfirmDelete} title={`Confirm ${deleteType.charAt(0).toUpperCase() + deleteType.slice(1)} Deletion`} message={getDeleteConfirmationMessage()} />
         <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} showMessage={showMainMessage} />
         <Chatbot selectedProject={selectedProject} onDataChange={handleDataRefresh} firstProjectName={projects.length > 0 ? projects[0] : ''} className={isFilterSidebarOpen ? 'sidebar-open' : ''} />
+        <ScrollToTopButton />
       </div>
     </GlobalProvider>
   );
