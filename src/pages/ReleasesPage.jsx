@@ -141,22 +141,41 @@ const KpiModal = ({ isOpen, onClose, fatPeriod, project, showMainMessage, isView
 };
 
 const DefectFilter = ({ selectedFilter, onChange }) => {
-    const filters = ['All', 'FAT', 'Not FAT'];
-
+    // Ensure selectedFilter has default structure if not initialized yet
+    const currentFilter = selectedFilter || { type: 'All', status: 'All' };
+    
     return (
-        <div id="defect-filter-options-container-id" className="sprint-filter-options-container">
-            {filters.map(filter => (
-                <label key={filter} id={`defect-filter-label-${filter.toLowerCase()}-id`} className="sprint-filter-label">
-                    <input
-                        type="radio"
-                        name="defect-filter"
-                        value={filter}
-                        checked={selectedFilter === filter}
-                        onChange={() => onChange(filter)}
-                    />
-                    {filter}
-                </label>
-            ))}
+        <div id="defect-filter-options-container-id" className="sprint-filter-options-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', width: '100%' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                <strong style={{ minWidth: '60px' }}>Type:</strong>
+                {['All', 'FAT', 'Not FAT'].map(filter => (
+                    <label key={`type-${filter}`} id={`defect-filter-type-label-${filter.replace(/\s+/g, '-').toLowerCase()}-id`} className="sprint-filter-label">
+                        <input
+                            type="radio"
+                            name="defect-filter-type"
+                            value={filter}
+                            checked={currentFilter.type === filter}
+                            onChange={() => onChange({ ...currentFilter, type: filter })}
+                        />
+                        {filter}
+                    </label>
+                ))}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                <strong style={{ minWidth: '60px' }}>Status:</strong>
+                {['All', 'Done', 'Not Done'].map(filter => (
+                    <label key={`status-${filter}`} id={`defect-filter-status-label-${filter.replace(/\s+/g, '-').toLowerCase()}-id`} className="sprint-filter-label">
+                        <input
+                            type="radio"
+                            name="defect-filter-status"
+                            value={filter}
+                            checked={currentFilter.status === filter}
+                            onChange={() => onChange({ ...currentFilter, status: filter })}
+                        />
+                        {filter}
+                    </label>
+                ))}
+            </div>
         </div>
     );
 };
@@ -418,7 +437,7 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
     const [details, setDetails] = useState({ requirements: [], defects: [] });
     const [isLoading, setIsLoading] = useState(true);
     const [isKpiModalOpen, setIsKpiModalOpen] = useState(false);
-    const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
+    const [selectedDefectFilter, setSelectedDefectFilter] = useState({ type: 'All', status: 'All' });
     const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
     const [isFatReportModalOpen, setIsFatReportModalOpen] = useState(false);
     const isDarkMode = useTheme();
@@ -475,15 +494,15 @@ const FatPeriodDetails = ({ fatPeriod, project, onComplete, onCancel, onNavigate
 
     const filteredDefects = useMemo(() => {
         if (!details.defects) return [];
-        switch (selectedDefectFilter) {
-            case 'FAT':
-                return details.defects.filter(d => d.is_fat_defect);
-            case 'Not FAT':
-                return details.defects.filter(d => !d.is_fat_defect);
-            case 'All':
-            default:
-                return details.defects;
-        }
+        return details.defects.filter(d => {
+            const matchType = selectedDefectFilter.type === 'All' || 
+                              (selectedDefectFilter.type === 'FAT' && d.is_fat_defect) || 
+                              (selectedDefectFilter.type === 'Not FAT' && !d.is_fat_defect);
+            const matchStatus = selectedDefectFilter.status === 'All' ||
+                                (selectedDefectFilter.status === 'Done' && (d.status === 'Done' || d.status === 'Closed')) ||
+                                (selectedDefectFilter.status === 'Not Done' && d.status !== 'Done' && d.status !== 'Closed');
+            return matchType && matchStatus;
+        });
     }, [details.defects, selectedDefectFilter]);
 
     const handleDefectClick = (defect) => {
@@ -915,7 +934,7 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     const [isFilterVisible, setIsFilterVisible] = useState(false);
     const [isPdfExporting, setIsPdfExporting] = useState(false);
 
-    const [selectedDefectFilter, setSelectedDefectFilter] = useState('All');
+    const [selectedDefectFilter, setSelectedDefectFilter] = useState({ type: 'All', status: 'All' });
     const [isDefectFilterVisible, setIsDefectFilterVisible] = useState(false);
     const isDarkMode = useTheme();
     const chartBorderColor = isDarkMode ? 'rgba(0,0,0,0)' : '#FFFAF0';
@@ -955,10 +974,15 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
     );
 
     const displayDefects = useMemo(() => {
-        if (selectedDefectFilter === 'All') return uniqueFilteredDefects;
-        if (selectedDefectFilter === 'FAT') return uniqueFilteredDefects.filter(d => d.is_fat_defect);
-        if (selectedDefectFilter === 'Not FAT') return uniqueFilteredDefects.filter(d => !d.is_fat_defect);
-        return uniqueFilteredDefects;
+        return uniqueFilteredDefects.filter(d => {
+            const matchType = selectedDefectFilter.type === 'All' || 
+                              (selectedDefectFilter.type === 'FAT' && d.is_fat_defect) || 
+                              (selectedDefectFilter.type === 'Not FAT' && !d.is_fat_defect);
+            const matchStatus = selectedDefectFilter.status === 'All' ||
+                                (selectedDefectFilter.status === 'Done' && (d.status === 'Done' || d.status === 'Closed')) ||
+                                (selectedDefectFilter.status === 'Not Done' && d.status !== 'Done' && d.status !== 'Closed');
+            return matchType && matchStatus;
+        });
     }, [uniqueFilteredDefects, selectedDefectFilter]);
 
     const defectCount = uniqueFilteredDefects.length;
@@ -1197,12 +1221,27 @@ const DefectDetailsCard = ({ release, defects, onClose, onNavigate, chartData, o
                                     {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
                                 </button>
                             </li>
-                        )) : <li>No defects match the current filter.</li>}
+                        )) : <li style={{listStyle: 'none', marginLeft: '-20px'}}>No defects match the current filter.</li>}
                     </ul>
                 </div>
             </div>
 
-            <div id={`defect-details-card-footer-${release.id}`} className="defect-details-card-footer">
+            <div className="defect-kpi-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginTop: 'auto', paddingTop: '20px', paddingBottom: '10px' }}>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '15px', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '0.9em', fontWeight: '500' }}>Total Defects</div>
+                    <strong style={{ fontSize: '1.6em', color: 'var(--text-primary)' }}>{defects.length}</strong>
+                </div>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '15px', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '0.9em', fontWeight: '500' }}>Pending</div>
+                    <strong style={{ fontSize: '1.6em', color: '#F44336' }}>{defects.filter(d => d.status !== 'Done' && d.status !== 'Closed').length}</strong>
+                </div>
+                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '15px', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '0.9em', fontWeight: '500' }}>FAT Bugs</div>
+                    <strong style={{ fontSize: '1.6em', color: '#dc3545' }}>{defects.filter(d => d.is_fat_defect).length}</strong>
+                </div>
+            </div>
+
+            <div id={`defect-details-card-footer-${release.id}`} className="defect-details-card-footer" style={{ marginTop: '0', paddingTop: '10px' }}>
                 <button type="button" onClick={onToggleFilter} className="button-filter">Filter Defects</button>
             </div>
         </div>
@@ -1294,7 +1333,7 @@ const ReleaseCard = ({ release, requirements, defects, defectCount, onNavigate, 
                                     {req.requirementUserIdentifier}
                                 </button>
                             </li>
-                        )) : <li>No requirements in this release.</li>}
+                        )) : <li style={{listStyle: 'none', marginLeft: '-20px'}}>No requirements in this release.</li>}
                     </ul>
                 </div>
             </div>
@@ -1360,7 +1399,7 @@ const ArchivedDefectList = ({ defects, onNavigate, listHeightClass }) => {
                                 {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
                             </button>
                         </li>
-                    )) : <li>No defects in this release.</li>}
+                    )) : <li style={{listStyle: 'none', marginLeft: '-20px'}}>No defects in this release.</li>}
                 </ul>
             </div>
         </div>
@@ -1674,7 +1713,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                                 </div>
                                             </li>
                                         );
-                                    }) : <li className="no-bugs-message">No SAT bugs added yet.</li>}
+                                    }) : <li className="no-bugs-message" style={{listStyle: 'none', marginLeft: '-20px'}}>No SAT bugs added yet.</li>}
                                 </ul>
                             </div>
                         </div>
@@ -1692,7 +1731,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                                     {item.requirement_title}
                                                 </button>
                                             </li>
-                                        )) : <li>No requirements were in this release.</li>}
+                                        )) : <li style={{listStyle: 'none', marginLeft: '-20px'}}>No requirements were in this release.</li>}
                                     </ul>
                                 )}
                             </div>
@@ -1712,7 +1751,7 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
                                                     {defect.is_fat_defect ? <span className="fat-defect-tag">FAT</span> : null}
                                                 </button>
                                             </li>
-                                        )) : <li>No defects in this release.</li>}
+                                        )) : <li style={{listStyle: 'none', marginLeft: '-20px'}}>No defects in this release.</li>}
                                     </ul>
                                 )}
                             </div>

@@ -138,9 +138,12 @@
 }
 
 .requirement-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+    list-style-type: disc;
+    padding-left: 20px;
+    margin-left: 15px;
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-right: 0;
     max-height: 250px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -462,7 +465,7 @@
 .defect-charts { width: 150px; height: 250px; flex-shrink: 0; }
 .defect-list { flex-grow: 1; display: flex; flex-direction: column; align-self: stretch; color: var(--text-primary); }
 .defect-list h4 { margin-top: 0; margin-bottom: 5px; color: var(--text-primary); }
-.defect-list ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; overflow-x: hidden; max-height: 250px; }
+.defect-list ul { list-style-type: disc; padding-left: 20px; margin-left: 15px; margin-top: 0; margin-bottom: 0; margin-right: 0; overflow-y: auto; overflow-x: hidden; max-height: 250px; }
 
 .countdown-timer { display: flex; align-items: center; padding: 8px 16px; border-radius: 4px; font-weight: bold; color: #fff; background-color: #17a2b8; }
 .countdown-timer.overdue { background-color: #dc3545; }
@@ -744,8 +747,11 @@
 
 .archived-details-view .requirement-list,
 .archived-details-view .defect-list ul,
-.archived-details-view .sat-bugs-list {
+.archived-details-view .requirement-list {
     max-height: none;
+    list-style-type: disc;
+    padding-left: 20px;
+    margin-left: 15px;
 }
 
 .archived-details-view .height-250 {
@@ -1169,10 +1175,8 @@
     justify-content: flex-start;
 }
 .defect-details-card .defect-list ul li {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    row-gap: 5px; 
+    display: list-item;
+    margin-bottom: 5px;
 }
 
 .fat-kpi-modal-content {
