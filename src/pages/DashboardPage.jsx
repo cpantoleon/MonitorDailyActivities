@@ -84,10 +84,15 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
         }
         if (allProcessedRequirements) {
           const matchedReq = allProcessedRequirements.find(pr => pr.id === req.groupId);
-          if (matchedReq && matchedReq.parentId) {
-            const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
-            if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(currentProjectActiveRelease.id)) {
+          if (matchedReq) {
+            if (matchedReq.currentStatusDetails?.releaseIds && matchedReq.currentStatusDetails.releaseIds.includes(currentProjectActiveRelease.id)) {
               return true;
+            }
+            if (matchedReq.parentId) {
+              const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
+              if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(currentProjectActiveRelease.id)) {
+                return true;
+              }
             }
           }
         }
@@ -157,10 +162,15 @@ const DashboardPage = ({ projects, allReleases, allProcessedRequirements, onNavi
             if (req.release_ids && Array.isArray(req.release_ids) && req.release_ids.includes(activeRel.id)) return true;
             if (allProcessedRequirements) {
                const matchedReq = allProcessedRequirements.find(pr => pr.id === req.groupId);
-               if (matchedReq && matchedReq.parentId) {
-                   const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
-                   if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(activeRel.id)) {
+               if (matchedReq) {
+                   if (matchedReq.currentStatusDetails?.releaseIds && matchedReq.currentStatusDetails.releaseIds.includes(activeRel.id)) {
                        return true;
+                   }
+                   if (matchedReq.parentId) {
+                       const parentReq = allProcessedRequirements.find(pr => pr.id === matchedReq.parentId);
+                       if (parentReq && parentReq.currentStatusDetails?.releaseIds && parentReq.currentStatusDetails.releaseIds.includes(activeRel.id)) {
+                           return true;
+                       }
                    }
                }
             }
