@@ -96,9 +96,22 @@ const Chatbot = ({ selectedProject, onDataChange, firstProjectName, className })
                 const gitData = await gitRes.json();
 
                 if (gitData.isBehind) {
+                    let msgText = `Hi there! 🐙 Just a heads-up: your local code is <b>${gitData.commitsBehind}</b> commit(s) behind the remote repository.<br/><br/>`;
+                    
+                    if (gitData.commitMessages) {
+                        // Ασφαλές καθάρισμα κειμένου (HTML escape) & μορφοποίηση
+                        const cleanLogs = gitData.commitMessages
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/\n/g, '<br/>');
+                        msgText += `<b>Here's what changed:</b><br/><div style="margin:10px 0; padding:10px; background:var(--bg-tertiary); border-radius:6px; font-size:0.9em;">${cleanLogs}</div><br/>`;
+                    }
+
+                    msgText += `If you want to get the latest updates, just type <b>"git pull"</b>!<br/><span style="font-size:0.8em; color:var(--text-secondary);">(You can disable these daily checks from the Settings menu)</span>`;
+
                     const cuteMessage = { 
                         from: 'bot', 
-                        text: `Hi there! 🐙 Just a heads-up: your local code is <b>${gitData.commitsBehind}</b> commit(s) behind the remote repository.<br/><br/>If you want to get the latest updates, just type <b>"git pull"</b>!<br/><span style="font-size:0.8em; color:var(--text-secondary);">(You can disable these daily checks from the Settings menu)</span>`
+                        text: msgText
                     };
                     setMessages(prev => [...prev, cuteMessage]);
                     setHasUnreadNotification(true);

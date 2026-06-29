@@ -4046,7 +4046,7 @@ app.get("/api/git/check-updates", async (req, res) => {
     const promisifiedExec = util.promisify(exec);
 
     try {
-        const projectRoot = path.resolve(__dirname, '..'); // Προσαρμόζεις το path αν χρειάζεται
+        const projectRoot = path.resolve(__dirname, '..'); 
         // Κάνουμε fetch για να φέρουμε τις πληροφορίες από το remote
         await promisifiedExec('git fetch', { cwd: projectRoot });
         // Ελέγχουμε το status
@@ -4056,7 +4056,16 @@ app.get("/api/git/check-updates", async (req, res) => {
         const match = stdout.match(/Your branch is behind .* by (\d+) commit/i);
 
         if (match) {
-            return res.json({ isBehind: true, commitsBehind: parseInt(match[1], 10) });
+            const commitsBehind = parseInt(match[1], 10);
+            
+            // Παίρνουμε τα μηνύματα από τα commits που μας λείπουν (από το HEAD έως το origin/main)
+            const { stdout: logOut } = await promisifiedExec('git log HEAD..origin/main --pretty=format:"%B"', { cwd: projectRoot });
+            
+            return res.json({ 
+                isBehind: true, 
+                commitsBehind: commitsBehind,
+                commitMessages: logOut.trim() 
+            });
         }
         return res.json({ isBehind: false, commitsBehind: 0 });
     } catch (error) {
