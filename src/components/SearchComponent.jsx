@@ -61,12 +61,21 @@ const SearchComponent = ({ query, onQueryChange, onSearch, onClear, onSuggestion
           type="button" 
           id="search-button-id"
           onClick={handleSearchClick} 
-          className="search-button" 
+          className="search-button icon-button" 
           disabled={!query || query.trim() === ''}
+          title="Search"
         >
-          Search
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
         </button>
-        <button id="search-clear-button-id" type="button" onClick={handleClearClick} className="search-clear-button">Clear</button>
+        <button id="search-clear-button-id" type="button" onClick={handleClearClick} className="search-clear-button icon-button" title="Clear">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
       {showSuggestions && suggestions && suggestions.length > 0 && (
         <ul id="suggestions-list-id" className="suggestions-list">

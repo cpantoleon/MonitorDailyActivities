@@ -46,7 +46,9 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [availableSprints, setAvailableSprints] = useState([]);
+  const [archivedSprints, setArchivedSprints] = useState([]);
   const [selectedSprint, setSelectedSprint] = useState('');
+  const [selectedReleaseMenu, setSelectedReleaseMenu] = useState('');
   const [displayableRequirements, setDisplayableRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -179,13 +181,13 @@ function App() {
       sprintsForProject = getSprintsForProject(allProcessedRequirements, selectedProject);
     }
 
-    const visibleSprints = showArchivedSprints
-      ? sprintsForProject
-      : sprintsForProject.filter(s => !s.startsWith('Archived_'));
+    const visibleSprints = sprintsForProject.filter(s => !s.startsWith('Archived_'));
+    const archived = sprintsForProject.filter(s => s.startsWith('Archived_'));
 
     setAvailableSprints(visibleSprints);
+    setArchivedSprints(archived);
 
-    if (selectedProject && selectedSprint && !visibleSprints.includes(selectedSprint)) {
+    if (selectedProject && selectedSprint && !visibleSprints.includes(selectedSprint) && !archived.includes(selectedSprint)) {
       let sprintToSelect = '';
       if (visibleSprints.length > 0) {
         const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
@@ -221,9 +223,7 @@ function App() {
     sessionStorage.setItem('globalProject', project);
 
     const sprintsForProject = getSprintsForProject(allProcessedRequirements, project);
-    const visibleSprints = showArchivedSprints
-      ? sprintsForProject
-      : sprintsForProject.filter(s => !s.startsWith('Archived_'));
+    const visibleSprints = sprintsForProject.filter(s => !s.startsWith('Archived_'));
 
     let sprintToSelect = '';
     if (visibleSprints.length > 0) {
@@ -242,6 +242,7 @@ function App() {
     }
 
     // Αλλάζουμε ΜΟΝΟ το URL. Το useEffect του URL θα αναλάβει να ενημερώσει τα states χωρίς flickering!
+    setSelectedReleaseMenu('');
     const newUrl = `/sprint-board?project=${encodeURIComponent(project)}${sprintToSelect ? `&sprint=${encodeURIComponent(sprintToSelect)}` : ''}`;
     navigate(newUrl, { replace: true });
 
@@ -257,7 +258,21 @@ function App() {
     }
 
     if (selectedProject) {
+      setSelectedReleaseMenu('');
       const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprint)}`;
+      navigate(newUrl, { replace: true });
+    }
+  }, [selectedProject, navigate]);
+
+  const handleManualReleaseMenuSelect = useCallback((releaseVal) => {
+    setSelectedReleaseMenu(releaseVal);
+    // Clear sprint to avoid conflict
+    setSelectedSprint('');
+    sessionStorage.removeItem('sprintBoardSprint');
+    
+    if (selectedProject) {
+      // We don't put releaseVal in URL for now, just clear sprint from URL
+      const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}`;
       navigate(newUrl, { replace: true });
     }
   }, [selectedProject, navigate]);
@@ -368,8 +383,21 @@ function App() {
   }, [allProcessedRequirements]);
 
   useEffect(() => {
-    if (selectedProject && selectedSprint && allProcessedRequirements.length > 0) {
-      const baseReqs = allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint);
+    if (selectedProject && (selectedSprint || selectedReleaseMenu) && allProcessedRequirements.length > 0) {
+      let baseReqs = allProcessedRequirements.filter(req => req.project === selectedProject);
+      if (selectedSprint) {
+        baseReqs = baseReqs.filter(req => req.currentStatusDetails?.sprint === selectedSprint);
+      } else if (selectedReleaseMenu) {
+        const releaseStr = String(selectedReleaseMenu);
+        if (releaseStr.startsWith('Archived_')) {
+          baseReqs = baseReqs.filter(req => req.currentStatusDetails?.sprint === releaseStr);
+        } else {
+          baseReqs = baseReqs.filter(req => {
+            const rIds = req.currentStatusDetails?.releaseIds || [];
+            return rIds.some(id => String(id) === releaseStr);
+          });
+        }
+      }
       const types = new Set();
       const releaseIds = new Set();
       let hasLinkedDefects = false;
@@ -401,12 +429,25 @@ function App() {
     } else {
       setFilterOptions({ enabledTypes: [], enabledReleases: [], isLinkedDefectsYesEnabled: false, isLinkedDefectsNoEnabled: false, hasNoReleaseItems: false });
     }
-  }, [selectedProject, selectedSprint, allProcessedRequirements]);
+  }, [selectedProject, selectedSprint, selectedReleaseMenu, allProcessedRequirements]);
 
   useEffect(() => {
     if (isSearching) return;
-    if (selectedProject && selectedSprint && allProcessedRequirements.length > 0) {
-      let filteredRequirements = allProcessedRequirements.filter(req => req.project === selectedProject && req.currentStatusDetails?.sprint === selectedSprint);
+    if (selectedProject && (selectedSprint || selectedReleaseMenu) && allProcessedRequirements.length > 0) {
+      let filteredRequirements = allProcessedRequirements.filter(req => req.project === selectedProject);
+      if (selectedSprint) {
+        filteredRequirements = filteredRequirements.filter(req => req.currentStatusDetails?.sprint === selectedSprint);
+      } else if (selectedReleaseMenu) {
+        const releaseStr = String(selectedReleaseMenu);
+        if (releaseStr.startsWith('Archived_')) {
+          filteredRequirements = filteredRequirements.filter(req => req.currentStatusDetails?.sprint === releaseStr);
+        } else {
+          filteredRequirements = filteredRequirements.filter(req => {
+            const rIds = req.currentStatusDetails?.releaseIds || [];
+            return rIds.some(id => String(id) === releaseStr);
+          });
+        }
+      }
       if (selectedTypes.length > 0) filteredRequirements = filteredRequirements.filter(req => selectedTypes.includes(req.currentStatusDetails?.type));
       if (linkedDefectsFilter) {
         if (linkedDefectsFilter === 'yes') filteredRequirements = filteredRequirements.filter(req => Array.isArray(req.linkedDefects) && req.linkedDefects.length > 0);
@@ -424,7 +465,7 @@ function App() {
       if (dateTo) filteredRequirements = filteredRequirements.filter(req => new Date(req.currentStatusDetails.date) <= new Date(dateTo));
       setDisplayableRequirements(filteredRequirements);
     } else { setDisplayableRequirements([]); }
-  }, [selectedProject, selectedSprint, allProcessedRequirements, isSearching, selectedTypes, linkedDefectsFilter, selectedReleases, dateFrom, dateTo]);
+  }, [selectedProject, selectedSprint, selectedReleaseMenu, allProcessedRequirements, isSearching, selectedTypes, linkedDefectsFilter, selectedReleases, dateFrom, dateTo]);
 
   const handleTypeChange = (type) => { setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]); };
   const handleLinkedDefectsChange = (value) => { setLinkedDefectsFilter(prev => (prev === value ? null : value)); };
@@ -963,8 +1004,12 @@ function App() {
                 selectedProject={selectedProject}
                 onSelectProject={handleManualProjectSelect}
                 availableSprints={availableSprints}
+                archivedSprints={archivedSprints}
                 selectedSprint={selectedSprint}
                 onSelectSprint={handleManualSprintSelect}
+                selectedReleaseMenu={selectedReleaseMenu}
+                onSelectReleaseMenu={handleManualReleaseMenuSelect}
+                showArchivedSprints={showArchivedSprints}
                 requirementQuery={requirementQuery}
                 onQueryChange={handleRequirementQueryChange}
                 onSearch={handleRequirementSearch}
@@ -1050,6 +1095,8 @@ function App() {
           onReleaseChange={handleReleaseChange}
           enabledReleases={filterOptions.enabledReleases}
           hasNoReleaseItems={filterOptions.hasNoReleaseItems}
+          showArchivedSprints={showArchivedSprints}
+          onSetShowArchived={setShowArchivedSprints}
           dateFrom={dateFrom}
           dateTo={dateTo}
           onDateFromChange={setDateFrom}

@@ -30,6 +30,13 @@
   transition: background-color 0.2s ease;
 }
 
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
 .search-button {
   background-color: var(--accent-color);
   color: white;

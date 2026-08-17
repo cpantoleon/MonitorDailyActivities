@@ -3,6 +3,7 @@ import '../App.css';
 import './SprintBoardPage.css';
 import ProjectSelector from '../components/ProjectSelector';
 import SprintSelector from '../components/SprintSelector';
+import ReleaseSelector from '../components/ReleaseSelector';
 import KanbanBoard from '../components/KanbanBoard';
 import SearchComponent from '../components/SearchComponent';
 import Tooltip from '../components/Tooltip';
@@ -73,13 +74,13 @@ const OptionsMenu = ({ onOpenAddProjectModal, onOpenAddModal, onOpenImportModal,
 
 
 const SprintActivitiesPage = ({
-  projects, selectedProject, onSelectProject, availableSprints, selectedSprint, onSelectSprint,
+  projects, selectedProject, onSelectProject, availableSprints, archivedSprints, selectedSprint, onSelectSprint,
+  selectedReleaseMenu, onSelectReleaseMenu, showArchivedSprints,
   requirementQuery, onQueryChange, onSearch, onClear, onSuggestionSelect, searchSuggestions, onAddSubtask,
   onOpenAddProjectModal, onOpenAddModal, onOpenImportModal, onOpenJiraImportModal, onOpenAddReleaseModal,
   onOpenEditReleaseModal, onOpenEditProjectModal, onToggleFilterSidebar, isSearching, displayableRequirements,
   onShowHistory, onEditRequirement, onDeleteRequirement, onStatusUpdateRequest, projectReleases,
-  allProcessedRequirements, hasAnyReleases, showArchivedSprints, onSetShowArchived, onReorderRequirements,
-  onDataRefresh
+  allProcessedRequirements, hasAnyReleases, onReorderRequirements, onDataRefresh
 }) => {
   const [showCharts, setShowCharts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -99,6 +100,11 @@ const SprintActivitiesPage = ({
   const releaseOptions = [
     { value: 'remove', label: 'Remove Release' },
     ...projectReleases.filter(r => r.status !== 'closed').map(r => ({ value: r.id, label: r.name }))
+  ];
+
+  const releaseMenuOptions = [
+    ...projectReleases.filter(r => r.status !== 'closed').map(r => ({ value: r.id, label: r.name })),
+    ...(showArchivedSprints ? archivedSprints.map(s => ({ value: s, label: s })) : [])
   ];
 
   const handleToggleSelect = (id) => {
@@ -418,29 +424,26 @@ const SprintActivitiesPage = ({
         <div className="selection-group-container">
           <ProjectSelector projects={projects} selectedProject={selectedProject} onSelectProject={onSelectProject} />
           <SprintSelector sprints={availableSprints} selectedSprint={selectedSprint} onSelectSprint={onSelectSprint} disabled={!selectedProject || projects.length === 0} />
+          <ReleaseSelector releases={releaseMenuOptions} selectedRelease={selectedReleaseMenu} onSelectRelease={onSelectReleaseMenu} disabled={!selectedProject || projects.length === 0} />
           <SearchComponent
             query={requirementQuery} onQueryChange={onQueryChange} onSearch={onSearch}
             onClear={onClear} onSuggestionSelect={onSuggestionSelect} suggestions={searchSuggestions}
             placeholder="Search requirements..."
           />
-          <button onClick={onToggleFilterSidebar} className="btn-primary filter-toggle-button" disabled={!selectedProject || !selectedSprint}>Filter</button>
-          <div className="show-archived-container">
-            <input type="checkbox" id="show-archived-sprints" checked={showArchivedSprints} onChange={(e) => onSetShowArchived(e.target.checked)} disabled={!selectedProject || projects.length === 0} />
-            <label htmlFor="show-archived-sprints">Show Archived</label>
-          </div>
+          <button onClick={onToggleFilterSidebar} className="btn-primary filter-toggle-button" disabled={!selectedProject || (!selectedSprint && !selectedReleaseMenu)}>Filter</button>
         </div>
         <div className="page-actions-group">
           {/* Expand / Collapse All */}
-          <div style={{ display: 'flex', gap: '8px', marginRight: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginRight: '10px' }}>
             <button
               onClick={async () => {
                 await fetch('/api/activities/expand-all', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: selectedProject, sprint: selectedSprint, is_expanded: true }) });
                 onDataRefresh();
               }}
               className="btn-primary"
-              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              style={{ padding: '2px 8px', fontSize: '0.75em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', height: '24px' }}
               title="Show details for all cards"
-              disabled={!selectedProject || !selectedSprint}>
+              disabled={!selectedProject || (!selectedSprint && !selectedReleaseMenu)}>
               Expand All
             </button>
             <button
@@ -449,9 +452,9 @@ const SprintActivitiesPage = ({
                 onDataRefresh();
               }}
               className="btn-primary"
-              style={{ padding: '6px 12px', fontSize: '0.85em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+              style={{ padding: '2px 8px', fontSize: '0.75em', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', height: '24px' }}
               title="Hide details for all cards"
-              disabled={!selectedProject || !selectedSprint}>
+              disabled={!selectedProject || (!selectedSprint && !selectedReleaseMenu)}>
               Collapse All
             </button>
           </div>

@@ -27,6 +27,8 @@ const FilterSidebar = ({
   onFatDefectChange,
   isFatDefectYesEnabled,
   isFatDefectNoEnabled,
+  showArchivedSprints,
+  onSetShowArchived,
 }) => {
   const sidebarRef = useClickOutside(onClose);
 
@@ -39,6 +41,23 @@ const FilterSidebar = ({
         />
       )}
       <div id="filter-sidebar-id" className={`filter-sidebar ${!isOpen ? 'closed' : ''}`} ref={sidebarRef} style={{ zIndex: 999 }}>
+      
+      {onSetShowArchived && (
+        <>
+          <h3 id="show-archived-heading-id">General Filters</h3>
+          <div id="filter-options-archived-id" className="filter-options">
+            <div id="filter-option-show-archived-id" className="filter-option">
+              <input
+                type="checkbox"
+                id="show-archived-sprints-sidebar"
+                checked={showArchivedSprints}
+                onChange={(e) => onSetShowArchived(e.target.checked)}
+              />
+              <label htmlFor="show-archived-sprints-sidebar">Show Archived</label>
+            </div>
+          </div>
+        </>
+      )}
       {types && onTypeChange && (
         <>
           <h3 id="filter-by-type-heading-id">Filter by Type</h3>
