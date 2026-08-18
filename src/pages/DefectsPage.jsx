@@ -11,6 +11,7 @@ import ImportDefectsModal from '../components/ImportDefectsModal';
 import JiraImportModal from '../components/JiraImportModal';
 import Tooltip from '../components/Tooltip';
 import FilterSidebar from '../components/FilterSidebar';
+import ReleaseSelector from '../components/ReleaseSelector';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
@@ -163,6 +164,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     setSearchResults([]);
     setSearchSuggestions([]);
     setSelectedReleases([]);
+    setSelectedReleaseMenu('');
 
     // Update global storage safely here
     if (project) {
@@ -298,6 +300,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     }
   }, [highlightedDefectId, activeDefects, closedDefects, selectedProject]);
 
+  const [selectedReleaseMenu, setSelectedReleaseMenu] = useState('');
+
   const filteredDefects = useMemo(() => {
     let defectsToFilter = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
 
@@ -310,7 +314,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
       });
     }
 
-    if (selectedReleases.length === 0) {
+    const effectiveReleases = [...selectedReleases];
+    if (selectedReleaseMenu && !effectiveReleases.includes(selectedReleaseMenu)) {
+      effectiveReleases.push(selectedReleaseMenu);
+    }
+
+    if (effectiveReleases.length === 0) {
       return defectsToFilter;
     }
 
@@ -333,30 +342,29 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
           if (sprint && sprint.startsWith('Archived_from_')) {
             const releaseName = sprint.substring('Archived_from_'.length).replace(/_/g, ' ');
             const matchingArchivedRelease = archivedReleases.find(ar => ar.name === releaseName);
-            if (matchingArchivedRelease && selectedReleases.includes(matchingArchivedRelease.id)) {
+            if (matchingArchivedRelease && effectiveReleases.includes(matchingArchivedRelease.id)) {
               return true;
             }
           }
 
-          // ΔΙΟΡΘΩΣΗ ΕΔΩ
           if (req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.length > 0) {
             return req.currentStatusDetails.releaseIds.some(originalReleaseId => {
               const archiveId = originalReleaseIdToArchiveIdMap.get(originalReleaseId);
-              if (archiveId && selectedReleases.includes(archiveId)) return true;
-              if (!archiveId && selectedReleases.includes(originalReleaseId)) return true;
+              if (archiveId && effectiveReleases.includes(archiveId)) return true;
+              if (!archiveId && effectiveReleases.includes(originalReleaseId)) return true;
               return false;
             });
           }
           return false;
         });
       } else {
-        // ΔΙΟΡΘΩΣΗ ΕΔΩ
         return linkedReqsWithDetails.some(req =>
-          req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.some(id => selectedReleases.includes(id))
+          req.currentStatusDetails.releaseIds && req.currentStatusDetails.releaseIds.some(id => effectiveReleases.includes(id))
         );
       }
     });
-  }, [isSearching, searchResults, showClosedView, closedDefects, activeDefects, selectedReleases, allRequirements, archivedReleases, fatDefectFilter]);
+  }, [isSearching, searchResults, showClosedView, closedDefects, activeDefects, selectedReleases, selectedReleaseMenu, allRequirements, archivedReleases, fatDefectFilter]);
+
 
   // Bulk Selection State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -925,6 +933,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
 
   const handleClearFilters = () => {
     setSelectedReleases([]);
+    setSelectedReleaseMenu('');
     setFatDefectFilter(null);
   };
 
@@ -1078,10 +1087,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
   // Replace the releasesForFilter useMemo:
   const releasesForFilter = useMemo(() => {
     // Filter allReleases by the defects page's own selectedProject
-    const activeForProject = allReleases.filter(r => r.project === selectedProject);
+    const projectReleasesAll = allReleases.filter(r => r.project === selectedProject);
 
     if (!showClosedView) {
-      return activeForProject;
+      return projectReleasesAll.filter(r => r.status !== 'closed');
     }
 
     const archivedAsReleases = archivedReleases.map(ar => ({
@@ -1090,18 +1099,28 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
       is_current: false
     }));
 
-    const combined = [...activeForProject, ...archivedAsReleases];
+    const combined = [...projectReleasesAll, ...archivedAsReleases];
 
     return Array.from(new Map(combined.map(item => [item.name, item])).values())
       .sort((a, b) => a.name.localeCompare(b.name));
 
   }, [showClosedView, allReleases, selectedProject, archivedReleases]);
 
+  const releaseMenuOptions = useMemo(() => {
+    return releasesForFilter.map(r => ({ value: r.id, label: r.name }));
+  }, [releasesForFilter]);
+
   return (
     <div className="main-content-area">
       <div className="selection-controls">
         <div className="selection-group-container">
           <ProjectSelector projects={projects || []} selectedProject={selectedProject} onSelectProject={handleManualProjectSelect} />
+          <ReleaseSelector
+            releases={releaseMenuOptions}
+            selectedRelease={selectedReleaseMenu}
+            onSelectRelease={setSelectedReleaseMenu}
+            disabled={!selectedProject || projects.length === 0}
+          />
           <SearchComponent
             query={defectQuery}
             onQueryChange={handleDefectQueryChange}

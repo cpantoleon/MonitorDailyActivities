@@ -1036,8 +1036,6 @@ function App() {
                 projectReleases={projectReleases}
                 allProcessedRequirements={allProcessedRequirements}
                 hasAnyReleases={allReleases.length > 0}
-                showArchivedSprints={showArchivedSprints}
-                onSetShowArchived={setShowArchivedSprints}
               />
             } />
 

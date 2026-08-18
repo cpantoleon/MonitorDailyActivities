@@ -80,7 +80,7 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isGeneralMode, setIsGeneralMode] = useState(false);
-  const [dateSelectionMode, setDateSelectionMode] = useState('month');
+  const [dateSelectionMode, setDateSelectionMode] = useState('date');
 
   // Unsaved Changes State
   const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
@@ -101,6 +101,9 @@ const NotesPage = ({ projects, apiBaseUrl, showMessage }) => {
      executeWithUnsavedCheck(() => {
        setSelectedProject(project);
        setIsGeneralMode(project === 'General');
+       if (project === 'General') {
+           setDateSelectionMode('date');
+       }
       
       if (project) {
           sessionStorage.setItem('globalProject', project);
