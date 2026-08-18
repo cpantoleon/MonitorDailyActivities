@@ -12,6 +12,7 @@ import JiraImportModal from '../components/JiraImportModal';
 import Tooltip from '../components/Tooltip';
 import FilterSidebar from '../components/FilterSidebar';
 import ReleaseSelector from '../components/ReleaseSelector';
+import { getSprintsForProject } from '../utils/dataHelpers';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend, Title, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
@@ -75,7 +76,7 @@ const DefectOptionsMenu = ({ onOpenAddModal, onOpenImportModal, onOpenJiraImport
   );
 };
 
-const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, projectReleases, allReleases }) => {
+const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, projectReleases, allReleases, selectedReleaseMenu, onSelectReleaseMenu }) => {
   const [selectedProject, setSelectedProject] = useState('');
   const [allDefects, setAllDefects] = useState([]);
   const [activeDefects, setActiveDefects] = useState([]);
@@ -164,17 +165,39 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     setSearchResults([]);
     setSearchSuggestions([]);
     setSelectedReleases([]);
-    setSelectedReleaseMenu('');
+    if (onSelectReleaseMenu) {
+      onSelectReleaseMenu('');
+    }
 
     // Update global storage safely here
     if (project) {
       sessionStorage.setItem('globalProject', project);
+      
+      // Auto-calculate the latest sprint for the new project so Sprint Board is pre-filled
+      const sprintsForProject = getSprintsForProject(allRequirements, project);
+      const visibleSprints = sprintsForProject.filter(s => !s.startsWith('Archived_'));
+      let sprintToSelect = '';
+      if (visibleSprints.length > 0) {
+        const nonArchivedSprints = visibleSprints.filter(s => !s.startsWith('Archived_'));
+        if (nonArchivedSprints.length > 0) {
+          sprintToSelect = nonArchivedSprints[nonArchivedSprints.length - 1];
+        } else {
+          sprintToSelect = visibleSprints[0];
+        }
+      }
+      if (sprintToSelect) {
+        sessionStorage.setItem('sprintBoardSprint', sprintToSelect);
+      } else {
+        sessionStorage.removeItem('sprintBoardSprint');
+      }
+
       navigate(`/defects?d_project=${encodeURIComponent(project)}${showClosedView ? '&view=closed' : ''}`, { replace: true });
     } else {
       sessionStorage.removeItem('globalProject');
+      sessionStorage.removeItem('sprintBoardSprint');
       navigate(`/defects${showClosedView ? '?view=closed' : ''}`, { replace: true });
     }
-  }, [navigate, showClosedView]);
+  }, [navigate, showClosedView, onSelectReleaseMenu, allRequirements]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -300,7 +323,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     }
   }, [highlightedDefectId, activeDefects, closedDefects, selectedProject]);
 
-  const [selectedReleaseMenu, setSelectedReleaseMenu] = useState('');
+
 
   const filteredDefects = useMemo(() => {
     let defectsToFilter = isSearching ? searchResults : (showClosedView ? closedDefects : activeDefects);
@@ -933,7 +956,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
 
   const handleClearFilters = () => {
     setSelectedReleases([]);
-    setSelectedReleaseMenu('');
+    onSelectReleaseMenu('');
     setFatDefectFilter(null);
   };
 
@@ -1118,7 +1141,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
           <ReleaseSelector
             releases={releaseMenuOptions}
             selectedRelease={selectedReleaseMenu}
-            onSelectRelease={setSelectedReleaseMenu}
+            onSelectRelease={onSelectReleaseMenu}
             disabled={!selectedProject || projects.length === 0}
           />
           <SearchComponent

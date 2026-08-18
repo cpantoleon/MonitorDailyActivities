@@ -48,7 +48,18 @@ function App() {
   const [availableSprints, setAvailableSprints] = useState([]);
   const [archivedSprints, setArchivedSprints] = useState([]);
   const [selectedSprint, setSelectedSprint] = useState('');
-  const [selectedReleaseMenu, setSelectedReleaseMenu] = useState('');
+  const [selectedReleaseMenu, setSelectedReleaseMenuState] = useState(() => {
+    return sessionStorage.getItem('globalRelease') || '';
+  });
+
+  const setSelectedReleaseMenu = useCallback((val) => {
+    setSelectedReleaseMenuState(val);
+    if (val) {
+      sessionStorage.setItem('globalRelease', val);
+    } else {
+      sessionStorage.removeItem('globalRelease');
+    }
+  }, []);
   const [displayableRequirements, setDisplayableRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -257,12 +268,12 @@ function App() {
       sessionStorage.removeItem('sprintBoardSprint');
     }
 
-    if (selectedProject) {
+    if (selectedProject && location.pathname === '/sprint-board') {
       setSelectedReleaseMenu('');
       const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}&sprint=${encodeURIComponent(sprint)}`;
       navigate(newUrl, { replace: true });
     }
-  }, [selectedProject, navigate]);
+  }, [selectedProject, navigate, setSelectedReleaseMenu, location.pathname]);
 
   const handleManualReleaseMenuSelect = useCallback((releaseVal) => {
     setSelectedReleaseMenu(releaseVal);
@@ -270,12 +281,12 @@ function App() {
     setSelectedSprint('');
     sessionStorage.removeItem('sprintBoardSprint');
     
-    if (selectedProject) {
+    if (selectedProject && location.pathname === '/sprint-board') {
       // We don't put releaseVal in URL for now, just clear sprint from URL
       const newUrl = `/sprint-board?project=${encodeURIComponent(selectedProject)}`;
       navigate(newUrl, { replace: true });
     }
-  }, [selectedProject, navigate]);
+  }, [selectedProject, navigate, setSelectedReleaseMenu, location.pathname]);
 
   // Effect για highlighting
   useEffect(() => {
@@ -1040,7 +1051,7 @@ function App() {
             } />
 
             // Find this line in App.jsx:
-            <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} projectReleases={projectReleases} allReleases={allReleases} />} />
+            <Route path="/defects" element={<DefectsPage projects={projects} allRequirements={allProcessedRequirements} showMessage={showMainMessage} onDefectUpdate={fetchRequirementsOnly} projectReleases={projectReleases} allReleases={allReleases} selectedReleaseMenu={selectedReleaseMenu} onSelectReleaseMenu={handleManualReleaseMenuSelect} />} />
             <Route path="/sprint-analysis" element={<SprintAnalysisPage projects={projects} showMessage={showMainMessage} />} />
             <Route path="/notes" element={<NotesPage projects={projects} apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} />
             <Route path="/snippets" element={<SnippetsPage apiBaseUrl={API_BASE_URL} showMessage={showMainMessage} />} /> {/* <--- ΠΡΟΣΘΗΚΗ ΑΥΤΟΥ */}
