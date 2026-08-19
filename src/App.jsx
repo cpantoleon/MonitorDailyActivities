@@ -849,6 +849,8 @@ function App() {
       showMainMessage(result.message, 'success');
       fetchData();
 
+      setSelectedReleaseMenu('');
+      sessionStorage.setItem('sprintBoardSprint', sprint);
       navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`, { replace: true });
     } catch (error) {
       showMainMessage(`Import Error: ${error.message}`, 'error');
@@ -857,7 +859,7 @@ function App() {
       setIsImportConfirmModalOpen(false);
       setImportConfirmData(null);
     }
-  }, [fetchData, showMainMessage, navigate]);
+  }, [fetchData, showMainMessage, navigate, setSelectedReleaseMenu]);
 
   const handleValidateImport = useCallback(async (file, project, sprint, release_id) => {
     const formData = new FormData();
@@ -944,11 +946,13 @@ function App() {
   };
 
   const handleJiraImportSuccess = useCallback(async (project, sprint) => {
+    setSelectedReleaseMenu('');
     await fetchData();
     if (project && sprint) {
+      sessionStorage.setItem('sprintBoardSprint', sprint);
       navigate(`/sprint-board?project=${encodeURIComponent(project)}&sprint=${encodeURIComponent(sprint)}`, { replace: true });
     }
-  }, [fetchData, navigate]);
+  }, [fetchData, navigate, setSelectedReleaseMenu]);
 
   const getDeleteConfirmationMessage = () => {
     if (!itemToDelete) return '';

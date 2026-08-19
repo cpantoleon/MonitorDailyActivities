@@ -3608,8 +3608,21 @@ app.post('/api/jira/import', async (req, res) => {
                     if (existingLinksMap.has(parentItem.link)) {
                         skipped++;
                         parentDbId = existingLinksMap.get(parentItem.link);
-                        // FIX: Ensure the type and key are correct in case it was created manually without them
-                        await runQuery(`UPDATE activities SET type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentItem.type, parentItem.key, parentDbId]);
+                        
+                        let updateSql = `UPDATE activities SET type = ?, key = ?`;
+                        let params = [parentItem.type, parentItem.key];
+                        if (release_id) {
+                            updateSql += `, release_id = ?`;
+                            params.push(release_id);
+                        }
+                        if (sprint) {
+                            updateSql += `, sprint = ?`;
+                            params.push(sprint);
+                        }
+                        updateSql += ` WHERE requirementGroupId = ? AND isCurrent = 1`;
+                        params.push(parentDbId);
+                        
+                        await runQuery(updateSql, params);
                     } else {
                         let appStatus = 'To Do';
                         if (DONE_STATUSES.includes(parentItem.status.toUpperCase())) appStatus = 'Done';
@@ -3634,8 +3647,21 @@ app.post('/api/jira/import', async (req, res) => {
                         if (existingLinksMap.has(subtask.link)) {
                             skipped++;
                             subDbId = existingLinksMap.get(subtask.link);
-                            // FIX: Link the existing subtask to the parent and fix its type
-                            await runQuery(`UPDATE activities SET parent_id = ?, type = ?, key = ? WHERE requirementGroupId = ? AND isCurrent = 1`, [parentDbId, subtask.type, subtask.key, subDbId]);
+                            
+                            let updateSubSql = `UPDATE activities SET parent_id = ?, type = ?, key = ?`;
+                            let subParams = [parentDbId, subtask.type, subtask.key];
+                            if (release_id) {
+                                updateSubSql += `, release_id = ?`;
+                                subParams.push(release_id);
+                            }
+                            if (sprint) {
+                                updateSubSql += `, sprint = ?`;
+                                subParams.push(sprint);
+                            }
+                            updateSubSql += ` WHERE requirementGroupId = ? AND isCurrent = 1`;
+                            subParams.push(subDbId);
+                            
+                            await runQuery(updateSubSql, subParams);
                         } else {
                             let subStatus = 'To Do';
                             if (DONE_STATUSES.includes(subtask.status.toUpperCase())) subStatus = 'Done';
@@ -3658,7 +3684,7 @@ app.post('/api/jira/import', async (req, res) => {
             scheduleQdrantSync();
 
             res.json({
-                message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Skipped/Updated links for ${skipped} existing.`,
+                message: `Import complete. Added ${importedParents} requirements and ${importedSubtasks} sub-tasks. Updated ${skipped} existing items.`,
                 data: { importedParents, importedSubtasks, skipped }
             });
 
@@ -3783,6 +3809,21 @@ app.post("/api/jira/import/requirements", async (req, res) => {
             if (existingLinksMap.has(link)) {
                 skipped++;
                 reqGroupId = existingLinksMap.get(link);
+                
+                let updateReqSql = `UPDATE activities SET type = ?, key = ?`;
+                let reqParams = [type, key];
+                if (release_id) {
+                    updateReqSql += `, release_id = ?`;
+                    reqParams.push(release_id);
+                }
+                if (sprint) {
+                    updateReqSql += `, sprint = ?`;
+                    reqParams.push(sprint);
+                }
+                updateReqSql += ` WHERE requirementGroupId = ? AND isCurrent = 1`;
+                reqParams.push(reqGroupId);
+                
+                await dbRun(updateReqSql, reqParams);
             } else {
                 const title = issue.fields.summary;
                 const jiraStatus = issue.fields.status.name;
@@ -3835,7 +3876,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
         }
 
         scheduleQdrantSync();
-        res.json({ message: `Imported ${imported} requirements. Skipped/Updated links for ${skipped}.` });
+        res.json({ message: `Imported ${imported} requirements. Updated ${skipped} existing requirements.` });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
