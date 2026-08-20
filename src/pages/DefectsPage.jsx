@@ -351,6 +351,12 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     );
 
     return defectsToFilter.filter(defect => {
+      // If the defect has manual_release_ids mapped directly, check if any match
+      if (defect.manual_release_ids && defect.manual_release_ids.length > 0) {
+        const hasManualRelease = defect.manual_release_ids.some(id => effectiveReleases.includes(id) || effectiveReleases.includes(String(id)));
+        if (hasManualRelease) return true;
+      }
+
       if (!defect.linkedRequirements || defect.linkedRequirements.length === 0) {
         return false;
       }
@@ -431,6 +437,17 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     const relevantReleaseIds = new Set();
     if (showClosedView) {
       baseItems.forEach(defect => {
+        if (defect.manual_release_ids && defect.manual_release_ids.length > 0) {
+          defect.manual_release_ids.forEach(id => {
+            const archiveId = originalReleaseIdToArchiveIdMap.get(id);
+            if (archiveId) {
+              relevantReleaseIds.add(archiveId);
+            } else {
+              relevantReleaseIds.add(id);
+            }
+          });
+        }
+        
         const linkedReqs = (defect.linkedRequirements || []).map(lr => allRequirements.find(ar => ar.id === lr.groupId)).filter(Boolean);
         linkedReqs.forEach(req => {
           const sprint = req.currentStatusDetails.sprint;
@@ -456,6 +473,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
       });
     } else {
       baseItems.forEach(defect => {
+        if (defect.manual_release_ids && defect.manual_release_ids.length > 0) {
+          defect.manual_release_ids.forEach(id => relevantReleaseIds.add(id));
+        }
+        
         const linkedReqsWithDetails = (defect.linkedRequirements || []).map(lr =>
           allRequirements.find(ar => ar.id === lr.groupId)
         ).filter(Boolean);
