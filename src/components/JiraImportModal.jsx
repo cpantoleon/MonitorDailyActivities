@@ -3,13 +3,15 @@ import CustomDropdown from './CustomDropdown';
 import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
+import { useGlobal } from '../context/GlobalContext';
 
 const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleases = [], currentProject, importType, showMessage }) => {
+    const { isMultiReleaseMode } = useGlobal();
     const [step, setStep] = useState(1); // 1: Config, 2: Review Hierarchy
     const [token, setToken] = useState('');
     const [hasSavedToken, setHasSavedToken] = useState(false);
     const [selectedProject, setSelectedProject] = useState('');
-    const [selectedReleaseId, setSelectedReleaseId] = useState('');
+    const [selectedReleaseIds, setSelectedReleaseIds] = useState([]);
     
     const [targetSprint, setTargetSprint] = useState('1');
     const [isBacklog, setIsBacklog] = useState(false);
@@ -32,7 +34,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
         if (isOpen) {
             setStep(1);
             setSelectedProject(currentProject || '');
-            setSelectedReleaseId('');
+            setSelectedReleaseIds([]);
             setTargetSprint('1');
             setIsBacklog(false);
             setJqlQuery('');
@@ -119,7 +121,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
         if (!selectedProject) { showMessage("Please select a project.", "error"); return; }
         if (!jqlQuery.trim()) { showMessage("Please enter a JQL query.", "error"); return; }
 
-        if (importType === 'defects' && !selectedReleaseId && !skipWarning) {
+        if (importType === 'defects' && selectedReleaseIds.length === 0 && !skipWarning) {
             setIsReleaseWarningOpen(true);
             return;
         }
@@ -133,7 +135,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
             try {
                 const endpoint = importType === 'requirements' ? '/api/jira/import/requirements' : '/api/jira/import/defects';
                 const payload = {
-                    project: selectedProject, jql: jqlQuery, release_id: selectedReleaseId || null,
+                    project: selectedProject, jql: jqlQuery, release_ids: selectedReleaseIds,
                     sprint: sprintValue, token: token || null, saveToken: saveToken
                 };
 
@@ -198,7 +200,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
 
         try {
             const payload = {
-                project: selectedProject, sprint: sprintValue, release_id: selectedReleaseId || null, itemsToImport
+                project: selectedProject, sprint: sprintValue, release_ids: selectedReleaseIds, itemsToImport
             };
             const response = await fetch('/api/jira/import', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -281,7 +283,38 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
 
                                     <div className="form-group">
                                         <label>Assign to Release (Optional):</label>
-                                        <CustomDropdown id="jiraReleaseSelect" name="targetReleaseId" value={selectedReleaseId} onChange={(e) => setSelectedReleaseId(e.target.value)} options={releaseOptions} disabled={!selectedProject || releaseOptions.length === 0} placeholder={!selectedProject ? "-- Select a project first --" : "-- Select a Release --"} />
+                                        {isMultiReleaseMode ? (
+                                            <select
+                                                multiple
+                                                id="jiraReleaseSelect"
+                                                name="targetReleaseIds"
+                                                value={selectedReleaseIds}
+                                                onChange={(e) => {
+                                                    const values = Array.from(e.target.selectedOptions, option => option.value);
+                                                    setSelectedReleaseIds(values);
+                                                }}
+                                                disabled={!selectedProject || releaseOptions.length === 0}
+                                                className="form-control"
+                                                style={{ height: '80px', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '5px' }}
+                                            >
+                                                {releaseOptions.map(r => (
+                                                    <option key={r.value} value={r.value}>{r.label}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <CustomDropdown 
+                                                id="jiraReleaseSelect" 
+                                                name="targetReleaseId" 
+                                                value={selectedReleaseIds[0] || ''} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setSelectedReleaseIds(val ? [val] : []);
+                                                }} 
+                                                options={releaseOptions} 
+                                                disabled={!selectedProject || releaseOptions.length === 0} 
+                                                placeholder={!selectedProject ? "-- Select a project first --" : "-- Select a Release --"} 
+                                            />
+                                        )}
                                     </div>
 
                                     <div className="form-group new-project-toggle" style={{ marginTop: '20px', padding: '10px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
@@ -389,21 +422,41 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
 
                         <div className="form-group">
                             <label>Assign to Release (Optional):</label>
-                            <CustomDropdown
-                                value={selectedReleaseId}
-                                onChange={(e) => setSelectedReleaseId(e.target.value)}
-                                options={[
-                                    { value: '', label: '-- None --' },
-                                    ...releaseOptions
-                                ]}
-                                placeholder="-- Select a Release --"
-                            />
+                            {isMultiReleaseMode ? (
+                                <select
+                                    multiple
+                                    value={selectedReleaseIds}
+                                    onChange={(e) => {
+                                        const values = Array.from(e.target.selectedOptions, option => option.value);
+                                        setSelectedReleaseIds(values);
+                                    }}
+                                    className="form-control"
+                                    style={{ height: '80px', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '5px' }}
+                                >
+                                    {releaseOptions.map(r => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <CustomDropdown
+                                    value={selectedReleaseIds[0] || ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setSelectedReleaseIds(val ? [val] : []);
+                                    }}
+                                    options={[
+                                        { value: '', label: '-- None --' },
+                                        ...releaseOptions
+                                    ]}
+                                    placeholder="-- Select a Release --"
+                                />
+                            )}
                         </div>
 
                         <div className="modal-actions" style={{ marginTop: '25px', justifyContent: 'flex-end', gap: '10px' }}>
                             <button className="modal-button-cancel" onClick={() => setIsReleaseWarningOpen(false)}>Back</button>
                             <button className="btn-secondary" onClick={() => handlePrimaryAction(true)}>Import as Orphans</button>
-                            <button className="btn-primary" onClick={() => handlePrimaryAction(true)} disabled={!selectedReleaseId}>
+                            <button className="btn-primary" onClick={() => handlePrimaryAction(true)} disabled={selectedReleaseIds.length === 0}>
                                 Assign & Import
                             </button>
                         </div>

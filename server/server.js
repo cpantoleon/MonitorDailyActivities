@@ -3580,7 +3580,7 @@ app.post('/api/jira/fetch', async (req, res) => {
 
 // --- 2. IMPORT ΣΤΗ ΒΑΣΗ (ΔΕΧΕΤΑΙ ΤΗΝ ΕΠΙΛΕΓΜΕΝΗ ΛΙΣΤΑ ΑΠΟ ΤΟ UI) ---
 app.post('/api/jira/import', async (req, res) => {
-    const { project, sprint, release_id, itemsToImport } = req.body;
+    const { project, sprint, release_ids, itemsToImport } = req.body;
 
     if (!project || !itemsToImport || !Array.isArray(itemsToImport)) {
         return res.status(400).json({ error: "Project and itemsToImport are required." });
@@ -3592,6 +3592,8 @@ app.post('/api/jira/import', async (req, res) => {
         const projectId = await getProjectId(project);
         const now = new Date().toISOString();
         const statusDate = now.split('T')[0];
+        
+        const releaseIdsJson = release_ids && release_ids.length > 0 ? JSON.stringify(release_ids.map(id => parseInt(id, 10))) : '[]';
 
         let importedParents = 0;
         let importedSubtasks = 0;
@@ -3615,7 +3617,7 @@ app.post('/api/jira/import', async (req, res) => {
 
         const insertSql = `INSERT INTO activities (
             project_id, requirementUserIdentifier, key, status, statusDate, 
-            sprint, type, link, isCurrent, created_at, updated_at, release_id, parent_id
+            sprint, type, link, isCurrent, created_at, updated_at, release_ids, parent_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`;
 
         const linkDefects = async (rawIssue, reqGroupId) => {
@@ -3663,9 +3665,9 @@ app.post('/api/jira/import', async (req, res) => {
                         
                         let updateSql = `UPDATE activities SET type = ?, key = ?`;
                         let params = [parentItem.type, parentItem.key];
-                        if (release_id) {
-                            updateSql += `, release_id = ?`;
-                            params.push(release_id);
+                        if (release_ids && release_ids.length > 0) {
+                            updateSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
+                            params.push(releaseIdsJson);
                         }
                         if (sprint) {
                             updateSql += `, sprint = ?`;
@@ -3681,7 +3683,7 @@ app.post('/api/jira/import', async (req, res) => {
 
                         parentDbId = await runQuery(insertSql, [
                             projectId, parentItem.summary, parentItem.key, appStatus, statusDate,
-                            sprint, parentItem.type, parentItem.link, now, now, release_id || null, null
+                            sprint, parentItem.type, parentItem.link, now, now, releaseIdsJson, null
                         ]);
                         await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [parentDbId, parentDbId]);
                         importedParents++;
@@ -3702,9 +3704,9 @@ app.post('/api/jira/import', async (req, res) => {
                             
                             let updateSubSql = `UPDATE activities SET parent_id = ?, type = ?, key = ?`;
                             let subParams = [parentDbId, subtask.type, subtask.key];
-                            if (release_id) {
-                                updateSubSql += `, release_id = ?`;
-                                subParams.push(release_id);
+                            if (release_ids && release_ids.length > 0) {
+                                updateSubSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
+                                subParams.push(releaseIdsJson);
                             }
                             if (sprint) {
                                 updateSubSql += `, sprint = ?`;
@@ -3720,7 +3722,7 @@ app.post('/api/jira/import', async (req, res) => {
 
                             subDbId = await runQuery(insertSql, [
                                 projectId, subtask.summary, subtask.key, subStatus, statusDate,
-                                sprint, subtask.type, subtask.link, now, now, release_id || null, parentDbId
+                                sprint, subtask.type, subtask.link, now, now, releaseIdsJson, parentDbId
                             ]);
                             await runQuery(`UPDATE activities SET requirementGroupId = ? WHERE id = ?`, [subDbId, subDbId]);
                             importedSubtasks++;
@@ -3821,7 +3823,7 @@ async function fetchJiraIssues(jql, token) {
 }
 
 app.post("/api/jira/import/requirements", async (req, res) => {
-    const { project, jql, release_id, sprint } = req.body;
+    const { project, jql, release_ids, sprint } = req.body;
 
     try {
         const projectId = await getProjectId(project);
@@ -3844,6 +3846,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
 
         const now = new Date().toISOString();
         const statusDate = now.split('T')[0];
+        const releaseIdsJson = release_ids && release_ids.length > 0 ? JSON.stringify(release_ids.map(id => parseInt(id, 10))) : '[]';
 
         for (const issue of issues) {
             const key = issue.key;
@@ -3864,10 +3867,12 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                 
                 let updateReqSql = `UPDATE activities SET type = ?, key = ?`;
                 let reqParams = [type, key];
-                if (release_id) {
-                    updateReqSql += `, release_id = ?`;
-                    reqParams.push(release_id);
+                
+                if (release_ids && release_ids.length > 0) {
+                    updateReqSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
+                    reqParams.push(releaseIdsJson);
                 }
+                
                 if (sprint) {
                     updateReqSql += `, sprint = ?`;
                     reqParams.push(sprint);
@@ -3886,9 +3891,9 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                     appStatus = 'Done';
                 }
 
-                await dbRun(`INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_id, isCurrent, requirementGroupId, created_at, updated_at)
+                await dbRun(`INSERT INTO activities (project_id, requirementUserIdentifier, status, statusDate, sprint, link, type, tags, key, release_ids, isCurrent, requirementGroupId, created_at, updated_at)
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`,
-                    [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, release_id || null, now, now]);
+                    [projectId, title, appStatus, statusDate, sprint || 'Backlog', link, type, null, key, releaseIdsJson, now, now]);
 
                 const row = await dbGet("SELECT last_insert_rowid() as id");
                 reqGroupId = row.id;
@@ -3936,7 +3941,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
 });
 
 app.post("/api/jira/import/defects", async (req, res) => {
-    const { project, jql, release_id } = req.body;
+    const { project, jql, release_ids } = req.body;
     try {
         const projectId = await getProjectId(project);
 
@@ -3956,6 +3961,8 @@ app.post("/api/jira/import/defects", async (req, res) => {
         existingRows.forEach(r => { if (r.link) existingLinksMap.set(r.link, r.id); });
 
         const now = new Date().toISOString();
+
+        const manualReleasesJson = release_ids && release_ids.length > 0 ? JSON.stringify(release_ids.map(id => parseInt(id, 10))) : '[]';
 
         for (const issue of issues) {
             const type = issue.fields.issuetype.name;
@@ -4000,8 +4007,6 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 }
             }
 
-            const manualReleasesJson = release_id ? JSON.stringify([parseInt(release_id, 10)]) : '[]';
-
             // ΑΛΛΑΓΗ: Αν υπάρχει, παίρνουμε το ID. Αλλιώς κάνουμε Insert.
             if (existingLinksMap.has(link)) {
                 skipped++;
@@ -4010,14 +4015,14 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 if (appStatus === 'Done') {
                     // Αν στο Jira έκλεισε (Done/Resolved), ενημερώνουμε ΤΑ ΠΑΝΤΑ (Status και Fixed Date)
                     await dbRun(
-                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' OR manual_release_ids = '' OR manual_release_ids = 'null' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
                         [appStatus, title, now, fixedDate, manualReleasesJson, defectId]
                     );
                 } else {
                     // Αν είναι ακόμα ανοιχτό στο Jira, ΑΦΗΝΟΥΜΕ ΑΝΕΠΑΦΟ το τοπικό Status και το Fixed Date, 
                     // ανανεώνουμε ΜΟΝΟ τον τίτλο και το updated_at
                     await dbRun(
-                        `UPDATE defects SET title = ?, updated_at = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        `UPDATE defects SET title = ?, updated_at = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' OR manual_release_ids = '' OR manual_release_ids = 'null' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
                         [title, now, manualReleasesJson, defectId]
                     );
                 }
