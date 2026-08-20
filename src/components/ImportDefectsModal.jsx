@@ -5,10 +5,16 @@ import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 import GifPlayerModal from './GifPlayerModal';
 
-const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClose }) => {
+import { useGlobal } from '../context/GlobalContext';
+
+const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClose, allReleases = [] }) => {
+  const { isMultiReleaseMode } = useGlobal();
+
   const getInitialState = (project = '') => ({
     selectedFile: null,
     targetProject: project,
+    mapFixVersions: false,
+    manualReleaseIds: []
   });
 
   const [formState, setFormState] = useState(getInitialState());
@@ -16,6 +22,8 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
   const [error, setError] = useState('');
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [isGifModalOpen, setIsGifModalOpen] = useState(false);
+
+  const [isReleaseWarningOpen, setIsReleaseWarningOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -26,6 +34,7 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
       setFormState(getInitialState());
       setInitialState(null);
       setError('');
+      setIsReleaseWarningOpen(false);
     }
   }, [isOpen, currentProject]);
 
@@ -33,7 +42,9 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
     if (!initialState) return false;
     const fileChanged = formState.selectedFile?.name !== initialState.selectedFile?.name;
     const projectChanged = formState.targetProject !== initialState.targetProject;
-    return fileChanged || projectChanged;
+    const mapChanged = formState.mapFixVersions !== initialState.mapFixVersions;
+    const releaseChanged = JSON.stringify(formState.manualReleaseIds) !== JSON.stringify(initialState.manualReleaseIds);
+    return fileChanged || projectChanged || mapChanged || releaseChanged;
   }, [formState, initialState]);
 
   const handleCloseRequest = () => {
@@ -53,6 +64,11 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
     setError('');
   };
 
+  const executeImport = () => {
+    setIsReleaseWarningOpen(false);
+    onImport(formState.selectedFile, formState.targetProject, formState.mapFixVersions, formState.manualReleaseIds);
+  };
+
   const handleImport = () => {
     if (!formState.selectedFile) {
       setError('Please select a file to import.');
@@ -62,7 +78,13 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
       setError('Please select a target project.');
       return;
     }
-    onImport(formState.selectedFile, formState.targetProject);
+
+    if (formState.manualReleaseIds.length === 0) {
+      setIsReleaseWarningOpen(true);
+      return;
+    }
+
+    executeImport();
   };
 
   const handleProjectChange = (e) => {
@@ -122,6 +144,19 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
               placeholder="-- Select a Project --"
             />
           </div>
+
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <input 
+                    type="checkbox" 
+                    id="mapFixVersions" 
+                    checked={formState.mapFixVersions} 
+                    onChange={(e) => setFormState(prev => ({ ...prev, mapFixVersions: e.target.checked }))} 
+                />
+                <label htmlFor="mapFixVersions" style={{ marginBottom: 0 }}>Map Jira "Fix Version" to project releases</label>
+            </div>
+          </div>
+
           <div id="modal-actions-id" className="modal-actions">
             <button id="import-button-id" onClick={handleImport} className="btn-primary">Import</button>
             <button id="cancel-button-id" type="button" onClick={onClose} className="modal-button-cancel">Cancel</button>
@@ -143,6 +178,73 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
         onClose={() => setIsGifModalOpen(false)}
         gifSrc="/exportJira.gif"
       />
+
+      {isReleaseWarningOpen && (
+        <div className="add-new-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+            <h3 style={{ marginBottom: '15px' }}>Warning: No Release Selected</h3>
+            <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+              {formState.mapFixVersions ? (
+                <>
+                  You have chosen to map Jira "Fix Versions". However, if a defect has no Fix Version or it doesn't match an active release, it will be imported as an orphan and won't appear in the release dashboard.
+                  <br /><br />
+                  Would you like to assign a fallback release?
+                </>
+              ) : (
+                <>
+                  You are importing defects without mapping them to a release. Since they do not have linked requirements yet, they will not appear in any release dashboard.
+                  <br /><br />
+                  Would you like to assign them to an active release?
+                </>
+              )}
+            </p>
+
+            <div className="form-group">
+              <label>Assign to Release(s):</label>
+              {isMultiReleaseMode ? (
+                  <select
+                      multiple
+                      value={formState.manualReleaseIds}
+                      onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => parseInt(option.value, 10));
+                          setFormState(prev => ({ ...prev, manualReleaseIds: values }));
+                      }}
+                      style={{
+                          width: '100%', height: '90px', padding: '6px', borderRadius: '6px',
+                          border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)',
+                          color: 'var(--text-primary)', fontFamily: 'inherit'
+                      }}
+                  >
+                      {allReleases.filter(r => r.project === formState.targetProject && r.status !== 'archived' && r.status !== 'closed').map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                  </select>
+              ) : (
+                  <CustomDropdown
+                      value={formState.manualReleaseIds[0] || ''}
+                      onChange={(e) => {
+                          const val = e.target.value ? [parseInt(e.target.value, 10)] : [];
+                          setFormState(prev => ({ ...prev, manualReleaseIds: val }));
+                      }}
+                      options={[
+                          { value: '', label: '-- None --' },
+                          ...allReleases.filter(r => r.project === formState.targetProject && r.status !== 'archived' && r.status !== 'closed').map(r => ({ value: r.id, label: r.name }))
+                      ]}
+                      placeholder="-- Select a Release --"
+                  />
+              )}
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '25px', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="modal-button-cancel" onClick={() => setIsReleaseWarningOpen(false)}>Back</button>
+              <button className="btn-secondary" onClick={executeImport}>Import as Orphans</button>
+              <button className="btn-primary" onClick={executeImport} disabled={formState.manualReleaseIds.length === 0}>
+                Assign & Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

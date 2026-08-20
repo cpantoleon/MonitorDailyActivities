@@ -928,7 +928,7 @@ const SprintFilter = ({ availableSprints, selectedSprints, onChange }) => {
     );
 };
 
-const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportReleaseToExcel, onExportToPdf }) => {
+const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, allDefects = [], onNavigateToRequirement, onNavigateToDefect, onFinalize, onEdit, handleExportReleaseToExcel, onExportToPdf }) => {
     const [selectedSprints, setSelectedSprints] = useState(['All']);
     const [isDefectsCardOpen, setIsDefectsCardOpen] = useState(false);
     const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -968,10 +968,22 @@ const ActiveReleaseCardWrapper = ({ release, allProcessedRequirements, onNavigat
         return releaseRequirements.filter(r => selectedSprints.includes(r.currentStatusDetails.sprint));
     }, [releaseRequirements, selectedSprints]);
 
-    const uniqueFilteredDefects = useMemo(() =>
-        Array.from(new Map(filteredRequirements.flatMap(r => r.linkedDefects || []).map(d => [d.id, d])).values()),
-        [filteredRequirements]
-    );
+    const uniqueFilteredDefects = useMemo(() => {
+        const linkedDefectsMap = new Map(filteredRequirements.flatMap(r => r.linkedDefects || []).map(d => [d.id, d]));
+        
+        // Find orphan defects that have this release in manual_release_ids
+        allDefects.forEach(d => {
+            if (d.project === release.project && d.manual_release_ids && Array.isArray(d.manual_release_ids)) {
+                if (d.manual_release_ids.includes(release.id)) {
+                    if (!linkedDefectsMap.has(d.id)) {
+                        linkedDefectsMap.set(d.id, d);
+                    }
+                }
+            }
+        });
+        
+        return Array.from(linkedDefectsMap.values());
+    }, [filteredRequirements, allDefects, release.id, release.project]);
 
     const displayDefects = useMemo(() => {
         return uniqueFilteredDefects.filter(d => {
@@ -1452,14 +1464,30 @@ const ArchivedReleaseDetails = ({ archive, onBack, onNavigateToRequirement, onNa
 
     useEffect(() => {
         if (items.length > 0 && allProcessedRequirements.length > 0) {
-            const releaseDefects = items.flatMap(item => {
+            const releaseDefectsMap = new Map();
+            
+            items.forEach(item => {
                 const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
-                return requirement ? (requirement.linkedDefects || []) : [];
+                if (requirement && requirement.linkedDefects) {
+                    requirement.linkedDefects.forEach(d => releaseDefectsMap.set(d.id, d));
+                }
             });
-            const uniqueDefects = Array.from(new Map(releaseDefects.map(defect => [defect.id, defect])).values());
-            setDefects(uniqueDefects);
+
+            if (allDefects) {
+                allDefects.forEach(d => {
+                    if (d.project === archive.project && d.manual_release_ids && Array.isArray(d.manual_release_ids)) {
+                        if (d.manual_release_ids.includes(archive.id)) {
+                            if (!releaseDefectsMap.has(d.id)) {
+                                releaseDefectsMap.set(d.id, d);
+                            }
+                        }
+                    }
+                });
+            }
+
+            setDefects(Array.from(releaseDefectsMap.values()));
         }
-    }, [items, allProcessedRequirements]);
+    }, [items, allProcessedRequirements, allDefects, archive.id, archive.project]);
 
     const handleRequirementClick = (item) => {
         const requirement = allProcessedRequirements.find(req => req.id === item.requirement_group_id);
@@ -2173,6 +2201,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
     const [view, setView] = useState('active');
     const [activeReleases, setActiveReleases] = useState([]);
     const [archivedReleases, setArchivedReleases] = useState([]);
+    const [allDefects, setAllDefects] = useState([]); // <-- ADDED THIS
     const [isLoading, setIsLoading] = useState(false);
     const [selectedArchive, setSelectedArchive] = useState(null);
     const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
@@ -2466,15 +2495,29 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
         }
     }, [selectedProject, showMainMessage, allProcessedRequirements]);
 
+    const fetchAllDefects = useCallback(async () => {
+        if (!selectedProject) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/defects/${selectedProject}`);
+            if (!response.ok) throw new Error('Failed to fetch defects');
+            const data = await response.json();
+            setAllDefects(data.data || []);
+        } catch (error) {
+            console.error('Error fetching defects in ReleasesPage:', error);
+            setAllDefects([]);
+        }
+    }, [selectedProject]);
+
     useEffect(() => {
         if (selectedProject) {
+            fetchAllDefects();
             if (view === 'active') {
                 fetchActiveReleases();
             } else if (view === 'archived') {
                 fetchArchivedReleases();
             }
         }
-    }, [view, selectedProject, fetchActiveReleases, fetchArchivedReleases]);
+    }, [view, selectedProject, fetchActiveReleases, fetchArchivedReleases, fetchAllDefects]);
 
     const handleOpenEditModal = (release) => {
         setReleaseToEdit(release);
@@ -3430,6 +3473,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                         key={release.id}
                         release={release}
                         allProcessedRequirements={allProcessedRequirements}
+                        allDefects={allDefects}
                         onNavigateToRequirement={onNavigateToRequirement}
                         onNavigateToDefect={onNavigateToDefect}
                         onFinalize={handleOpenFinalizeModal}
@@ -3461,6 +3505,7 @@ const ReleasesPage = ({ projects, allProcessedRequirements, showMainMessage, onN
                 onNavigateToRequirement={onNavigateToRequirement}
                 onNavigateToDefect={onNavigateToDefect}
                 allProcessedRequirements={allProcessedRequirements}
+                allDefects={allDefects}
                 onAddSatReport={handleOpenSatModal}
                 onCompleteRelease={handleCompleteRelease}
                 onExportToExcel={handleExportArchivedReleaseToExcel}

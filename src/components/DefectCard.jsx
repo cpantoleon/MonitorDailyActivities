@@ -6,7 +6,7 @@ const ToggleIcon = ({ isExpanded }) => (
   </svg>
 );
 
-const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed, onUpdateFixedDate, isSelectionMode, isSelected, onToggleSelect }) => {
+const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate, onDragStart, onMoveToClosed, onUpdateFixedDate, isSelectionMode, isSelected, onToggleSelect, allReleases = [] }) => {
   
   const getLocalDateTime = (isoString) => {
     if (!isoString) return '';
@@ -183,6 +183,18 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
               <div className="card-detail-item">
                 <span className="detail-label">Link:</span>
                 <a href={defect.link} target="_blank" rel="noopener noreferrer" className="detail-value">{defect.link}</a>
+              </div>
+            )}
+
+            {(!defect.linkedRequirements || defect.linkedRequirements.length === 0) && defect.manual_release_ids && defect.manual_release_ids.length > 0 && (
+              <div className="card-detail-item">
+                <span className="detail-label">Release(s):</span>
+                <span className="detail-value">
+                  {defect.manual_release_ids
+                    .map(id => allReleases.find(r => r.id === id)?.name)
+                    .filter(Boolean)
+                    .join(', ')}
+                </span>
               </div>
             )}
 

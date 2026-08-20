@@ -737,11 +737,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     if (project) handleManualProjectSelect(project);
   }, [refreshDefectsState, handleManualProjectSelect]);
 
-  const executeDefectImport = useCallback(async (file, project, importMode = 'all') => {
+  const executeDefectImport = useCallback(async (file, project, mapFixVersions, manualReleaseIds, importMode = 'all') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project', project);
     formData.append('importMode', importMode);
+    formData.append('mapFixVersions', mapFixVersions);
+    if (manualReleaseIds && manualReleaseIds.length > 0) {
+        formData.append('manualReleaseIds', JSON.stringify(manualReleaseIds));
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/import/defects`, { method: 'POST', body: formData });
       const result = await response.json();
@@ -756,7 +761,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     }
   }, [refreshDefectsState, showMessage, handleCloseImportModal, handleManualProjectSelect]);
 
-  const handleValidateDefectImport = useCallback(async (file, project) => {
+  const handleValidateDefectImport = useCallback(async (file, project, mapFixVersions, manualReleaseIds) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project', project);
@@ -773,10 +778,10 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
         return;
       }
       if (duplicateCount > 0) {
-        setImportConfirmData({ file, project, ...result.data });
+        setImportConfirmData({ file, project, mapFixVersions, manualReleaseIds, ...result.data });
         setIsImportConfirmModalOpen(true);
       } else {
-        executeDefectImport(file, project);
+        executeDefectImport(file, project, mapFixVersions, manualReleaseIds);
       }
     } catch (error) {
       showMessage(`Validation Error: ${error.message}`, 'error');
@@ -786,16 +791,16 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
 
   const handleConfirmImportAll = () => {
     if (!importConfirmData) return;
-    const { file, project } = importConfirmData;
-    executeDefectImport(file, project, 'all');
+    const { file, project, mapFixVersions, manualReleaseIds } = importConfirmData;
+    executeDefectImport(file, project, mapFixVersions, manualReleaseIds, 'all');
     setIsImportConfirmModalOpen(false);
     setImportConfirmData(null);
   };
 
   const handleConfirmImportNewOnly = () => {
     if (!importConfirmData) return;
-    const { file, project } = importConfirmData;
-    executeDefectImport(file, project, 'new_only');
+    const { file, project, mapFixVersions, manualReleaseIds } = importConfirmData;
+    executeDefectImport(file, project, mapFixVersions, manualReleaseIds, 'new_only');
     setIsImportConfirmModalOpen(false);
     setImportConfirmData(null);
   };
@@ -1078,6 +1083,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
             isSelectionMode={isSelectionMode}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
+            allReleases={allReleases}
           />
         </div>
       );
@@ -1093,6 +1099,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
             onShowHistory={handleShowHistory}
             onDeleteRequest={handleDeleteRequest}
             onNavigate={handleNavigateToRequirement}
+            allReleases={allReleases}
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onMoveToClosed={handleMoveToClosed}
@@ -1256,8 +1263,8 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
       {defectForHistory && <DefectHistoryModal isOpen={isHistoryModalOpen} onClose={() => { setIsHistoryModalOpen(false); setDefectForHistory(null); setDefectHistory([]); }} defect={defectForHistory} history={defectHistory} onSaveComment={handleUpdateHistoryComment} />}
       <ConfirmationModal isOpen={isDeleteConfirmModalOpen} onClose={() => setIsDeleteConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Confirm Defect Deletion" message={`Are you sure you want to permanently delete the defect "${defectToDelete?.title}"? This action cannot be undone.`} />
       <ConfirmationModal isOpen={isMoveToClosedConfirmModalOpen} onClose={handleCancelMoveToClosed} onConfirm={handleConfirmMoveToClosed} title="Confirm Move to Closed" message={`The defect "${defectToMove?.title}" has not been completed. Are you sure you want to move it to closed?`} confirmText="Yes, Move to Closed" cancelText="No, Keep it Active" />
-      <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} />
-      <JiraImportModal isOpen={isJiraImportModalOpen} onClose={handleCloseJiraImportModal} onImportSuccess={handleJiraImportSuccess} projects={projects || []} releases={projectReleases} currentProject={selectedProject} importType="defects" showMessage={showMessage} />
+      <ImportDefectsModal isOpen={isImportDefectsModalOpen} onClose={handleCloseImportModal} onImport={handleValidateDefectImport} projects={projects || []} currentProject={selectedProject} allReleases={allReleases} />
+      <JiraImportModal isOpen={isJiraImportModalOpen} onClose={handleCloseJiraImportModal} onImportSuccess={handleJiraImportSuccess} projects={projects || []} allReleases={allReleases} currentProject={selectedProject} importType="defects" showMessage={showMessage} />
 
       {isImportConfirmModalOpen && importConfirmData && (
         <div className="confirmation-modal-overlay" onClick={() => setIsImportConfirmModalOpen(false)}>

@@ -26,7 +26,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     linkedReqReleaseMap: {}, // <-- ADDED: Maps reqId -> array of releaseIds
     is_fat_defect: false,
     real_time: '',
-    real_time_unit: 'h'
+    real_time_unit: 'h',
+    manual_release_ids: []
   });
 
   const [formData, setFormData] = useState(getInitialFormState(currentSelectedProject));
@@ -79,7 +80,8 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
           linkedReqReleaseMap: initialMap, // <-- ADDED
           is_fat_defect: defect.is_fat_defect || false,
           real_time: initRTime.val,
-          real_time_unit: initRTime.unit
+          real_time_unit: initRTime.unit,
+          manual_release_ids: defect.manual_release_ids || []
         };
       } else {
         const initialProject = currentSelectedProject || '';
@@ -291,6 +293,13 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
     });
   };
 
+  const releaseOptions = useMemo(() => {
+    if (!formData.project) return [];
+    return allReleases
+      .filter(r => r.project === formData.project && r.status !== 'archived' && r.status !== 'closed')
+      .map(r => ({ value: r.id, label: r.name }));
+  }, [allReleases, formData.project]);
+
   if (!isOpen) return null;
 
   const projectOptions = projects.map(p => ({ value: p, label: p }));
@@ -466,6 +475,57 @@ const DefectModal = ({ isOpen, onClose, onSubmit, defect, projects, currentSelec
                   autoComplete="off"
                 />
               </div>
+
+              {formData.linkedRequirementGroupIds.length === 0 && (
+                <div id="form-group-release-id" className="form-group">
+                  <label id="newReqRelease-label" htmlFor="newReqRelease" className="optional-label" style={{ marginBottom: 0 }}>Release(s):</label>
+                  {isMultiReleaseMode ? (
+                    <>
+                      <select
+                        multiple
+                        id="newReqRelease"
+                        name="manual_release_ids"
+                        value={formData.manual_release_ids || []}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => parseInt(option.value, 10));
+                          setFormData(prev => ({ ...prev, manual_release_ids: values }));
+                        }}
+                        disabled={!formData.project || releaseOptions.length === 0}
+                        style={{
+                          width: '100%', height: '90px', padding: '6px', borderRadius: '6px',
+                          border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)',
+                          color: 'var(--text-primary)', fontFamily: 'inherit'
+                        }}
+                      >
+                        {releaseOptions.map(opt => <option key={opt.value} value={opt.value} style={{ padding: '5px' }}>{opt.label}</option>)}
+                      </select>
+                      <small style={{ display: 'block', marginTop: '5px', color: 'var(--text-secondary)', fontSize: '0.85em' }}>Hold Ctrl/Cmd to select multiple releases.</small>
+                    </>
+                  ) : (
+                    <CustomDropdown
+                      id="newReqReleaseSingle"
+                      name="manual_release_ids"
+                      value={formData.manual_release_ids?.[0] || ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? [parseInt(e.target.value, 10)] : [];
+                        setFormData(prev => ({ ...prev, manual_release_ids: val }));
+                      }}
+                      options={[{ value: '', label: '-- None --' }, ...releaseOptions]}
+                      placeholder="-- Select a Release --"
+                      disabled={!formData.project || releaseOptions.length === 0}
+                    />
+                  )}
+                </div>
+              )}
+
+              {formData.linkedRequirementGroupIds.length > 0 && (
+                <div id="form-group-release-inherited-id" className="form-group">
+                  <label className="optional-label">Release(s):</label>
+                  <div style={{ padding: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', color: 'var(--text-secondary)' }}>
+                    Inherited from linked requirements.
+                  </div>
+                </div>
+              )}
 
               <div id="form-group-linked-requirements-id" className="form-group">
                 <fieldset id="linked-requirements-fieldset-id" style={{ border: 'none', padding: 0, margin: 0 }}>

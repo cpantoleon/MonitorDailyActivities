@@ -4,7 +4,7 @@ import Tooltip from './Tooltip';
 import useClickOutside from '../hooks/useClickOutside';
 import ConfirmationModal from './ConfirmationModal';
 
-const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases, currentProject, importType, showMessage }) => {
+const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleases = [], currentProject, importType, showMessage }) => {
     const [step, setStep] = useState(1); // 1: Config, 2: Review Hierarchy
     const [token, setToken] = useState('');
     const [hasSavedToken, setHasSavedToken] = useState(false);
@@ -83,13 +83,13 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
 
     const releaseOptions = useMemo(() => {
         if (!selectedProject) return [];
-        return releases
+        return allReleases
             .filter(r => r.project === selectedProject && r.status === 'active')
             .map(r => ({
                 value: r.id,
                 label: `${r.name} ${r.is_current ? '(Current)' : ''}`
             }));
-    }, [selectedProject, releases]);
+    }, [selectedProject, allReleases]);
 
     const sprintNumberOptions = useMemo(() => {
         return Array.from({ length: 20 }, (_, i) => ({
@@ -112,11 +112,19 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
 
     const modalRef = useClickOutside(handleCloseRequest);
 
+    const [isReleaseWarningOpen, setIsReleaseWarningOpen] = useState(false);
+
     // --- ACTION: FETCH OR DIRECT IMPORT ---
-    const handlePrimaryAction = async () => {
+    const handlePrimaryAction = async (skipWarning = false) => {
         if (!selectedProject) { showMessage("Please select a project.", "error"); return; }
         if (!jqlQuery.trim()) { showMessage("Please enter a JQL query.", "error"); return; }
 
+        if (importType === 'defects' && !selectedReleaseId && !skipWarning) {
+            setIsReleaseWarningOpen(true);
+            return;
+        }
+
+        setIsReleaseWarningOpen(false);
         setIsLoading(true);
         const sprintValue = isBacklog ? 'Backlog' : `Sprint ${targetSprint}`;
 
@@ -294,7 +302,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                             </div>
 
                             <div className="modal-actions">
-                                <button onClick={handlePrimaryAction} className="modal-button-save" disabled={isLoading}>
+                                <button onClick={() => handlePrimaryAction(false)} className="modal-button-save" disabled={isLoading}>
                                     {isLoading ? 'Processing...' : (includeSubtasks && importType === 'requirements' ? 'Fetch & Review' : 'Import Directly')}
                                 </button>
                                 <button onClick={onClose} className="modal-button-cancel" disabled={isLoading}>Cancel</button>
@@ -369,6 +377,39 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, releases,
                 title="Unsaved Changes"
                 message="You have entered data. Are you sure you want to close?"
             />
+            {isReleaseWarningOpen && (
+                <div className="add-new-modal-overlay" style={{ zIndex: 1100 }}>
+                    <div className="add-new-modal-content" style={{ maxWidth: '500px' }}>
+                        <h3 style={{ marginBottom: '15px' }}>Warning: No Release Selected</h3>
+                        <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+                            You are importing defects without mapping them to a release. Since they do not have linked requirements yet, they will not appear in any release dashboard.
+                            <br /><br />
+                            Would you like to assign them to an active release?
+                        </p>
+
+                        <div className="form-group">
+                            <label>Assign to Release (Optional):</label>
+                            <CustomDropdown
+                                value={selectedReleaseId}
+                                onChange={(e) => setSelectedReleaseId(e.target.value)}
+                                options={[
+                                    { value: '', label: '-- None --' },
+                                    ...releaseOptions
+                                ]}
+                                placeholder="-- Select a Release --"
+                            />
+                        </div>
+
+                        <div className="modal-actions" style={{ marginTop: '25px', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button className="modal-button-cancel" onClick={() => setIsReleaseWarningOpen(false)}>Back</button>
+                            <button className="btn-secondary" onClick={() => handlePrimaryAction(true)}>Import as Orphans</button>
+                            <button className="btn-primary" onClick={() => handlePrimaryAction(true)} disabled={!selectedReleaseId}>
+                                Assign & Import
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

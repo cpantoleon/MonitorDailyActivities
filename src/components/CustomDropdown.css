@@ -74,7 +74,7 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: var(--card-shadow);
-  z-index: 1080;
+  z-index: 1150;
   list-style: none;
   padding: 6px;
   margin: 0;

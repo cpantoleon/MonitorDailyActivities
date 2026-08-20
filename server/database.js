@@ -176,7 +176,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (err) console.error("Error creating sat_bugs table", err.message);
             });
 
-            // UPDATED: Added is_fat_defect, fixed_date, is_expanded, display_order, real_time
+            // UPDATED: Added is_fat_defect, fixed_date, is_expanded, display_order, real_time, manual_release_ids
             db.run(`CREATE TABLE IF NOT EXISTS defects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
@@ -191,6 +191,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 is_expanded INTEGER DEFAULT 1,
                 display_order INTEGER DEFAULT 0,
                 real_time REAL DEFAULT NULL,
+                manual_release_ids TEXT DEFAULT '[]',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -383,6 +384,9 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
 
                     const hasRealTimeColumn = columns.some(col => col.name === 'real_time');
                     if (!hasRealTimeColumn) db.run("ALTER TABLE defects ADD COLUMN real_time REAL DEFAULT NULL");
+
+                    const hasManualReleaseIds = columns.some(col => col.name === 'manual_release_ids');
+                    if (!hasManualReleaseIds) db.run("ALTER TABLE defects ADD COLUMN manual_release_ids TEXT DEFAULT '[]'");
                 }
             });
 

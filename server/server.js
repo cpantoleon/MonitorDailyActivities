@@ -441,6 +441,7 @@ const processDefectExcelData = (fileBuffer) => {
 
         const links = row['Links'] ? String(row['Links']).trim() : null;
         const status = row['Status'] ? String(row['Status']).trim() : null;
+        const fixVersions = row['Fix Version/s'] ? String(row['Fix Version/s']).trim() : null;
 
         let createdDate = null;
         const createdRaw = row['Created'];
@@ -455,7 +456,7 @@ const processDefectExcelData = (fileBuffer) => {
             }
         }
 
-        results.validRows.push({ title, link, links, createdDate, status });
+        results.validRows.push({ title, link, links, createdDate, status, fixVersions });
     });
 
     return results;
@@ -1170,7 +1171,7 @@ app.post('/api/import/defects/validate', upload.single('file'), async (req, res)
 });
 
 app.post('/api/import/defects', upload.single('file'), async (req, res) => {
-    const { project, importMode } = req.body;
+    const { project, importMode, manualReleaseIds, mapFixVersions } = req.body;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
     if (!project) return res.status(400).json({ error: 'Project is required.' });
 
@@ -1178,6 +1179,15 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
         const projectId = await getProjectId(project);
         const { validRows, skippedCount } = processDefectExcelData(req.file.buffer);
         const now = new Date().toISOString();
+
+        // Fetch project releases for Fix Version mapping
+        const releasesSql = `SELECT id, name FROM releases WHERE project_id = ? AND status != 'archived'`;
+        const projectReleases = await new Promise((resolve, reject) => {
+            db.all(releasesSql, [projectId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
 
         const getExistingDataSql = `SELECT link, title FROM defects WHERE project_id = ?`;
         db.all(getExistingDataSql, [projectId], (err, existingRows) => {
@@ -1217,7 +1227,7 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
 
             db.serialize(() => {
                 db.run("BEGIN TRANSACTION");
-                const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date, is_fat_defect, created_at, updated_at, fixed_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, created_date, is_fat_defect, created_at, updated_at, fixed_date, manual_release_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 const insertHistorySql = `INSERT INTO defect_history (defect_id, changes_summary, comment, changed_at) VALUES (?, ?, ?, ?)`;
 
                 let completedInserts = 0;
@@ -1237,8 +1247,22 @@ app.post('/api/import/defects', upload.single('file'), async (req, res) => {
                     }
 
                     const createdDateToUse = item.createdDate || now;
+                    
+                    let finalReleaseIds = [];
+                    if (manualReleaseIds) {
+                        try {
+                            finalReleaseIds = JSON.parse(manualReleaseIds);
+                        } catch (e) { }
+                    } else if (mapFixVersions === 'true' && item.fixVersions) {
+                        const matchedReleases = projectReleases.filter(pr => 
+                            item.fixVersions.toLowerCase().includes(pr.name.toLowerCase())
+                        );
+                        if (matchedReleases.length > 0) {
+                            finalReleaseIds = matchedReleases.map(mr => mr.id);
+                        }
+                    }
 
-                    db.run(insertDefectSql, [projectId, item.title, null, defaultArea, defaultStatus, item.link, createdDateToUse, 0, createdDateToUse, now, fixedDate], function (err) {
+                    db.run(insertDefectSql, [projectId, item.title, null, defaultArea, defaultStatus, item.link, createdDateToUse, 0, createdDateToUse, now, fixedDate, JSON.stringify(finalReleaseIds)], function (err) {
                         if (err) {
                             console.error("Error inserting imported defect:", err.message);
                         } else {
@@ -2897,6 +2921,7 @@ app.get("/api/defects/all", (req, res) => {
 
         const defectsWithLinks = defectRows.map(defect => ({
             ...defect,
+            manual_release_ids: defect.manual_release_ids ? JSON.parse(defect.manual_release_ids) : [],
             lastComment: defect.last_comment,
             linkedRequirements: linksMap.get(defect.id) || []
         }));
@@ -2995,6 +3020,7 @@ app.get("/api/defects/:project", async (req, res) => {
             const defectsWithLinks = defectRows.map(defect => ({
                 ...defect,
                 project: project,
+                manual_release_ids: defect.manual_release_ids ? JSON.parse(defect.manual_release_ids) : [],
                 lastComment: defect.last_comment,
                 linkedRequirements: linksMap.get(defect.id) || []
             }));
@@ -3078,7 +3104,7 @@ app.put("/api/defects/history/:historyId", (req, res) => {
 });
 
 app.post("/api/defects", async (req, res) => {
-    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, real_time } = req.body;
+    let { project, title, description, area, status, link, created_date, comment, linkedRequirementGroupIds, is_fat_defect, real_time, manual_release_ids } = req.body;
     if (!project || !title || !area || !status || !created_date) {
         return res.status(400).json({ error: "Missing required fields" });
     }
@@ -3093,6 +3119,13 @@ app.post("/api/defects", async (req, res) => {
         description = description ? description.trim() : null;
         comment = comment ? comment.trim() : null;
         const isFatDefect = is_fat_defect ? 1 : 0;
+        
+        let finalManualReleaseIds = '[]';
+        if (linkedRequirementGroupIds && linkedRequirementGroupIds.length > 0) {
+            finalManualReleaseIds = '[]'; // clear if reqs exist
+        } else if (manual_release_ids) {
+            finalManualReleaseIds = JSON.stringify(manual_release_ids);
+        }
 
         const settingRow = await dbGet("SELECT value FROM app_settings WHERE key = 'default_card_expanded'");
         const defaultExpanded = settingRow && settingRow.value === '0' ? 0 : 1;
@@ -3103,9 +3136,9 @@ app.post("/api/defects", async (req, res) => {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
 
-            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded, real_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+            const insertDefectSql = `INSERT INTO defects (project_id, title, description, area, status, link, is_fat_defect, created_date, created_at, updated_at, display_order, is_expanded, real_time, manual_release_ids) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
-            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded, real_time || null];
+            const defectParams = [projectId, title, description, area, status, link, isFatDefect, createdAtTimestamp, createdAtTimestamp, createdAtTimestamp, finalDisplayOrder, defaultExpanded, real_time || null, finalManualReleaseIds];
 
             db.run(insertDefectSql, defectParams, function (err) {
                 if (err) {
@@ -3252,6 +3285,25 @@ app.put("/api/defects/:id", async (req, res) => {
             updates.push(`is_fat_defect = ?`);
             updateParamsList.push(is_fat_defect ? 1 : 0);
             changedFieldsForSummary['is_fat_defect'] = { old: currentDefect.is_fat_defect, new: is_fat_defect ? 1 : 0 };
+        }
+
+        const { manual_release_ids } = req.body;
+        if (manual_release_ids !== undefined || linkedRequirementGroupIds !== undefined) {
+            // Determine final manual_release_ids based on requirements
+            const currentReqs = linkedRequirementGroupIds !== undefined ? linkedRequirementGroupIds : currentLinks;
+            
+            let finalManualReleaseIds = currentDefect.manual_release_ids;
+            if (currentReqs && currentReqs.length > 0) {
+                finalManualReleaseIds = '[]';
+            } else if (manual_release_ids !== undefined) {
+                finalManualReleaseIds = JSON.stringify(manual_release_ids);
+            }
+            
+            if (finalManualReleaseIds !== currentDefect.manual_release_ids) {
+                updates.push(`manual_release_ids = ?`);
+                updateParamsList.push(finalManualReleaseIds);
+                changedFieldsForSummary['manual_release_ids'] = { old: currentDefect.manual_release_ids, new: finalManualReleaseIds };
+            }
         }
 
         const hasFieldChanges = Object.keys(changedFieldsForSummary).length > 0;
@@ -3884,7 +3936,7 @@ app.post("/api/jira/import/requirements", async (req, res) => {
 });
 
 app.post("/api/jira/import/defects", async (req, res) => {
-    const { project, jql } = req.body;
+    const { project, jql, release_id } = req.body;
     try {
         const projectId = await getProjectId(project);
 
@@ -3948,6 +4000,8 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 }
             }
 
+            const manualReleasesJson = release_id ? JSON.stringify([parseInt(release_id, 10)]) : '[]';
+
             // ΑΛΛΑΓΗ: Αν υπάρχει, παίρνουμε το ID. Αλλιώς κάνουμε Insert.
             if (existingLinksMap.has(link)) {
                 skipped++;
@@ -3956,24 +4010,24 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 if (appStatus === 'Done') {
                     // Αν στο Jira έκλεισε (Done/Resolved), ενημερώνουμε ΤΑ ΠΑΝΤΑ (Status και Fixed Date)
                     await dbRun(
-                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ? WHERE id = ? AND status != 'Closed'`,
-                        [appStatus, title, now, fixedDate, defectId]
+                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        [appStatus, title, now, fixedDate, manualReleasesJson, defectId]
                     );
                 } else {
                     // Αν είναι ακόμα ανοιχτό στο Jira, ΑΦΗΝΟΥΜΕ ΑΝΕΠΑΦΟ το τοπικό Status και το Fixed Date, 
                     // ανανεώνουμε ΜΟΝΟ τον τίτλο και το updated_at
                     await dbRun(
-                        `UPDATE defects SET title = ?, updated_at = ? WHERE id = ? AND status != 'Closed'`,
-                        [title, now, defectId]
+                        `UPDATE defects SET title = ?, updated_at = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        [title, now, manualReleasesJson, defectId]
                     );
                 }
             } else {
                 const description = null;
 
                 // Κάνουμε INSERT βάζοντας σωστό created_date από το Jira και fixed_date
-                await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at, fixed_date) 
-                             VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?, ?)`,
-                    [projectId, title, description, appStatus, link, issueCreatedDate, now, now, fixedDate]);
+                await dbRun(`INSERT INTO defects (project_id, title, description, area, status, link, created_date, created_at, updated_at, fixed_date, manual_release_ids) 
+                             VALUES (?, ?, ?, 'Imported', ?, ?, ?, ?, ?, ?, ?)`,
+                    [projectId, title, description, appStatus, link, issueCreatedDate, now, now, fixedDate, manualReleasesJson]);
 
                 const row = await dbGet("SELECT last_insert_rowid() as id");
                 defectId = row.id;
