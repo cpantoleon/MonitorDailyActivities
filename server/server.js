@@ -3663,12 +3663,8 @@ app.post('/api/jira/import', async (req, res) => {
                         skipped++;
                         parentDbId = existingLinksMap.get(parentItem.link);
                         
-                        let updateSql = `UPDATE activities SET type = ?, key = ?`;
-                        let params = [parentItem.type, parentItem.key];
-                        if (release_ids && release_ids.length > 0) {
-                            updateSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
-                            params.push(releaseIdsJson);
-                        }
+                        let updateSql = `UPDATE activities SET type = ?, key = ?, release_ids = ?`;
+                        let params = [parentItem.type, parentItem.key, releaseIdsJson];
                         if (sprint) {
                             updateSql += `, sprint = ?`;
                             params.push(sprint);
@@ -3702,12 +3698,8 @@ app.post('/api/jira/import', async (req, res) => {
                             skipped++;
                             subDbId = existingLinksMap.get(subtask.link);
                             
-                            let updateSubSql = `UPDATE activities SET parent_id = ?, type = ?, key = ?`;
-                            let subParams = [parentDbId, subtask.type, subtask.key];
-                            if (release_ids && release_ids.length > 0) {
-                                updateSubSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
-                                subParams.push(releaseIdsJson);
-                            }
+                            let updateSubSql = `UPDATE activities SET parent_id = ?, type = ?, key = ?, release_ids = ?`;
+                            let subParams = [parentDbId, subtask.type, subtask.key, releaseIdsJson];
                             if (sprint) {
                                 updateSubSql += `, sprint = ?`;
                                 subParams.push(sprint);
@@ -3865,13 +3857,9 @@ app.post("/api/jira/import/requirements", async (req, res) => {
                 skipped++;
                 reqGroupId = existingLinksMap.get(link);
                 
-                let updateReqSql = `UPDATE activities SET type = ?, key = ?`;
-                let reqParams = [type, key];
-                
-                if (release_ids && release_ids.length > 0) {
-                    updateReqSql += `, release_ids = CASE WHEN release_ids IS NULL OR release_ids = '[]' THEN ? ELSE release_ids END`;
-                    reqParams.push(releaseIdsJson);
-                }
+                let updateReqSql = `UPDATE activities SET type = ?, key = ?, release_ids = ?`;
+                let reqParams = [type, key, releaseIdsJson];
+
                 
                 if (sprint) {
                     updateReqSql += `, sprint = ?`;
@@ -4015,14 +4003,14 @@ app.post("/api/jira/import/defects", async (req, res) => {
                 if (appStatus === 'Done') {
                     // Αν στο Jira έκλεισε (Done/Resolved), ενημερώνουμε ΤΑ ΠΑΝΤΑ (Status και Fixed Date)
                     await dbRun(
-                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' OR manual_release_ids = '' OR manual_release_ids = 'null' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        `UPDATE defects SET status = ?, title = ?, updated_at = ?, fixed_date = ?, manual_release_ids = ? WHERE id = ? AND status != 'Closed'`,
                         [appStatus, title, now, fixedDate, manualReleasesJson, defectId]
                     );
                 } else {
                     // Αν είναι ακόμα ανοιχτό στο Jira, ΑΦΗΝΟΥΜΕ ΑΝΕΠΑΦΟ το τοπικό Status και το Fixed Date, 
                     // ανανεώνουμε ΜΟΝΟ τον τίτλο και το updated_at
                     await dbRun(
-                        `UPDATE defects SET title = ?, updated_at = ?, manual_release_ids = CASE WHEN manual_release_ids IS NULL OR manual_release_ids = '[]' OR manual_release_ids = '' OR manual_release_ids = 'null' THEN ? ELSE manual_release_ids END WHERE id = ? AND status != 'Closed'`,
+                        `UPDATE defects SET title = ?, updated_at = ?, manual_release_ids = ? WHERE id = ? AND status != 'Closed'`,
                         [title, now, manualReleasesJson, defectId]
                     );
                 }
