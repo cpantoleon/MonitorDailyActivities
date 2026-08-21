@@ -467,7 +467,7 @@ const SprintActivitiesPage = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '8px' }}>
-            <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject || !selectedSprint}>
+            <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }} className="btn-primary" style={{ backgroundColor: isSelectionMode ? 'var(--accent-color)' : 'var(--bg-tertiary)', color: isSelectionMode ? 'white' : 'var(--text-primary)' }} disabled={!selectedProject || (!selectedSprint && !selectedReleaseMenu)}>
               {isSelectionMode ? 'Cancel Selection' : 'Select Mode'}
             </button>
           </div>
