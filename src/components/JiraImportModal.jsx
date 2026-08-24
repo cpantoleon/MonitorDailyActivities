@@ -121,11 +121,6 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
         if (!selectedProject) { showMessage("Please select a project.", "error"); return; }
         if (!jqlQuery.trim()) { showMessage("Please enter a JQL query.", "error"); return; }
 
-        if (importType === 'defects' && selectedReleaseIds.length === 0 && !skipWarning) {
-            setIsReleaseWarningOpen(true);
-            return;
-        }
-
         setIsReleaseWarningOpen(false);
         setIsLoading(true);
         const sprintValue = isBacklog ? 'Backlog' : `Sprint ${targetSprint}`;
@@ -136,7 +131,8 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
                 const endpoint = importType === 'requirements' ? '/api/jira/import/requirements' : '/api/jira/import/defects';
                 const payload = {
                     project: selectedProject, jql: jqlQuery, release_ids: selectedReleaseIds,
-                    sprint: sprintValue, token: token || null, saveToken: saveToken
+                    sprint: sprintValue, token: token || null, saveToken: saveToken,
+                    force_import: skipWarning
                 };
 
                 const response = await fetch(endpoint, {
@@ -144,6 +140,12 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || "Import failed");
+
+                if (result.warning) {
+                    setIsLoading(false);
+                    setIsReleaseWarningOpen(true);
+                    return;
+                }
 
                 showMessage(result.message, "success");
                 onImportSuccess(selectedProject, sprintValue);
@@ -415,7 +417,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
                     <div className="add-new-modal-content" style={{ maxWidth: '500px' }}>
                         <h3 style={{ marginBottom: '15px' }}>Warning: No Release Selected</h3>
                         <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
-                            You are importing defects without mapping them to a release. Since they do not have linked requirements yet, they will not appear in any release dashboard.
+                            You are importing defects without mapping them to a release. If they do not have a related requirement already in the system, they will be imported as orphans and will not appear in any release dashboard.
                             <br /><br />
                             Would you like to assign them to an active release?
                         </p>
@@ -455,7 +457,7 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
 
                         <div className="modal-actions" style={{ marginTop: '25px', justifyContent: 'flex-end', gap: '10px' }}>
                             <button className="modal-button-cancel" onClick={() => setIsReleaseWarningOpen(false)}>Back</button>
-                            <button className="btn-secondary" onClick={() => handlePrimaryAction(true)}>Import as Orphans</button>
+                            <button className="btn-secondary" onClick={() => handlePrimaryAction(true)}>Continue without Release</button>
                             <button className="btn-primary" onClick={() => handlePrimaryAction(true)} disabled={selectedReleaseIds.length === 0}>
                                 Assign & Import
                             </button>

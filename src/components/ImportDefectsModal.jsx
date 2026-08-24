@@ -186,13 +186,13 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
             <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
               {formState.mapFixVersions ? (
                 <>
-                  You have chosen to map Jira "Fix Versions". However, if a defect has no Fix Version or it doesn't match an active release, it will be imported as an orphan and won't appear in the release dashboard.
+                  You have chosen to map Jira "Fix Versions". However, if a defect has no Fix Version or it doesn't match an active release, it will be imported as an orphan (unless it already has a linked requirement) and won't appear in the release dashboard.
                   <br /><br />
                   Would you like to assign a fallback release?
                 </>
               ) : (
                 <>
-                  You are importing defects without mapping them to a release. Since they do not have linked requirements yet, they will not appear in any release dashboard.
+                  You are importing defects without mapping them to a release. If they do not have a related requirement already in the system, they will be imported as orphans and will not appear in any release dashboard.
                   <br /><br />
                   Would you like to assign them to an active release?
                 </>
@@ -237,7 +237,7 @@ const ImportDefectsModal = ({ isOpen, onImport, projects, currentProject, onClos
 
             <div className="modal-actions" style={{ marginTop: '25px', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="modal-button-cancel" onClick={() => setIsReleaseWarningOpen(false)}>Back</button>
-              <button className="btn-secondary" onClick={executeImport}>Import as Orphans</button>
+              <button className="btn-secondary" onClick={executeImport}>Continue without Release</button>
               <button className="btn-primary" onClick={executeImport} disabled={formState.manualReleaseIds.length === 0}>
                 Assign & Import
               </button>

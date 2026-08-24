@@ -3940,6 +3940,48 @@ app.post("/api/jira/import/defects", async (req, res) => {
         await dbRun("INSERT INTO jira_project_configs (project_id, jql_query) VALUES (?, ?) ON CONFLICT(project_id) DO UPDATE SET jql_query = excluded.jql_query", [projectId, jql]);
 
         const issues = await fetchJiraIssues(jql, token);
+        
+        // --- DRY RUN FOR ORPHANS WARNING ---
+        if ((!release_ids || release_ids.length === 0) && !req.body.force_import) {
+            let orphanCount = 0;
+            for (const issue of issues) {
+                if (issue.fields.issuetype.name !== 'Defect') continue;
+
+                const linkedKeys = [];
+                if (issue.fields.issuelinks && issue.fields.issuelinks.length > 0) {
+                    issue.fields.issuelinks.forEach(linkObj => {
+                        if (linkObj.outwardIssue && linkObj.outwardIssue.key) linkedKeys.push(linkObj.outwardIssue.key);
+                        if (linkObj.inwardIssue && linkObj.inwardIssue.key) linkedKeys.push(linkObj.inwardIssue.key);
+                    });
+                }
+                let hasLinkInDb = false;
+                if (linkedKeys.length > 0) {
+                    const validKeys = linkedKeys.filter(Boolean);
+                    if (validKeys.length > 0) {
+                        const likeConditions = validKeys.map(() => "link LIKE ?").join(" OR ");
+                        const likeParams = validKeys.map(k => `%${k}`);
+                        const findReqsSql = `SELECT requirementGroupId FROM activities WHERE isCurrent = 1 AND project_id = ? AND (${likeConditions}) LIMIT 1`;
+                        const matchedReqs = await dbAll(findReqsSql, [projectId, ...likeParams]);
+                        if (matchedReqs && matchedReqs.length > 0) {
+                            hasLinkInDb = true;
+                        }
+                    }
+                }
+                
+                if (!hasLinkInDb) {
+                    orphanCount++;
+                }
+            }
+
+            if (orphanCount > 0) {
+                return res.status(200).json({ 
+                    warning: true, 
+                    orphanCount, 
+                    message: `Found ${orphanCount} defect(s) without related requirements.` 
+                });
+            }
+        }
+
         let imported = 0;
         let skipped = 0;
 
