@@ -154,8 +154,8 @@ const KanbanCard = React.memo(({
       id={`req-card-${requirement.id}`}
       data-id={requirement.id}
       className={`kanban-card ${focusClass} ${isSubtask ? 'is-subtask-card' : ''} ${isSelected ? 'selected' : ''}`}
-      draggable={!isSelectionMode}
-      onDragStart={(e) => !isSelectionMode && handleDragStartLocal(e, requirement)}
+      draggable={true}
+      onDragStart={(e) => handleDragStartLocal(e, requirement)}
       onDragEnd={handleDragEnd}
       onClick={() => isSelectionMode && onToggleSelect && onToggleSelect(requirement.id)}
       style={{ position: 'relative', cursor: isSelectionMode ? 'pointer' : 'default', border: isSelected ? '2px solid var(--accent-color)' : '' }}

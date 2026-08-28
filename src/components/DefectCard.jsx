@@ -87,8 +87,8 @@ const DefectCard = ({ defect, onEdit, onShowHistory, onDeleteRequest, onNavigate
     <div 
       id={`defect-card-${defect.id}`}
       className={`defect-card kanban-card ${isSelected ? 'selected' : ''}`}
-      draggable={!isSelectionMode && isDraggable}
-      onDragStart={(e) => !isSelectionMode && handleDragStartLocal(e, defect)}
+      draggable={isDraggable}
+      onDragStart={(e) => handleDragStartLocal(e, defect)}
       onDragEnd={handleDragEnd}
       onClick={() => isSelectionMode && onToggleSelect && onToggleSelect(defect.id)}
       style={{ cursor: isSelectionMode ? 'pointer' : (isDraggable ? 'grab' : 'default'), position: 'relative', border: isSelected ? '2px solid var(--accent-color)' : '' }}

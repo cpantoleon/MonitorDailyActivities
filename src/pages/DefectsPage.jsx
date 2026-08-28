@@ -99,7 +99,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
   const [searchResults, setSearchResults] = useState([]);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
-  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ defect: null, newStatus: '' });
+  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ defects: [], newStatus: '' });
   const [isImportDefectsModalOpen, setIsImportDefectsModalOpen] = useState(false);
   const [isJiraImportModalOpen, setIsJiraImportModalOpen] = useState(false);
   const [isImportConfirmModalOpen, setIsImportConfirmModalOpen] = useState(false);
@@ -881,36 +881,40 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     }
   };
 
-  const handleStatusUpdateRequest = (defect, newStatus) => {
-    setStatusUpdateInfo({ defect, newStatus });
+  const handleStatusUpdateRequest = (defOrDefs, newStatus) => {
+    const defs = Array.isArray(defOrDefs) ? defOrDefs : [defOrDefs];
+    setStatusUpdateInfo({ defects: defs, newStatus });
     setIsUpdateStatusModalOpen(true);
   };
 
   const handleCloseUpdateStatusModal = () => {
     setIsUpdateStatusModalOpen(false);
-    setStatusUpdateInfo({ defect: null, newStatus: '' });
+    setStatusUpdateInfo({ defects: [], newStatus: '' });
   };
 
-  const handleConfirmDefectStatusUpdate = async ({ comment, timeData }) => {
-    const { defect, newStatus } = statusUpdateInfo;
-    if (!defect) return;
-
-    // Προσθέτουμε τον χρόνο που γύρισε το Modal στο payload
-    const payload = {
-      ...defect,
-      status: newStatus,
-      comment,
-      real_time: timeData.real_time !== undefined ? timeData.real_time : defect.real_time
-    };
+  const handleConfirmDefectStatusUpdate = async ({ comment, timeDataByItemId }) => {
+    const { defects, newStatus } = statusUpdateInfo;
+    if (!defects || defects.length === 0) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) throw new Error('Failed to update defect status.');
-      showMessage('Defect status updated successfully!', 'success');
+      for (let i = 0; i < defects.length; i++) {
+        const defect = defects[i];
+        const timeData = timeDataByItemId ? (timeDataByItemId[defect.id] || {}) : {};
+        const payload = {
+          ...defect,
+          status: newStatus,
+          comment,
+          real_time: timeData.real_time !== undefined ? timeData.real_time : defect.real_time
+        };
+
+        const response = await fetch(`${API_BASE_URL}/defects/${defect.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to update defect status for ' + defect.title);
+      }
+      showMessage(defects.length > 1 ? `Successfully updated ${defects.length} defects!` : 'Defect status updated successfully!', 'success');
       await refreshDefectsState();
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
@@ -919,14 +923,39 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
     }
   };
 
-  const handleDragStart = (e, defect) => { e.dataTransfer.setData("defectId", defect.id); };
+  const handleDragStart = (e, defect) => {
+    e.dataTransfer.setData("defectId", defect.id);
+    if (isSelectionMode && selectedIds.includes(defect.id)) {
+      e.dataTransfer.setData("isMultiDrag", "true");
+      e.dataTransfer.setData("selectedIds", JSON.stringify(selectedIds));
+    } else {
+      e.dataTransfer.setData("isMultiDrag", "false");
+    }
+  };
 
   const handleDrop = (e, targetStatus) => {
-    const defectId = e.dataTransfer.getData("defectId");
     const sourceData = isSearching ? searchResults : activeDefects;
-    const draggedDefect = sourceData.find(d => d.id.toString() === defectId);
-    if (draggedDefect && draggedDefect.status !== targetStatus) {
-      handleStatusUpdateRequest(draggedDefect, targetStatus);
+    const isMultiDrag = e.dataTransfer.getData("isMultiDrag") === "true";
+
+    if (isMultiDrag) {
+      const selectedIdsArray = JSON.parse(e.dataTransfer.getData("selectedIds"));
+      const draggedDefects = sourceData.filter(d => selectedIdsArray.includes(d.id) && d.status !== targetStatus);
+
+      if (draggedDefects.length > 0) {
+        const uniqueStatuses = new Set(draggedDefects.map(d => d.status));
+        if (uniqueStatuses.size > 1) {
+          if (!window.confirm("The selected items are currently in different statuses. Are you sure you want to move them all to " + targetStatus + "?")) {
+              return;
+          }
+        }
+        handleStatusUpdateRequest(draggedDefects, targetStatus);
+      }
+    } else {
+      const defectId = e.dataTransfer.getData("defectId");
+      const draggedDefect = sourceData.find(d => d.id.toString() === defectId);
+      if (draggedDefect && draggedDefect.status !== targetStatus) {
+        handleStatusUpdateRequest(draggedDefect, targetStatus);
+      }
     }
   };
 
@@ -1275,7 +1304,7 @@ const DefectsPage = ({ projects, allRequirements, showMessage, onDefectUpdate, p
         isOpen={isUpdateStatusModalOpen}
         onClose={handleCloseUpdateStatusModal}
         onSave={handleConfirmDefectStatusUpdate}
-        item={statusUpdateInfo.defect}
+        items={statusUpdateInfo.defects}
         itemType="defect"
         newStatus={statusUpdateInfo.newStatus}
         showMessage={showMessage}

@@ -95,7 +95,7 @@ function App() {
   const [requirementQuery, setRequirementQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
-  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirement: null, newStatus: '', targetIndex: null });
+  const [statusUpdateInfo, setStatusUpdateInfo] = useState({ requirements: [], newStatus: '', targetIndex: null });
   const [highlightedReqId, setHighlightedReqId] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -626,41 +626,55 @@ function App() {
   const handleDeleteRequest = useCallback((type, item) => { setDeleteType(type); setItemToDelete(item); setIsDeleteConfirmModalOpen(true); }, []);
   const handleCancelDelete = useCallback(() => { setIsDeleteConfirmModalOpen(false); setItemToDelete(null); setDeleteType(''); }, []);
 
-  const handleStatusUpdateRequest = (requirement, newStatus, targetIndex) => {
-    setStatusUpdateInfo({ requirement, newStatus, targetIndex });
+  const handleStatusUpdateRequest = (reqOrReqs, newStatus, targetIndex) => {
+    const reqs = Array.isArray(reqOrReqs) ? reqOrReqs : [reqOrReqs];
+    setStatusUpdateInfo({ requirements: reqs, newStatus, targetIndex });
     setIsUpdateStatusModalOpen(true);
   };
   const handleCloseUpdateStatusModal = () => {
     setIsUpdateStatusModalOpen(false);
-    setStatusUpdateInfo({ requirement: null, newStatus: '', targetIndex: null });
+    setStatusUpdateInfo({ requirements: [], newStatus: '', targetIndex: null });
   };
 
   const handleNavigateToRequirement = (req) => { navigate(`/sprint-board?project=${encodeURIComponent(req.project)}&sprint=${encodeURIComponent(req.currentStatusDetails.sprint)}&highlight=${req.id}`); };
   const handleNavigateToDefect = (defect, isClosed = false) => { navigate(`/defects?d_project=${encodeURIComponent(defect.project)}&highlight=${defect.id}${isClosed ? '&view=closed' : ''}`); };
 
-  const handleConfirmStatusUpdate = async ({ comment, timeData }) => {
-    const { requirement, newStatus, targetIndex } = statusUpdateInfo;
-    if (!requirement) return;
+  const handleConfirmStatusUpdate = async ({ comment, timeDataByItemId }) => {
+    const { requirements, newStatus, targetIndex } = statusUpdateInfo;
+    if (!requirements || requirements.length === 0) return;
 
-    const payload = {
-      project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus,
-      sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link,
-      type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags,
-      release_ids: requirement.currentStatusDetails.releaseIds || [], // ΔΙΟΡΘΩΣΗ ΕΔΩ
-      parent_id: requirement.parentId,
-      statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: targetIndex,
-      expected_time: requirement.currentStatusDetails.expected_time,
-      real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
-      real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing,
-      release_time_tracking: timeData.release_time_tracking !== undefined ? timeData.release_time_tracking : (requirement.currentStatusDetails.release_time_tracking || {})
-    };
     try {
-      const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) throw new Error('Failed to update status.');
-      showMainMessage('Status updated successfully!', 'success');
-      if (isSearching) { setDisplayableRequirements(prev => prev.map(req => req.id === requirement.id ? { ...req, currentStatusDetails: { ...req.currentStatusDetails, status: newStatus } } : req)); }
+      for (let i = 0; i < requirements.length; i++) {
+        const requirement = requirements[i];
+        const actualTargetIndex = requirements.length > 1 ? null : targetIndex;
+        const timeData = timeDataByItemId ? (timeDataByItemId[requirement.id] || {}) : {};
+
+        const payload = {
+          project: requirement.project, requirementName: requirement.requirementUserIdentifier, status: newStatus,
+          sprint: requirement.currentStatusDetails.sprint, comment: comment, link: requirement.currentStatusDetails.link,
+          type: requirement.currentStatusDetails.type, tags: requirement.currentStatusDetails.tags,
+          release_ids: requirement.currentStatusDetails.releaseIds || [],
+          parent_id: requirement.parentId,
+          statusDate: new Date().toISOString().split('T')[0], existingRequirementGroupId: requirement.id, display_order: actualTargetIndex,
+          expected_time: requirement.currentStatusDetails.expected_time,
+          real_time_tc_creation: timeData.real_time_tc_creation !== undefined ? timeData.real_time_tc_creation : requirement.currentStatusDetails.real_time_tc_creation,
+          real_time_testing: timeData.real_time_testing !== undefined ? timeData.real_time_testing : requirement.currentStatusDetails.real_time_testing,
+          release_time_tracking: timeData.release_time_tracking !== undefined ? timeData.release_time_tracking : (requirement.currentStatusDetails.release_time_tracking || {})
+        };
+
+        const response = await fetch(`${API_BASE_URL}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!response.ok) throw new Error('Failed to update status for ' + requirement.requirementUserIdentifier);
+        
+        if (isSearching) { 
+            setDisplayableRequirements(prev => prev.map(req => req.id === requirement.id ? { ...req, currentStatusDetails: { ...req.currentStatusDetails, status: newStatus } } : req)); 
+        }
+      }
+      
+      showMainMessage(requirements.length > 1 ? `Successfully updated ${requirements.length} requirements!` : 'Status updated successfully!', 'success');
       await fetchData();
-    } catch (error) { showMainMessage(`Error: ${error.message}`, 'error'); }
+    } catch (error) { 
+      showMainMessage(`Error: ${error.message}`, 'error'); 
+    }
     finally { handleCloseUpdateStatusModal(); }
   };
 
@@ -1086,7 +1100,7 @@ function App() {
           isOpen={isUpdateStatusModalOpen}
           onClose={handleCloseUpdateStatusModal}
           onSave={handleConfirmStatusUpdate}
-          item={statusUpdateInfo.requirement}
+          items={statusUpdateInfo.requirements}
           itemType="requirement"
           newStatus={statusUpdateInfo.newStatus}
           showMessage={showMainMessage}
