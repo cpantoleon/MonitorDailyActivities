@@ -234,6 +234,55 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
         setSelectedParents(newSet);
     };
 
+    const allAvailableParents = useMemo(() => hierarchyData.filter(p => !p.isOrphanGroup).map(p => p.key), [hierarchyData]);
+    const allAvailableSubtasks = useMemo(() => {
+        const subs = [];
+        hierarchyData.forEach(p => {
+            if (p.subtasks) {
+                p.subtasks.forEach(s => subs.push(s.key));
+            }
+        });
+        return subs;
+    }, [hierarchyData]);
+
+    const isEverythingSelected = useMemo(() => {
+        if (hierarchyData.length === 0) return false;
+        const parentsSelected = allAvailableParents.length === 0 || allAvailableParents.every(key => selectedParents.has(key));
+        const subtasksSelected = allAvailableSubtasks.length === 0 || allAvailableSubtasks.every(key => selectedSubtasks.has(key));
+        return parentsSelected && subtasksSelected;
+    }, [hierarchyData, selectedParents, selectedSubtasks, allAvailableParents, allAvailableSubtasks]);
+
+    const toggleEverything = () => {
+        if (isEverythingSelected) {
+            setSelectedParents(new Set());
+            setSelectedSubtasks(new Set());
+        } else {
+            setSelectedParents(new Set(allAvailableParents));
+            setSelectedSubtasks(new Set(allAvailableSubtasks));
+        }
+    };
+
+    const areAllParentSubtasksSelected = (parent) => {
+        if (!parent.subtasks || parent.subtasks.length === 0) return false;
+        return parent.subtasks.every(sub => selectedSubtasks.has(sub.key));
+    };
+
+    const toggleParentSubtasks = (parent) => {
+        if (!parent.subtasks) return;
+        const allSelected = areAllParentSubtasksSelected(parent);
+        const newSet = new Set(selectedSubtasks);
+        
+        parent.subtasks.forEach(sub => {
+            if (allSelected) {
+                newSet.delete(sub.key);
+            } else {
+                newSet.add(sub.key);
+            }
+        });
+        
+        setSelectedSubtasks(newSet);
+    };
+
     const projectOptions = projects.map(p => ({ value: p, label: p }));
 
     if (!isOpen) return null;
@@ -353,22 +402,49 @@ const JiraImportModal = ({ isOpen, onClose, onImportSuccess, projects, allReleas
                                 All parent items will be imported. Select the specific sub-tasks you want to include.
                             </p>
 
+                            {hierarchyData.length > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                                    <label style={{ cursor: 'pointer', fontSize: '0.95em', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isEverythingSelected}
+                                            onChange={toggleEverything}
+                                            style={{ width: '16px', height: '16px', margin: 0 }}
+                                        />
+                                        <span>Select All Items & Sub-tasks</span>
+                                    </label>
+                                </div>
+                            )}
+
                             <div style={{ maxHeight: '50vh', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', backgroundColor: 'var(--bg-primary)' }}>
                                 {hierarchyData.length === 0 ? (
                                     <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>No items found for this query.</p>
                                 ) : (
                                     hierarchyData.map(parent => (
                                         <div key={parent.key} style={{ marginBottom: '15px', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                                            <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {!parent.isOrphanGroup && (
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={selectedParents.has(parent.key)}
-                                                        onChange={() => toggleParent(parent.key)}
-                                                        style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
-                                                    />
+                                            <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {!parent.isOrphanGroup && (
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedParents.has(parent.key)}
+                                                            onChange={() => toggleParent(parent.key)}
+                                                            style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
+                                                        />
+                                                    )}
+                                                    <span>[{parent.key}] {parent.summary}</span>
+                                                </div>
+                                                {parent.subtasks && parent.subtasks.length > 0 && (
+                                                    <label style={{ fontSize: '0.85em', fontWeight: 'normal', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)' }}>
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={areAllParentSubtasksSelected(parent)}
+                                                            onChange={() => toggleParentSubtasks(parent)}
+                                                            style={{ width: '14px', height: '14px', margin: 0 }}
+                                                        />
+                                                        Select All
+                                                    </label>
                                                 )}
-                                                <span>[{parent.key}] {parent.summary}</span>
                                             </div>
                                             
                                             {parent.subtasks && parent.subtasks.length > 0 ? (
